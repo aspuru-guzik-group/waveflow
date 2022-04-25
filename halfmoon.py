@@ -119,9 +119,9 @@ def loss(params, inputs):
     # loss_val = ((log_pdf(params, inputs) - groundtruth)).mean()
 
     # loss_val = (gt_weight * (groundtruth - log_pdf(params, inputs))).mean()
-    loss_val = ((groundtruth - log_pdf(params, inputs))).mean()
+    # loss_val = ((groundtruth - log_pdf(params, inputs))).mean()
 
-    # loss_val = ((np.exp(groundtruth) - np.exp(log_pdf(params, inputs)))**2).mean()
+    loss_val = ((np.exp(groundtruth) - np.exp(log_pdf(params, inputs)))**2).mean()
 
     #loss_val = -log_pdf(params, inputs).mean()
     return loss_val
@@ -166,8 +166,8 @@ for epoch in pbar:
     split_rng, rng = random.split(rng)
     # X = random.permutation(split_rng, X)
     # X = sample(split_rng, params, n_samples)
-    X = sample_gt(split_rng, params_gt, n_samples)
-    # X = jax.random.uniform(split_rng, (n_samples,2), minval=-length/2, maxval=length/2)
+    # X = sample_gt(split_rng, params_gt, n_samples)
+    X = jax.random.uniform(split_rng, (n_samples,2), minval=-length/2, maxval=length/2)
 
 
     opt_state, loss_val = step(epoch, opt_state, X)
