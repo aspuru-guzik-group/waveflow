@@ -5,7 +5,7 @@ from functools import partial
 from jax import jit, vmap, jacfwd
 from helper import compute_hessian_diagonals, vectorized_diagonal, vectorized_trace
 
-# @partial(jit, static_argnums=(2,))
+# @partial(jit, static_argnums=(0,))
 def laplacian(fn):
 
     _laplacian = lambda params, x: jnp.trace(jax.hessian(fn, argnums=1)(params, x), axis1=1, axis2=2)
@@ -42,11 +42,7 @@ def laplace_numerical(fn, eps=0.1):
 
 def construct_hamiltonian_function(fn, system='hydrogen', eps=0.0, box_length=1):
     def _construct(weight_dict, x):
-        if eps == 0.0:
-            laplace = laplacian_fn(weight_dict, x)
-        else:
-            laplace = vectorized_hessian(weight_dict, x)
-
+        laplace = laplacian_fn(weight_dict, x)
         return -laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
         # return v_fn(x)[:,None] * fn_x
 
@@ -59,11 +55,8 @@ def construct_hamiltonian_function(fn, system='hydrogen', eps=0.0, box_length=1)
         exit()
 
     if eps > 0.0:
-        vectorized_hessian = laplace_numerical(fn, eps=eps)
+        laplacian_fn = laplace_numerical(fn, eps=eps)
     else:
-        # hessian = jax.hessian(fn, argnums=1)
-        # vectorized_hessian = vmap(hessian, in_axes=[None, 0])
-        # vectorized_hessian = vmap(hessian, in_axes=[None, 0])
         laplacian_fn = laplacian(fn)
 
     return _construct

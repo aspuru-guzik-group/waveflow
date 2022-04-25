@@ -37,18 +37,18 @@ X = sample_gt(rng, params_gt, n_samples)
 # plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
 # plt.show()
 #
-# length = 2
-# x = np.linspace(-length / 2, length / 2, 100)
-# y = np.linspace(-length / 2, length / 2, 100)
-#
-# xv, yv = np.meshgrid(x, y)
-# xv, yv = xv.reshape(-1), yv.reshape(-1)
-# xv = np.expand_dims(xv, axis=-1)
-# yv = np.expand_dims(yv, axis=-1)
-# grid = np.concatenate([xv, yv], axis=-1)
-# gt_grid = np.exp(log_pdf_gt(params_gt, grid).reshape(100, 100))
-# plt.imshow(gt_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
-# plt.show()
+length = 2
+x = np.linspace(-length / 2, length / 2, 100)
+y = np.linspace(-length / 2, length / 2, 100)
+
+xv, yv = np.meshgrid(x, y)
+xv, yv = xv.reshape(-1), yv.reshape(-1)
+xv = np.expand_dims(xv, axis=-1)
+yv = np.expand_dims(yv, axis=-1)
+grid = np.concatenate([xv, yv], axis=-1)
+gt_grid = np.exp(log_pdf_gt(params_gt, grid).reshape(100, 100))
+plt.imshow(gt_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+plt.show()
 
 
 # scaler = preprocessing.StandardScaler()
@@ -60,7 +60,7 @@ X = sample_gt(rng, params_gt, n_samples)
 
 
 input_dim = X.shape[1]
-num_epochs, batch_size = 10000, 100
+num_epochs, batch_size = 51000, 100
 
 def get_masks(input_dim, hidden_dim=64, num_hidden=1):
     masks = []
@@ -139,7 +139,7 @@ def step(i, opt_state, inputs):
 pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
     losses = []
-    if epoch % 1000== 0:
+    if epoch % 10000== 0:
         params = get_params(opt_state)
         sample_rng, rng = random.split(rng)
         X_syn = sample(rng, params, X.shape[0])

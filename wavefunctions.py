@@ -22,10 +22,12 @@ def get_particle_in_the_box_fns(length, n):
         return wavefunction_odd(x) ** 2
 
     def dpdf_even(x):
+        # TODO currently wrong
         normalization = 2 / length
         return 2* ( (n * jnp.pi)/ length ) * jnp.sin((n * jnp.pi * x) / length) * jnp.cos((n * jnp.pi * x) / length) * normalization
 
     def dpdf_odd(x):
+        # TODO currently wrong
         normalization = 2 / length
         return -2 * ((n * jnp.pi) / length) * jnp.sin((n * jnp.pi * x) / length) * jnp.cos((n * jnp.pi * x) / length) * normalization
 
@@ -85,26 +87,6 @@ class ParticleInBoxWrapper:
 
 
 def WaveFlow(transformation, prior_psi, prior_pdf, prior_sampling):
-    """
-    Args:
-        transformation: a function mapping ``(rng, input_dim)`` to a
-            ``(params, direct_fun, inverse_fun)`` triplet
-        prior: a function mapping ``(rng, input_dim)`` to a
-            ``(params, log_pdf, sample)`` triplet
-
-    Returns:
-        A function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
-
-    Examples:
-        >>> import flows
-        >>> input_dim, rng = 3, random.PRNGKey(0)
-        >>> transformation = flows.Serial(
-        ...     flows.Reverse(),
-        ...     flows.Reverse()
-        ... )
-        >>> init_fun = flows.Flow(transformation, Normal())
-        >>> params, log_pdf, sample = init_fun(rng, input_dim)
-    """
 
     def init_fun(rng, input_dim, normalization_mean=0, normalization_length=1):
         transformation_rng, prior_rng = jax.random.split(rng)
