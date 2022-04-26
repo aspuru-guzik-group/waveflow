@@ -139,7 +139,7 @@ def step(i, opt_state, inputs):
 pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
     losses = []
-    if epoch % 10000== 0:
+    if epoch % 10000 == 0:
         params = get_params(opt_state)
         sample_rng, rng = random.split(rng)
         X_syn = sample(rng, params, X.shape[0])

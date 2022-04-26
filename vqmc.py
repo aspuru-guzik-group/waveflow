@@ -15,7 +15,7 @@ from scipy.stats.sampling import NumericalInverseHermite
 import pickle
 import matplotlib.pyplot as plt
 from jax.config import config
-
+from physics import laplacian, laplacian_numerical
 
 # config.update("jax_enable_x64", True)
 # config.update('jax_platform_name', 'cpu')
@@ -68,19 +68,19 @@ def create_train_state(box_length, learning_rate, n_space_dimension=2, prior_wav
 
 
 
-def loss(params, psi, h_fn, batch):
+def loss_fn(params, psi, h_fn, batch):
     psi_val = psi(params, batch)[:,None]
     energies_val = h_fn(params, batch)
-    loss_val = energies_val / psi_val
-    return loss_val.mean()
+    # loss_val = energies_val / psi_val
+    # return loss_val.mean()
 
-    # return (psi_val * energies_val).mean() / (psi_val**2).mean()
+    return (psi_val * energies_val).mean() / (psi_val**2).mean()
 
 @partial(jit, static_argnums=(1, 2, 3, 5))
 def train_step(epoch, psi, h_fn, opt_update, opt_state, get_params, batch):
     params = get_params(opt_state)
-    gradients = grad(loss, argnums=0)(params, psi, h_fn, batch)
-    loss_val = loss(params, psi, h_fn, batch)
+    gradients = grad(loss_fn, argnums=0)(params, psi, h_fn, batch)
+    loss_val = loss_fn(params, psi, h_fn, batch)
     return opt_update(epoch, gradients, opt_state), loss_val
 
 
@@ -102,10 +102,10 @@ class ModelTrainer:
         self.realtime_plots = True
         self.n_plotting = 200
         self.log_every = 2000
-        self.window = 4
+        self.window = 200
 
         # Optimizer
-        self.learning_rate = 1e-5
+        self.learning_rate = 5e-6
 
         # Train setup
         self.num_epochs = 200000
@@ -113,7 +113,7 @@ class ModelTrainer:
         self.save_dir = './results/{}_{}d'.format(self.system, self.n_space_dimension)
 
         # Simulation size
-        self.box_length_model = 10
+        self.box_length_model = 5
         self.box_length = 10
 
 
@@ -129,7 +129,7 @@ class ModelTrainer:
                                                                                  n_space_dimension=self.n_space_dimension,
                                                                                  prior_wavefunction_n=self.prior_wavefunction_n,
                                                                                  rng=split_rng)
-        h_fn = construct_hamiltonian_function(psi, system=self.system, eps=0.0, box_length=self.box_length)
+        h_fn = construct_hamiltonian_function(psi, system=self.system, eps=0.01, box_length=self.box_length)
 
 
         start_epoch = 0
@@ -154,15 +154,31 @@ class ModelTrainer:
                                          energies, self.system, self.window,
                                          self.n_plotting, *plots)
                 plt.pause(.01)
+                batch = jax.random.uniform(split_rng, minval=-self.box_length / 2, maxval=self.box_length / 2,
+                                           shape=(self.batch_size, self.n_space_dimension))
+                params = get_params(opt_state)
+                psi_val = psi(params, batch)[:, None]
+                energies_val = h_fn(params, batch)
+                print('MCI ', (psi_val**2).mean())
+                print('Energies ', energies_val.mean())
+                print('Nominator ', (psi_val * energies_val).mean())
+                print('Loss ', loss_fn(params, psi, h_fn, batch))
+
+                ln = laplacian_numerical(psi, eps=0.1)
+                l = laplacian(psi)
+                print(ln(params, batch).mean())
+                print(l(params, batch).mean())
+
+
 
 
             # Generate a random batch
             split_rng, rng = jax.random.split(rng)
-            # batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
-            #                            shape=(self.batch_size, self.n_space_dimension))
+            batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
+                                       shape=(self.batch_size, self.n_space_dimension))
 
-            params = get_params(opt_state)
-            batch = sample(split_rng, params, self.batch_size)
+            # params = get_params(opt_state)
+            # batch = sample(split_rng, params, self.batch_size)
 
             # Run an optimization step over a training batch
             opt_state, new_loss = train_step(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)

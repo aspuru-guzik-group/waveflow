@@ -177,7 +177,7 @@ def create_checkpoint(save_dir, psi, params, box_length, n_space_dimension, opt_
             energies_ax.set_ylim(min(ground_truth) - .1, 0)
         energies_ax.legend()
         energies_ax.set_yscale('symlog', linthresh=.1)
-        energies_ax.set_yticks([0.0] + ground_truth.tolist())
+        energies_ax.set_yticks([0.0] + (ground_truth+0.25*ground_truth).tolist())
         energies_ax.minorticks_off()
         energies_ax.yaxis.set_major_formatter(StrMethodFormatter('{x:.3f}'))
         energies_fig.savefig('{}/energies'.format(save_dir, save_dir))

@@ -27,7 +27,7 @@ def second_difference_along_coordinate(weight_dict, fn, x, i, eps):
     return fn(weight_dict, x + coordinate * eps) + fn(weight_dict, x - coordinate * eps) - 2 * fn(weight_dict, x)
 
 
-def laplace_numerical(fn, eps=0.1):
+def laplacian_numerical(fn, eps=0.1):
     def _laplace_numerical(weight_dict, x):
         differences = 0
 
@@ -55,7 +55,7 @@ def construct_hamiltonian_function(fn, system='hydrogen', eps=0.0, box_length=1)
         exit()
 
     if eps > 0.0:
-        laplacian_fn = laplace_numerical(fn, eps=eps)
+        laplacian_fn = laplacian_numerical(fn, eps=eps)
     else:
         laplacian_fn = laplacian(fn)
 
