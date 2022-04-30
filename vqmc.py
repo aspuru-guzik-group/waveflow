@@ -90,7 +90,7 @@ def train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batc
 def loss_fn(params, psi, h_fn, batch):
     psi_val = psi(params, batch)[:,None]
     energies_val = h_fn(params, batch)
-    loss_val = energies_val / psi_val
+    loss_val = energies_val*100 #/ psi_val
     return loss_val.mean(), (energies_val, psi_val)
 
     # return (psi_val * energies_val).mean() / (psi_val**2).mean()
@@ -101,7 +101,7 @@ def conditional_expand(arr1, arr2):
     else:
         return arr2
 
-# @partial(jit, static_argnums=(1, 2, 3, 4, 6))
+@partial(jit, static_argnums=(1, 2, 3, 4, 6))
 def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch):
     params = get_params(opt_state)
     gradients, aux = grad(loss_fn, argnums=0, has_aux=True)(params, psi, h_fn, batch)
@@ -111,7 +111,7 @@ def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, bat
     gradients2 = jax.tree_multimap(lambda x: (x*conditional_expand(x, normalized_energies)).mean(0), log_pdf_grad)
     gradients = jax.tree_multimap(lambda x, y: x + y, gradients, gradients2)
 
-    loss_val = normalized_energies.mean(0)
+    loss_val = normalized_energies.mean()
     return opt_update(epoch, gradients, opt_state), loss_val
 
 
@@ -131,8 +131,8 @@ class ModelTrainer:
         # Turn on/off real time plotting
         self.realtime_plots = True
         self.n_plotting = 200
-        self.log_every = 20
-        self.window = 5
+        self.log_every = 200
+        self.window = 20
 
         # Optimizer
         self.learning_rate = 1e-4
