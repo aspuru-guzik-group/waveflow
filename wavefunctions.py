@@ -114,7 +114,15 @@ def WaveFlow(transformation, prior_psi, prior_pdf, prior_sampling):
 
             psi = jnp.prod(prior_psi(u), axis=-1)
             # return jnp.expand_dims(psi * jnp.exp(0.5*log_det), axis=-1)
-            return psi * jnp.exp(0.5 * log_det)
+            psi_val = psi * jnp.exp(0.5 * log_det)
+
+
+            # lim = 5
+            # d = (jnp.sqrt(2 * lim ** 2 - (inputs) ** 2) - lim) / lim
+            # d = jnp.prod(d, axis=-1, keepdims=True)
+            # psi_val = psi_val * d[:,0]
+
+            return psi_val
 
         def sample(rng, params, num_samples=1):
             prior_samples = prior_sampling.rvs(input_dim*num_samples).reshape(-1,input_dim)
@@ -123,3 +131,7 @@ def WaveFlow(transformation, prior_psi, prior_pdf, prior_sampling):
         return params, psi, log_pdf, sample
 
     return init_fun
+
+
+
+

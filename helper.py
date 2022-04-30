@@ -124,12 +124,22 @@ def create_plots(n_space_dimension, neig):
 
 
 def uniform_sliding_average(data, window):
+    pad = np.ones(len(data.shape), dtype=np.int32)
+    pad[-1] = window - 1
+    pad = list(zip(pad, np.zeros(len(data.shape), dtype=np.int32)))
+    data = np.pad(data, pad, mode='reflect')
+
     ret = np.cumsum(data, dtype=float)
     ret[window:] = ret[window:] - ret[:-window]
     return ret[window - 1:] / window
 
 
 def uniform_sliding_stdev(data, window):
+    pad = np.ones(len(data.shape), dtype=np.int32)
+    pad[-1] = window - 1
+    pad = list(zip(pad, np.zeros(len(data.shape), dtype=np.int32)))
+    data = np.pad(data, pad, mode='reflect')
+
     shape = data.shape[:-1] + (data.shape[-1] - window + 1, window)
     strides = data.strides + (data.strides[-1],)
     rolling = np.lib.stride_tricks.as_strided(data, shape=shape, strides=strides)
@@ -145,6 +155,8 @@ def create_checkpoint(save_dir, psi, params, box_length, n_space_dimension, opt_
     # with open('{}/checkpoints'.format(save_dir), 'wb') as f:
     #     pickle.dump((params, opt_state, epoch), f)
 
+    checkpoint_dir = f'{save_dir}/'
+    Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
     np.save('{}/loss'.format(save_dir), loss), np.save('{}/energies'.format(save_dir), energies)
 
     if n_space_dimension == 1:
@@ -168,7 +180,8 @@ def create_checkpoint(save_dir, psi, params, box_length, n_space_dimension, opt_
         color = plt.cm.tab10(np.arange(n_eigenfuncs))
         for i, c in zip(range(n_eigenfuncs), color):
             energies_ax.plot([0, epoch], [ground_truth[i], ground_truth[i]], '--', c=c)
-            x = np.arange(window // 2 - 1, len(energies_array[:, i]) - (window // 2))
+            # x = np.arange(window // 2 - 1, len(energies_array[:, i]) - (window // 2))
+            x = np.arange(0, len(energies_array[:, i]))
             av = uniform_sliding_average(energies_array[:, i], window)
             stdev = uniform_sliding_stdev(energies_array[:, i], window)
             energies_ax.plot(x, av, c=c, label='Eigenvalue {}'.format(i))
