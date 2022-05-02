@@ -90,7 +90,7 @@ def train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batc
 def loss_fn(params, psi, h_fn, batch):
     psi_val = psi(params, batch)[:,None]
     energies_val = h_fn(params, batch)
-    loss_val = energies_val*100 #/ psi_val
+    loss_val = energies_val / psi_val
     return loss_val.mean(), (energies_val, psi_val)
 
     # return (psi_val * energies_val).mean() / (psi_val**2).mean()
@@ -103,13 +103,14 @@ def conditional_expand(arr1, arr2):
 
 @partial(jit, static_argnums=(1, 2, 3, 4, 6))
 def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch):
+    # TODO: Think about adding baseline in policy gradient part to the gradient to reduce variance, probably not though
     params = get_params(opt_state)
-    gradients, aux = grad(loss_fn, argnums=0, has_aux=True)(params, psi, h_fn, batch)
+    energy_gradient, aux = grad(loss_fn, argnums=0, has_aux=True)(params, psi, h_fn, batch)
     energies_val, psi_val = aux
     normalized_energies = energies_val / psi_val
     log_pdf_grad = jax.jacrev(log_pdf)(params, batch)
-    gradients2 = jax.tree_multimap(lambda x: (x*conditional_expand(x, normalized_energies)).mean(0), log_pdf_grad)
-    gradients = jax.tree_multimap(lambda x, y: x + y, gradients, gradients2)
+    pdf_gradient = jax.tree_multimap(lambda x: (x*conditional_expand(x, normalized_energies)).mean(0), log_pdf_grad)
+    gradients = jax.tree_multimap(lambda x, y: x + y, energy_gradient, pdf_gradient)
 
     loss_val = normalized_energies.mean()
     return opt_update(epoch, gradients, opt_state), loss_val
@@ -126,13 +127,13 @@ class ModelTrainer:
         self.charge = 1
 
         # Flow parameter
-        self.prior_wavefunction_n = 1
+        self.prior_wavefunction_n = 2
 
         # Turn on/off real time plotting
         self.realtime_plots = True
         self.n_plotting = 200
-        self.log_every = 200
-        self.window = 20
+        self.log_every = 20
+        self.window = 2
 
         # Optimizer
         self.learning_rate = 1e-4
@@ -190,8 +191,8 @@ class ModelTrainer:
 
             # Generate a random batch
             split_rng, rng = jax.random.split(rng)
-            # batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
-            #                            shape=(self.batch_size, self.n_space_dimension))
+            batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
+                                       shape=(self.batch_size, self.n_space_dimension))
 
             params = get_params(opt_state)
             batch = sample(split_rng, params, self.batch_size)
