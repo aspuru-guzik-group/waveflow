@@ -5,6 +5,13 @@ from functools import partial
 from jax import jit, vmap, jacfwd
 from helper import compute_hessian_diagonals, vectorized_diagonal, vectorized_trace
 
+def laplacian2(fun,x,params):
+    x = jnp.expand_dims(x,axis=1) #add new dimensionality for vmap
+    _hess = lambda  _x,params: hessian(fun,argnums=0)(_x,params).reshape(_x.shape[1],_x.shape[1])
+    hess_ = vmap(_hess,in_axes=(0,None))(x,params)
+    lap_ = jnp.einsum('ijj', hess_) #simialar to: vmap(jnp.trace,in_axes=0)(hess_)
+    return lap_
+
 # @partial(jit, static_argnums=(0,))
 def laplacian(fn):
 
