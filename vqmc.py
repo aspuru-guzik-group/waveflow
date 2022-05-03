@@ -15,12 +15,8 @@ from scipy.stats.sampling import NumericalInverseHermite
 import pickle
 import matplotlib.pyplot as plt
 from jax.config import config
-<<<<<<< HEAD
 from physics import laplacian, laplacian_numerical, laplacian2
-=======
-from physics import laplacian, laplacian_numerical
 from helper import test_calibration
->>>>>>> 05bdb012a1645e5bce225bae72a40e44d65cdd5c
 
 # config.update("jax_enable_x64", True)
 # config.update('jax_platform_name', 'cpu')
