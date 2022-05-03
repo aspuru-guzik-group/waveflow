@@ -9,6 +9,14 @@ import pickle
 from matplotlib.ticker import StrMethodFormatter, NullFormatter
 
 
+def test_calibration(x, params, log_pdf):
+    pdf_vals = jnp.exp(log_pdf(params, x))
+
+    plt.hist(pdf_vals)
+    plt.show()
+
+
+
 def vectorized_diagonal(m):
     return vmap(jnp.diag)(m)
 
@@ -81,7 +89,7 @@ def get_exact_eigenvalues(system, n_eigenfuncs, n_space_dimension, box_length, c
             return ground_truth
 
 
-def plot_output(psi, weight_dict, box_length, fig, ax, n_eigenfunc=0, n_space_dimension=2, N=100):
+def plot_output(psi, sample, weight_dict, box_length, fig, ax, n_eigenfunc=0, n_space_dimension=2, N=100):
     if n_space_dimension == 1:
         x = np.linspace(-box_length/2, box_length/2, N)[:, None]
 
@@ -103,8 +111,10 @@ def plot_output(psi, weight_dict, box_length, fig, ax, n_eigenfunc=0, n_space_di
         z_min, z_max = -np.abs(z).max(), np.abs(z).max()
         # plt.imshow(z, extent=[-box_length / 2, box_length / 2, -box_length / 2, box_length / 2], origin='lower')
         # plt.show()
+        sample_points = sample(jax.random.PRNGKey(0), weight_dict, 250)
 
         c = ax.pcolormesh(x, y, z, cmap='RdBu', vmin=z_min, vmax=z_max)
+        ax.scatter(sample_points[:, 0], sample_points[:, 1], c='black', s=4)
         ax.set_title('Eigenfunction {}'.format(n_eigenfunc))
         # set the limits of the plot to the limits of the data
         ax.axis([x.min(), x.max(), y.min(), y.max()])
@@ -124,19 +134,29 @@ def create_plots(n_space_dimension, neig):
 
 
 def uniform_sliding_average(data, window):
+    pad = np.ones(len(data.shape), dtype=np.int32)
+    pad[-1] = window - 1
+    pad = list(zip(pad, np.zeros(len(data.shape), dtype=np.int32)))
+    data = np.pad(data, pad, mode='reflect')
+
     ret = np.cumsum(data, dtype=float)
     ret[window:] = ret[window:] - ret[:-window]
     return ret[window - 1:] / window
 
 
 def uniform_sliding_stdev(data, window):
+    pad = np.ones(len(data.shape), dtype=np.int32)
+    pad[-1] = window - 1
+    pad = list(zip(pad, np.zeros(len(data.shape), dtype=np.int32)))
+    data = np.pad(data, pad, mode='reflect')
+
     shape = data.shape[:-1] + (data.shape[-1] - window + 1, window)
     strides = data.strides + (data.strides[-1],)
     rolling = np.lib.stride_tricks.as_strided(data, shape=shape, strides=strides)
     return np.std(rolling, 1)
 
 
-def create_checkpoint(save_dir, psi, params, box_length, n_space_dimension, opt_state, epoch, loss, energies, system, window, n_plotting, psi_fig,
+def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimension, opt_state, epoch, loss, energies, system, window, n_plotting, psi_fig,
                       psi_ax, energies_fig, energies_ax, n_eigenfuncs=1):
     # checkpoints.save_checkpoint('{}/checkpoints'.format(save_dir),
     #                             (weight_dict, opt_state, epoch, sigma_t_bar, j_sigma_t_bar), epoch, keep=2)
@@ -145,6 +165,8 @@ def create_checkpoint(save_dir, psi, params, box_length, n_space_dimension, opt_
     # with open('{}/checkpoints'.format(save_dir), 'wb') as f:
     #     pickle.dump((params, opt_state, epoch), f)
 
+    checkpoint_dir = f'{save_dir}/'
+    Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
     np.save('{}/loss'.format(save_dir), loss), np.save('{}/energies'.format(save_dir), energies)
 
     if n_space_dimension == 1:
@@ -154,7 +176,7 @@ def create_checkpoint(save_dir, psi, params, box_length, n_space_dimension, opt_
             ax = psi_ax.flatten()[i]
         else:
             ax = psi_ax
-        plot_output(psi, params, box_length, psi_fig, ax, n_eigenfunc=i,
+        plot_output(psi, sample, params, box_length, psi_fig, ax, n_eigenfunc=i,
                     n_space_dimension=n_space_dimension, N=n_plotting)
     eigenfunc_dir = f'{save_dir}/eigenfunctions'
     Path(eigenfunc_dir).mkdir(parents=True, exist_ok=True)
@@ -168,7 +190,8 @@ def create_checkpoint(save_dir, psi, params, box_length, n_space_dimension, opt_
         color = plt.cm.tab10(np.arange(n_eigenfuncs))
         for i, c in zip(range(n_eigenfuncs), color):
             energies_ax.plot([0, epoch], [ground_truth[i], ground_truth[i]], '--', c=c)
-            x = np.arange(window // 2 - 1, len(energies_array[:, i]) - (window // 2))
+            # x = np.arange(window // 2 - 1, len(energies_array[:, i]) - (window // 2))
+            x = np.arange(0, len(energies_array[:, i]))
             av = uniform_sliding_average(energies_array[:, i], window)
             stdev = uniform_sliding_stdev(energies_array[:, i], window)
             energies_ax.plot(x, av, c=c, label='Eigenvalue {}'.format(i))

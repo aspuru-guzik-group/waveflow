@@ -9,13 +9,14 @@ from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, Wav
 from scipy.stats.sampling import NumericalInverseHermite, SimpleRatioUniforms
 import jax
 import flows
+from helper import test_calibration
 
 from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
 
 config.update("jax_debug_nans", True)
 
-n_samples = 10000
+n_samples = 1000
 plot_range = [(-1, 1), (-1, 1)]
 n_bins = 100
 rng, flow_rng = random.split(random.PRNGKey(0))
@@ -47,9 +48,12 @@ xv = np.expand_dims(xv, axis=-1)
 yv = np.expand_dims(yv, axis=-1)
 grid = np.concatenate([xv, yv], axis=-1)
 gt_grid = np.exp(log_pdf_gt(params_gt, grid).reshape(100, 100))
-plt.imshow(gt_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
-plt.show()
+# plt.imshow(gt_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+# plt.show()
 
+# X = sample_gt(rng, params_gt, 1000000)
+# plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)#[-1]
+# plt.show()
 
 # scaler = preprocessing.StandardScaler()
 # X, _ = datasets.make_moons(n_samples=n_samples, noise=.05)
@@ -126,7 +130,7 @@ def loss(params, inputs):
     #loss_val = -log_pdf(params, inputs).mean()
     return loss_val
 
-@jit
+# @jit
 def step(i, opt_state, inputs):
     params = get_params(opt_state)
     gradients = grad(loss)(params, inputs)
@@ -139,14 +143,14 @@ def step(i, opt_state, inputs):
 pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
     losses = []
-    if epoch % 10000 == 0:
+    if epoch % 100 == 0:
         params = get_params(opt_state)
         sample_rng, rng = random.split(rng)
-        X_syn = sample(rng, params, X.shape[0])
-
-        plt.hist2d(X_syn[:, 0], X_syn[:, 1], bins=n_bins, range=plot_range)
-        plt.show()
-
+        # X_syn = sample(rng, params, X.shape[0])
+        #
+        # plt.hist2d(X_syn[:, 0], X_syn[:, 1], bins=n_bins, range=plot_range)
+        # plt.show()
+        #
         x = np.linspace(-length / 2, length / 2, 100)
         y = np.linspace(-length / 2, length / 2, 100)
 
@@ -155,12 +159,31 @@ for epoch in pbar:
         xv = np.expand_dims(xv, axis=-1)
         yv = np.expand_dims(yv, axis=-1)
         grid = np.concatenate([xv, yv], axis=-1)
-        psi_grid = psi(params, grid).reshape(100, 100)
-        plt.imshow(psi_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        # psi_grid = psi(params, grid).reshape(100, 100)
+        # plt.imshow(psi_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        # plt.show()
+        #
+        # plt.imshow(psi_grid**2, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        # plt.show()
+
+
+        pdf_vals = np.exp(log_pdf(params, grid)).reshape(100, 100)
+
+        X_syn = sample(rng, params, 10000)
+        hist = np.histogram2d(X_syn[:, 0], X_syn[:, 1], bins=np.linspace(-length / 2, length / 2, 101), density=True)[0].T
+        plt.imshow(hist, extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
         plt.show()
 
-        plt.imshow(psi_grid**2, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        plt.imshow(pdf_vals, extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
         plt.show()
+
+        plt.imshow(np.abs(hist - pdf_vals), extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
+        plt.show()
+
+        print(np.mean(np.abs(hist - gt_grid).reshape(-1)[hist.reshape(-1) > 0]))
+        exit()
+
+
 
 
     split_rng, rng = random.split(rng)

@@ -8,14 +8,19 @@ from functools import partial
 import flows
 import jax.numpy as jnp
 
-from jax import grad, jit, random
+from jax import grad, jit, random, value_and_grad
 from jax.example_libraries import stax, optimizers
 from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, WaveFlow
 from scipy.stats.sampling import NumericalInverseHermite
 import pickle
 import matplotlib.pyplot as plt
 from jax.config import config
+<<<<<<< HEAD
 from physics import laplacian, laplacian_numerical, laplacian2
+=======
+from physics import laplacian, laplacian_numerical
+from helper import test_calibration
+>>>>>>> 05bdb012a1645e5bce225bae72a40e44d65cdd5c
 
 # config.update("jax_enable_x64", True)
 # config.update('jax_platform_name', 'cpu')
@@ -38,7 +43,8 @@ def create_train_state(box_length, learning_rate, n_space_dimension=2, prior_wav
 
     def masked_transform(rng, input_dim):
         masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
-        act = stax.Relu
+        # act = stax.Relu
+        act = stax.Softplus
         init_fun, apply_fun = stax.serial(
             flows.MaskedDense(masks[0]),
             act,
@@ -63,7 +69,25 @@ def create_train_state(box_length, learning_rate, n_space_dimension=2, prior_wav
     opt_init, opt_update, get_params = optimizers.adam(step_size=learning_rate)
     opt_state = opt_init(params)
 
-    return psi, pdf, sample, opt_state, opt_update, get_params
+    return psi, log_pdf, sample, opt_state, opt_update, get_params
+
+
+
+
+
+def loss_fn_uniform(params, psi, h_fn, batch):
+    psi_val = psi(params, batch)[:,None]
+    energies_val = h_fn(params, batch)
+    # loss_val = energies_val / psi_val
+    # return loss_val.mean()
+
+    return (psi_val * energies_val).mean() / jax.lax.stop_gradient((psi_val**2).mean())
+
+@partial(jit, static_argnums=(1, 2, 3, 5))
+def train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch):
+    params = get_params(opt_state)
+    loss_val, gradients = value_and_grad(loss_fn_uniform, argnums=0)(params, psi, h_fn, batch)
+    return opt_update(epoch, gradients, opt_state), loss_val
 
 
 
@@ -71,18 +95,30 @@ def create_train_state(box_length, learning_rate, n_space_dimension=2, prior_wav
 def loss_fn(params, psi, h_fn, batch):
     psi_val = psi(params, batch)[:,None]
     energies_val = h_fn(params, batch)
-    # loss_val = energies_val / psi_val
-    # return loss_val.mean()
+    loss_val = energies_val / psi_val
+    return loss_val.mean(), (energies_val, psi_val)
 
-    return (psi_val * energies_val).mean() / (psi_val**2).mean()
+    # return (psi_val * energies_val).mean() / (psi_val**2).mean()
 
-@partial(jit, static_argnums=(1, 2, 3, 5))
-def train_step(epoch, psi, h_fn, opt_update, opt_state, get_params, batch):
+def conditional_expand(arr1, arr2):
+    if len(arr1.shape) == 3:
+        return jnp.expand_dims(arr2, axis=1)
+    else:
+        return arr2
+
+@partial(jit, static_argnums=(1, 2, 3, 4, 6))
+def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch):
+    # TODO: Think about adding baseline in policy gradient part to the gradient to reduce variance, probably not though
     params = get_params(opt_state)
-    gradients = grad(loss_fn, argnums=0)(params, psi, h_fn, batch)
-    loss_val = loss_fn(params, psi, h_fn, batch)
+    energy_gradient, aux = grad(loss_fn, argnums=0, has_aux=True)(params, psi, h_fn, batch)
+    energies_val, psi_val = aux
+    normalized_energies = energies_val / psi_val
+    # log_pdf_grad = jax.jacrev(log_pdf, argnums=0)(params, batch)
+    # pdf_gradient = jax.tree_multimap(lambda x: (x*conditional_expand(x, normalized_energies)).mean(0), log_pdf_grad)
+    # gradients = jax.tree_multimap(lambda x, y: x + y, energy_gradient, pdf_gradient)
+    gradients = energy_gradient
+    loss_val = normalized_energies.mean()
     return opt_update(epoch, gradients, opt_state), loss_val
-
 
 
 
@@ -102,19 +138,19 @@ class ModelTrainer:
         self.realtime_plots = True
         self.n_plotting = 200
         self.log_every = 2000
-        self.window = 200
+        self.window = 100
 
         # Optimizer
-        self.learning_rate = 5e-6
+        self.learning_rate = 1e-4
 
         # Train setup
         self.num_epochs = 200000
-        self.batch_size = 512
+        self.batch_size = 256
         self.save_dir = './results/{}_{}d'.format(self.system, self.n_space_dimension)
 
         # Simulation size
         self.box_length_model = 5
-        self.box_length = 10
+        self.box_length = 15
 
 
     def start_training(self, show_progress=True, callback=None):
@@ -124,12 +160,12 @@ class ModelTrainer:
         rng = jax.random.PRNGKey(1)
         split_rng, rng = jax.random.split(rng)
         # Create initial state
-        psi, pdf, sample, opt_state, opt_update, get_params = create_train_state(self.box_length_model,
+        psi, log_pdf, sample, opt_state, opt_update, get_params = create_train_state(self.box_length_model,
                                                                                  self.learning_rate,
                                                                                  n_space_dimension=self.n_space_dimension,
                                                                                  prior_wavefunction_n=self.prior_wavefunction_n,
                                                                                  rng=split_rng)
-        h_fn = construct_hamiltonian_function(psi, system=self.system, eps=0.01, box_length=self.box_length)
+        h_fn = construct_hamiltonian_function(psi, system=self.system, eps=0.0, box_length=self.box_length)
 
 
         start_epoch = 0
@@ -149,39 +185,27 @@ class ModelTrainer:
         for epoch in pbar:
             # Save a check point
             if epoch % self.log_every == 0 or epoch == 1:
-                helper.create_checkpoint(self.save_dir, psi, get_params(opt_state), self.box_length,
+                helper.create_checkpoint(self.save_dir, psi, sample, get_params(opt_state), self.box_length,
                                          self.n_space_dimension, opt_state, epoch, loss,
                                          energies, self.system, self.window,
                                          self.n_plotting, *plots)
                 plt.pause(.01)
-                batch = jax.random.uniform(split_rng, minval=-self.box_length / 2, maxval=self.box_length / 2,
-                                           shape=(self.batch_size, self.n_space_dimension))
-                params = get_params(opt_state)
-                psi_val = psi(params, batch)[:, None]
-                energies_val = h_fn(params, batch)
-                print('MCI ', (psi_val**2).mean())
-                print('Energies ', energies_val.mean())
-                print('Nominator ', (psi_val * energies_val).mean())
-                print('Loss ', loss_fn(params, psi, h_fn, batch))
-
-                ln = laplacian_numerical(psi, eps=0.1)
-                l = laplacian(psi)
-                print(ln(params, batch).mean())
-                print(l(params, batch).mean())
 
 
 
 
             # Generate a random batch
             split_rng, rng = jax.random.split(rng)
-            batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
-                                       shape=(self.batch_size, self.n_space_dimension))
+            # batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
+            #                            shape=(self.batch_size, self.n_space_dimension))
 
-            # params = get_params(opt_state)
-            # batch = sample(split_rng, params, self.batch_size)
+            params = get_params(opt_state)
+            batch = sample(split_rng, params, self.batch_size)
+
 
             # Run an optimization step over a training batch
-            opt_state, new_loss = train_step(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)
+            # opt_state, new_loss = train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)
+            opt_state, new_loss = train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch)
             pbar.set_description('Loss {:.3f}'.format(jnp.around(jnp.asarray(new_loss), 3).item()))
 
             loss.append(new_loss)

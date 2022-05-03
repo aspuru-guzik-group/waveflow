@@ -50,6 +50,9 @@ def laplacian_numerical(fn, eps=0.1):
 def construct_hamiltonian_function(fn, system='hydrogen', eps=0.0, box_length=1):
     def _construct(weight_dict, x):
         laplace = laplacian_fn(weight_dict, x)
+        if eps != 0.0:
+            laplace = jnp.expand_dims(laplace, axis=-1)
+
         return -laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
         # return v_fn(x)[:,None] * fn_x
 
