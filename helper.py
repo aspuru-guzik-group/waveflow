@@ -81,7 +81,7 @@ def get_exact_eigenvalues(system, n_eigenfuncs, n_space_dimension, box_length, c
             return ground_truth
 
 
-def plot_output(psi, weight_dict, box_length, fig, ax, n_eigenfunc=0, n_space_dimension=2, N=100):
+def plot_output(psi, sample, weight_dict, box_length, fig, ax, n_eigenfunc=0, n_space_dimension=2, N=100):
     if n_space_dimension == 1:
         x = np.linspace(-box_length/2, box_length/2, N)[:, None]
 
@@ -103,8 +103,10 @@ def plot_output(psi, weight_dict, box_length, fig, ax, n_eigenfunc=0, n_space_di
         z_min, z_max = -np.abs(z).max(), np.abs(z).max()
         # plt.imshow(z, extent=[-box_length / 2, box_length / 2, -box_length / 2, box_length / 2], origin='lower')
         # plt.show()
+        sample_points = sample(jax.random.PRNGKey(0), weight_dict, 250)
 
         c = ax.pcolormesh(x, y, z, cmap='RdBu', vmin=z_min, vmax=z_max)
+        ax.scatter(sample_points[:, 0], sample_points[:, 1], c='black', s=4)
         ax.set_title('Eigenfunction {}'.format(n_eigenfunc))
         # set the limits of the plot to the limits of the data
         ax.axis([x.min(), x.max(), y.min(), y.max()])
@@ -146,7 +148,7 @@ def uniform_sliding_stdev(data, window):
     return np.std(rolling, 1)
 
 
-def create_checkpoint(save_dir, psi, params, box_length, n_space_dimension, opt_state, epoch, loss, energies, system, window, n_plotting, psi_fig,
+def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimension, opt_state, epoch, loss, energies, system, window, n_plotting, psi_fig,
                       psi_ax, energies_fig, energies_ax, n_eigenfuncs=1):
     # checkpoints.save_checkpoint('{}/checkpoints'.format(save_dir),
     #                             (weight_dict, opt_state, epoch, sigma_t_bar, j_sigma_t_bar), epoch, keep=2)
@@ -166,7 +168,7 @@ def create_checkpoint(save_dir, psi, params, box_length, n_space_dimension, opt_
             ax = psi_ax.flatten()[i]
         else:
             ax = psi_ax
-        plot_output(psi, params, box_length, psi_fig, ax, n_eigenfunc=i,
+        plot_output(psi, sample, params, box_length, psi_fig, ax, n_eigenfunc=i,
                     n_space_dimension=n_space_dimension, N=n_plotting)
     eigenfunc_dir = f'{save_dir}/eigenfunctions'
     Path(eigenfunc_dir).mkdir(parents=True, exist_ok=True)

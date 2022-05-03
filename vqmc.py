@@ -76,7 +76,7 @@ def loss_fn_uniform(params, psi, h_fn, batch):
     # loss_val = energies_val / psi_val
     # return loss_val.mean()
 
-    return (psi_val * energies_val).mean() / (psi_val**2).mean()
+    return (psi_val * energies_val).mean() / jax.lax.stop_gradient((psi_val**2).mean())
 
 @partial(jit, static_argnums=(1, 2, 3, 5))
 def train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch):
@@ -127,13 +127,13 @@ class ModelTrainer:
         self.charge = 1
 
         # Flow parameter
-        self.prior_wavefunction_n = 2
+        self.prior_wavefunction_n = 1
 
         # Turn on/off real time plotting
         self.realtime_plots = True
         self.n_plotting = 200
-        self.log_every = 20
-        self.window = 2
+        self.log_every = 2000
+        self.window = 100
 
         # Optimizer
         self.learning_rate = 1e-4
@@ -180,7 +180,7 @@ class ModelTrainer:
         for epoch in pbar:
             # Save a check point
             if epoch % self.log_every == 0 or epoch == 1:
-                helper.create_checkpoint(self.save_dir, psi, get_params(opt_state), self.box_length,
+                helper.create_checkpoint(self.save_dir, psi, sample, get_params(opt_state), self.box_length,
                                          self.n_space_dimension, opt_state, epoch, loss,
                                          energies, self.system, self.window,
                                          self.n_plotting, *plots)
@@ -191,8 +191,8 @@ class ModelTrainer:
 
             # Generate a random batch
             split_rng, rng = jax.random.split(rng)
-            batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
-                                       shape=(self.batch_size, self.n_space_dimension))
+            # batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
+            #                            shape=(self.batch_size, self.n_space_dimension))
 
             params = get_params(opt_state)
             batch = sample(split_rng, params, self.batch_size)
