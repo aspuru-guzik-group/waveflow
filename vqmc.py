@@ -16,10 +16,11 @@ import pickle
 import matplotlib.pyplot as plt
 from jax.config import config
 from physics import laplacian, laplacian_numerical
+from helper import test_calibration
 
 # config.update("jax_enable_x64", True)
 # config.update('jax_platform_name', 'cpu')
-# config.update("jax_debug_nans", True)
+config.update("jax_debug_nans", True)
 
 
 def create_train_state(box_length, learning_rate, n_space_dimension=2, prior_wavefunction_n=1, rng=0):
@@ -108,10 +109,10 @@ def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, bat
     energy_gradient, aux = grad(loss_fn, argnums=0, has_aux=True)(params, psi, h_fn, batch)
     energies_val, psi_val = aux
     normalized_energies = energies_val / psi_val
-    log_pdf_grad = jax.jacrev(log_pdf)(params, batch)
-    pdf_gradient = jax.tree_multimap(lambda x: (x*conditional_expand(x, normalized_energies)).mean(0), log_pdf_grad)
-    gradients = jax.tree_multimap(lambda x, y: x + y, energy_gradient, pdf_gradient)
-
+    # log_pdf_grad = jax.jacrev(log_pdf, argnums=0)(params, batch)
+    # pdf_gradient = jax.tree_multimap(lambda x: (x*conditional_expand(x, normalized_energies)).mean(0), log_pdf_grad)
+    # gradients = jax.tree_multimap(lambda x, y: x + y, energy_gradient, pdf_gradient)
+    gradients = energy_gradient
     loss_val = normalized_energies.mean()
     return opt_update(epoch, gradients, opt_state), loss_val
 
@@ -196,6 +197,7 @@ class ModelTrainer:
 
             params = get_params(opt_state)
             batch = sample(split_rng, params, self.batch_size)
+
 
             # Run an optimization step over a training batch
             # opt_state, new_loss = train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)

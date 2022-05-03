@@ -9,6 +9,14 @@ import pickle
 from matplotlib.ticker import StrMethodFormatter, NullFormatter
 
 
+def test_calibration(x, params, log_pdf):
+    pdf_vals = jnp.exp(log_pdf(params, x))
+
+    plt.hist(pdf_vals)
+    plt.show()
+
+
+
 def vectorized_diagonal(m):
     return vmap(jnp.diag)(m)
 
