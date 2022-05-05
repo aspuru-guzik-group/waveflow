@@ -159,29 +159,26 @@ for epoch in pbar:
         xv = np.expand_dims(xv, axis=-1)
         yv = np.expand_dims(yv, axis=-1)
         grid = np.concatenate([xv, yv], axis=-1)
-        # psi_grid = psi(params, grid).reshape(100, 100)
-        # plt.imshow(psi_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        psi_grid = psi(params, grid).reshape(100, 100)
+        plt.imshow(psi_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        plt.show()
+
+        plt.imshow(psi_grid**2, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        plt.show()
+
+
+        # pdf_vals = np.exp(log_pdf(params, grid)).reshape(100, 100)
+        #
+        # X_syn = sample(rng, params, 10000)
+        # hist = np.histogram2d(X_syn[:, 0], X_syn[:, 1], bins=np.linspace(-length / 2, length / 2, 101), density=True)[0].T
+        # plt.imshow(hist, extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
         # plt.show()
         #
-        # plt.imshow(psi_grid**2, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        # plt.imshow(pdf_vals, extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
         # plt.show()
-
-
-        pdf_vals = np.exp(log_pdf(params, grid)).reshape(100, 100)
-
-        X_syn = sample(rng, params, 10000)
-        hist = np.histogram2d(X_syn[:, 0], X_syn[:, 1], bins=np.linspace(-length / 2, length / 2, 101), density=True)[0].T
-        plt.imshow(hist, extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
-        plt.show()
-
-        plt.imshow(pdf_vals, extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
-        plt.show()
-
-        plt.imshow(np.abs(hist - pdf_vals), extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
-        plt.show()
-
-        print(np.mean(np.abs(hist - gt_grid).reshape(-1)[hist.reshape(-1) > 0]))
-        exit()
+        #
+        # plt.imshow(np.abs(hist - pdf_vals), extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
+        # plt.show()
 
 
 

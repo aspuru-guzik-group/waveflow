@@ -20,7 +20,7 @@ from helper import test_calibration
 
 # config.update("jax_enable_x64", True)
 # config.update('jax_platform_name', 'cpu')
-config.update("jax_debug_nans", True)
+# config.update("jax_debug_nans", True)
 
 
 def create_train_state(box_length, learning_rate, n_space_dimension=2, prior_wavefunction_n=1, rng=0):
@@ -51,13 +51,13 @@ def create_train_state(box_length, learning_rate, n_space_dimension=2, prior_wav
         _, params = init_fun(rng, (input_dim,))
         return params, apply_fun
 
-    psi, pdf, dpdf, cdf = get_particle_in_the_box_fns(box_length, prior_wavefunction_n)
-    particleInBox = ParticleInBoxWrapper(psi, pdf, dpdf, cdf)
+    psi, prior_pdf, dpdf, cdf = get_particle_in_the_box_fns(box_length, prior_wavefunction_n)
+    particleInBox = ParticleInBoxWrapper(psi, prior_pdf, dpdf, cdf)
     sample = NumericalInverseHermite(particleInBox, domain=(-box_length / 2, box_length / 2), order=1, u_resolution=1e-7)
 
     init_fun = WaveFlow(
         flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-        psi, pdf, sample
+        psi, prior_pdf, sample
     )
 
     params, psi, log_pdf, sample = init_fun(rng, n_space_dimension, normalization_length=box_length)
@@ -103,16 +103,16 @@ def conditional_expand(arr1, arr2):
         return arr2
 
 @partial(jit, static_argnums=(1, 2, 3, 4, 6))
-def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch):
+def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch, running_avg_loss):
     # TODO: Think about adding baseline in policy gradient part to the gradient to reduce variance, probably not though
     params = get_params(opt_state)
     energy_gradient, aux = grad(loss_fn, argnums=0, has_aux=True)(params, psi, h_fn, batch)
     energies_val, psi_val = aux
     normalized_energies = energies_val / psi_val
-    # log_pdf_grad = jax.jacrev(log_pdf, argnums=0)(params, batch)
-    # pdf_gradient = jax.tree_multimap(lambda x: (x*conditional_expand(x, normalized_energies)).mean(0), log_pdf_grad)
-    # gradients = jax.tree_multimap(lambda x, y: x + y, energy_gradient, pdf_gradient)
-    gradients = energy_gradient
+    log_pdf_grad = jax.jacrev(log_pdf, argnums=0)(params, batch)
+    pdf_gradient = jax.tree_multimap(lambda x: (x*(conditional_expand(x, normalized_energies) - running_avg_loss)).mean(0), log_pdf_grad)
+    gradients = jax.tree_multimap(lambda x, y: x + y, energy_gradient, pdf_gradient)
+    # gradients = energy_gradient
     loss_val = normalized_energies.mean()
     return opt_update(epoch, gradients, opt_state), loss_val
 
@@ -137,7 +137,7 @@ class ModelTrainer:
         self.window = 100
 
         # Optimizer
-        self.learning_rate = 1e-4
+        self.learning_rate = 5e-5
 
         # Train setup
         self.num_epochs = 200000
@@ -165,7 +165,7 @@ class ModelTrainer:
 
 
         start_epoch = 0
-        loss = []
+        loss = [0]
         energies = []
         # if Path(self.save_dir).is_dir():
         #     with open('{}/checkpoints/'.format(self.save_dir), 'rb') as f:
@@ -190,6 +190,8 @@ class ModelTrainer:
 
 
 
+
+
             # Generate a random batch
             split_rng, rng = jax.random.split(rng)
             # batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
@@ -201,7 +203,7 @@ class ModelTrainer:
 
             # Run an optimization step over a training batch
             # opt_state, new_loss = train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)
-            opt_state, new_loss = train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch)
+            opt_state, new_loss = train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch, jnp.array(loss[-100:]).mean())
             pbar.set_description('Loss {:.3f}'.format(jnp.around(jnp.asarray(new_loss), 3).item()))
 
             loss.append(new_loss)

@@ -99,7 +99,7 @@ def WaveFlow(transformation, prior_psi, prior_pdf, prior_sampling):
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
 
-            inputs = (inputs - normalization_mean) / normalization_length
+            # inputs = (inputs - normalization_mean) / normalization_length
 
             u, log_det = direct_fun(params, inputs)
 
