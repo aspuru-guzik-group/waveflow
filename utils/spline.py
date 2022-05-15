@@ -43,7 +43,7 @@ class MSplines(object):
             self.splines = None
         else:
             self.splines= []
-            for i in range(self.num_splines + 1): # NOTE added an extra function
+            for i in range(self.num_splines): # NOTE added an extra function
                 self.splines.append(lambda x: (x >= self.knots[i]) * (x < self.knots[i+1]) * self.splines0_fp[i])
 
     def kernel_fp(self, coord):
@@ -76,18 +76,34 @@ class MSplines(object):
             splines_fp_temp = np.copy(splines_fp)
             _p = k / (k - 1.0)
             for i in range(self.num_splines):
+                _p1 = _p / (self.knots[i + k] - self.knots[i])
                 for x in range(nx):
-                    _p1 = _p /(self.knots[i+k] - self.knots[i]) # making life easier
                     _p2 = (coord[x] - self.knots[i]) * splines_fp_temp[i, x] + (self.knots[i+k] - coord[x]) * splines_fp_temp[i+1, x] #TODO check here
                     splines_fp[i, x] = _p1 * _p2
 
-        return splines_fpp
-
+        return splines_fp
 
     def kernel(self):
-        pass
+        '''
+        Returns: a list of functions that encode the splines.
+        TODO check if the list of functions even work.
+        '''
+        for k in range(2, self.degree):
+            splines_temp = self.splines.copy()
+            self.splines = []
+            _p = k / (k - 1.0)
+            for i in range(self.num_splines - 1):
+                _p1 = _p / (self.knots[i + k] - self.knots[i])
+                func1 = lambda x: x - self.knots[i]
+                func2 = lambda x: self.knots[k+i] - x
+                self.splines.append(lambda x: _p1 * (splines_temp[i](x) * func1 + splines_temp[i+1](x) * func2))
 
+            # last spline
+            _p1 = _p / (self.knots[self.num_splines + k - 1] - self.knots[self.num_splines - 1])
+            func1 = lambda x: x - self.knots[self.num_splines - 1]
+            self.splines.append(lambda x: _p1 * splines_temp[i](x) * func1)
 
+        return self.splines
 
 def ISplines():
     pass
