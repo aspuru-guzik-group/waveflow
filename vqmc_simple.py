@@ -3,6 +3,7 @@ import jax
 import helper
 from physics import construct_hamiltonian_function
 from tqdm import tqdm
+from pathlib import Path
 from functools import partial
 import flows
 import jax.numpy as jnp
@@ -11,8 +12,11 @@ from jax import grad, jit, random, value_and_grad
 from jax.example_libraries import stax, optimizers
 from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, WaveFlow
 from scipy.stats.sampling import NumericalInverseHermite
+import pickle
 import matplotlib.pyplot as plt
 from jax.config import config
+from physics import laplacian, laplacian_numerical, laplacian2
+from helper import test_calibration
 
 # config.update("jax_enable_x64", True)
 # config.update('jax_platform_name', 'cpu')
@@ -82,6 +86,8 @@ def train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batc
     return opt_update(epoch, gradients, opt_state), loss_val
 
 
+
+
 def loss_fn(params, psi, h_fn, batch):
     psi_val = psi(params, batch)[:,None]
     energies_val = h_fn(params, batch)
@@ -97,26 +103,18 @@ def conditional_expand(arr1, arr2):
         return arr2
 
 @partial(jit, static_argnums=(1, 2, 3, 4, 6))
-def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch, running_average):
-
+def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch, running_avg_loss):
     # TODO: Think about adding baseline in policy gradient part to the gradient to reduce variance, probably not though
     params = get_params(opt_state)
     energy_gradient, aux = grad(loss_fn, argnums=0, has_aux=True)(params, psi, h_fn, batch)
     energies_val, psi_val = aux
     normalized_energies = energies_val / psi_val
     log_pdf_grad = jax.jacrev(log_pdf, argnums=0)(params, batch)
-    pdf_gradient = jax.tree_multimap(lambda x: (x*(conditional_expand(x, normalized_energies) - running_average)).mean(0), log_pdf_grad)
+    pdf_gradient = jax.tree_multimap(lambda x: (x*(conditional_expand(x, normalized_energies) - running_avg_loss)).mean(0), log_pdf_grad)
     gradients = jax.tree_multimap(lambda x, y: x + y, energy_gradient, pdf_gradient)
+    # gradients = energy_gradient
     loss_val = normalized_energies.mean()
-
-    gradients = jax.tree_multimap(lambda x: jnp.clip(x, a_min=-20, a_max=20), gradients)
-
-    max_gradients = []
-    for x in jax.tree_multimap(lambda x: jnp.max(jnp.abs(x)), gradients):
-        for s in x:
-            if len(s) > 0:
-                max_gradients.append(jnp.max(jnp.abs(jnp.array(s))))
-    return opt_update(epoch, gradients, opt_state), loss_val, jnp.max(jnp.array(max_gradients))
+    return opt_update(epoch, gradients, opt_state), loss_val
 
 
 
@@ -135,11 +133,11 @@ class ModelTrainer:
         # Turn on/off real time plotting
         self.realtime_plots = True
         self.n_plotting = 200
-        self.log_every = 1000
+        self.log_every = 2000
         self.window = 100
 
         # Optimizer
-        self.learning_rate = 1e-4
+        self.learning_rate = 5e-5
 
         # Train setup
         self.num_epochs = 200000
@@ -177,9 +175,7 @@ class ModelTrainer:
         if self.realtime_plots:
             plt.ion()
         plots = helper.create_plots(self.n_space_dimension, 1)
-        gradeitns_fig, gradients_ax = plt.subplots(1, 1)
-        max_gradients = []
-        running_average = 0
+
 
         pbar = tqdm(range(start_epoch + 1, start_epoch + self.num_epochs + 1), disable=not show_progress)
         for epoch in pbar:
@@ -207,25 +203,8 @@ class ModelTrainer:
 
             # Run an optimization step over a training batch
             # opt_state, new_loss = train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)
-            opt_state, new_loss, max_gradient = train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch, running_average)
+            opt_state, new_loss = train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch, jnp.array(loss[-100:]).mean())
             pbar.set_description('Loss {:.3f}'.format(jnp.around(jnp.asarray(new_loss), 3).item()))
-            max_gradients.append(max_gradient)
-            if epoch % 100 == 0 or max_gradient > 1000:
-                running_average = jnp.clip(jnp.array(loss[-100:]), a_min=-1, a_max=1).mean()
-                gradients_ax.cla()
-                x = jnp.arange(0, len(max_gradients))
-                gradients_ax.plot(x, max_gradients)
-                gradeitns_fig.canvas.draw()
-                plt.show(block=False)
-                plt.pause(.01)
-
-                if max_gradient > 1000:
-                    helper.create_checkpoint(self.save_dir, psi, sample, get_params(opt_state), self.box_length,
-                                             self.n_space_dimension, opt_state, epoch, loss,
-                                             energies, self.system, self.window,
-                                             self.n_plotting, *plots)
-                    plt.pause(.01)
-                    print()
 
             loss.append(new_loss)
             energies.append([new_loss])

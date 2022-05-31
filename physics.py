@@ -5,25 +5,12 @@ from functools import partial
 from jax import jit, vmap, jacfwd
 from helper import compute_hessian_diagonals, vectorized_diagonal, vectorized_trace
 
-def laplacian2(fun,x,params):
-    x = jnp.expand_dims(x,axis=1) #add new dimensionality for vmap
-    _hess = lambda  _x,params: hessian(fun,argnums=0)(_x,params).reshape(_x.shape[1],_x.shape[1])
-    hess_ = vmap(_hess,in_axes=(0,None))(x,params)
-    lap_ = jnp.einsum('ijj', hess_) #simialar to: vmap(jnp.trace,in_axes=0)(hess_)
-    return lap_
 
 # @partial(jit, static_argnums=(0,))
 def laplacian(fn):
 
     _laplacian = lambda params, x: jnp.trace(jax.hessian(fn, argnums=1)(params, x), axis1=1, axis2=2)
     return vmap(_laplacian, in_axes=(None, 0))
-
-
-def get_hydrogen_potential():
-    def hygrogen_potential(x):
-        return - 1 / jnp.linalg.norm(x, axis=-1)
-
-    return hygrogen_potential
 
 
 def second_difference_along_coordinate(weight_dict, fn, x, i, eps):
@@ -47,7 +34,19 @@ def laplacian_numerical(fn, eps=0.1):
     return _laplace_numerical
 
 
-def construct_hamiltonian_function(fn, system='hydrogen', eps=0.0, box_length=1):
+
+
+def get_hydrogen_potential(max_val=None):
+    def hygrogen_potential(x):
+        if max_val is None:
+            return - 1 / jnp.linalg.norm(x, axis=-1)
+        else:
+            return - jnp.clip(1 / jnp.linalg.norm(x, axis=-1), a_max=max_val)
+
+    return hygrogen_potential
+
+
+def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), system='hydrogen', eps=0.0, box_length=1, max_potential_val=None):
     def _construct(weight_dict, x):
         laplace = laplacian_fn(weight_dict, x)
         if eps != 0.0:
@@ -57,7 +56,7 @@ def construct_hamiltonian_function(fn, system='hydrogen', eps=0.0, box_length=1)
         # return v_fn(x)[:,None] * fn_x
 
     if system == 'hydrogen':
-        v_fn = get_hydrogen_potential()
+        v_fn = get_hydrogen_potential(max_potential_val)
     elif system == 'laplace':
         v_fn = lambda x: 0 * x.sum(-1)
     else:
