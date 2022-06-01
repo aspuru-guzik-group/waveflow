@@ -51,7 +51,7 @@ def get_potential(protons, max_val=None):
     return proton_electron_potential
 
 
-def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), eps=0.0, box_length=1, max_potential_val=None):
+def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), n_space_dimensions=2, eps=0.0, max_potential_val=None):
     def _construct(weight_dict, x):
         laplace = laplacian_fn(weight_dict, x)
         if eps != 0.0:

@@ -199,7 +199,7 @@ class ModelTrainer:
                                                                                  n_space_dimension=self.n_space_dimension,
                                                                                  prior_wavefunction_n=self.prior_wavefunction_n,
                                                                                  rng=split_rng)
-        h_fn = construct_hamiltonian_function(psi, protons=self.system, eps=0.0, box_length=self.box_length)
+        h_fn = construct_hamiltonian_function(psi, protons=self.system, n_space_dimensions=self.n_space_dimension, eps=0.0)
 
 
         start_epoch = 0
