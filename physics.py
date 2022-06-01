@@ -36,17 +36,22 @@ def laplacian_numerical(fn, eps=0.1):
 
 
 
-def get_hydrogen_potential(max_val=None):
-    def hygrogen_potential(x):
-        if max_val is None:
-            return - 1 / jnp.linalg.norm(x, axis=-1)
-        else:
-            return - jnp.clip(1 / jnp.linalg.norm(x, axis=-1), a_max=max_val)
-
-    return hygrogen_potential
 
 
-def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), system='hydrogen', eps=0.0, box_length=1, max_potential_val=None):
+
+def get_potential(protons, max_val=None):
+    def proton_electron_potential(x):
+        potential = - 1 / jnp.linalg.norm(protons[None] - x[:, None], axis=-1)
+        if max_val is not None:
+            potential = jnp.clip(potential, a_max=max_val)
+
+        potential = jnp.sum(potential, axis=-1)
+        return potential
+
+    return proton_electron_potential
+
+
+def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), eps=0.0, box_length=1, max_potential_val=None):
     def _construct(weight_dict, x):
         laplace = laplacian_fn(weight_dict, x)
         if eps != 0.0:
@@ -55,13 +60,7 @@ def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), system='hydr
         return -laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
         # return v_fn(x)[:,None] * fn_x
 
-    if system == 'hydrogen':
-        v_fn = get_hydrogen_potential(max_potential_val)
-    elif system == 'laplace':
-        v_fn = lambda x: 0 * x.sum(-1)
-    else:
-        print('System "{}" not supported'.format(system))
-        exit()
+    v_fn = get_potential(protons, max_potential_val)
 
     if eps > 0.0:
         laplacian_fn = laplacian_numerical(fn, eps=eps)

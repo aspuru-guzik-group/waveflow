@@ -96,7 +96,7 @@ def conditional_expand(arr1, arr2):
     else:
         return arr2
 
-@partial(jit, static_argnums=(1, 2, 3, 4, 6))
+# @partial(jit, static_argnums=(1, 2, 3, 4, 6))
 def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch, running_average):
 
     # TODO: Think about adding baseline in policy gradient part to the gradient to reduce variance, probably not though
@@ -159,7 +159,8 @@ class ModelTrainer:
     def __init__(self) -> None:
         # Hyperparameter
         # Problem definition
-        self.system = 'hydrogen'
+        self.system_name = 'hydrogen'
+        self.system = jnp.array([[-3.0, 0.0], [3.0, 0.0]])
         # self.system = 'laplace'
         self.n_space_dimension = 2
         self.charge = 1
@@ -179,7 +180,7 @@ class ModelTrainer:
         # Train setup
         self.num_epochs = 200000
         self.batch_size = 256
-        self.save_dir = './results/{}_{}d'.format(self.system, self.n_space_dimension)
+        self.save_dir = './results/{}_{}d'.format(self.system_name, self.n_space_dimension)
 
         # Simulation size
         self.box_length_model = 5
@@ -190,7 +191,7 @@ class ModelTrainer:
         """
         Function for training the model
         """
-        rng = jax.random.PRNGKey(1)
+        rng = jax.random.PRNGKey(2)
         split_rng, rng = jax.random.split(rng)
         # Create initial state
         psi, log_pdf, sample, opt_state, opt_update, get_params = create_train_state(self.box_length_model,
@@ -198,7 +199,7 @@ class ModelTrainer:
                                                                                  n_space_dimension=self.n_space_dimension,
                                                                                  prior_wavefunction_n=self.prior_wavefunction_n,
                                                                                  rng=split_rng)
-        h_fn = construct_hamiltonian_function(psi, system=self.system, eps=0.0, box_length=self.box_length)
+        h_fn = construct_hamiltonian_function(psi, protons=self.system, eps=0.0, box_length=self.box_length)
 
 
         start_epoch = 0
@@ -213,7 +214,6 @@ class ModelTrainer:
             plt.ion()
         plots = helper.create_plots(self.n_space_dimension, 1)
         # gradeitns_fig, gradients_ax = plt.subplots(1, 1)
-        max_gradients = []
         running_average = 0
 
         pbar = tqdm(range(start_epoch + 1, start_epoch + self.num_epochs + 1), disable=not show_progress)
@@ -222,7 +222,7 @@ class ModelTrainer:
             if epoch % self.log_every == 0 or epoch == 1:
                 helper.create_checkpoint(self.save_dir, psi, sample, get_params(opt_state), self.box_length,
                                          self.n_space_dimension, opt_state, epoch, loss,
-                                         energies, self.system, self.window,
+                                         energies, self.system, self.system_name, self.window,
                                          self.n_plotting, *plots)
                 plt.pause(.01)
 

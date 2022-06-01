@@ -49,14 +49,14 @@ def moving_average(running_average, new_data, beta):
     return running_average - beta * (running_average - new_data)
 
 
-def get_exact_eigenvalues(system, n_eigenfuncs, n_space_dimension, box_length, charge=1):
+def get_exact_eigenvalues(system_name, n_eigenfuncs, n_space_dimension, box_length, charge=1):
     if n_space_dimension == 1:
         quantum_nos = np.arange(1, n_eigenfuncs + 1)
 
-        if system == 'laplace':
+        if system_name == 'laplace':
             return -((quantum_nos * np.pi) / (box_length)) ** 2
 
-        if system == 'hydrogen':
+        if system_name == 'hydrogen':
             if charge is None:
                 raise Exception("charge is not provided")
             energies = -2 * charge ** 2 / (quantum_nos ** 2)
@@ -65,7 +65,7 @@ def get_exact_eigenvalues(system, n_eigenfuncs, n_space_dimension, box_length, c
 
     if n_space_dimension == 2:
 
-        if system == 'laplace':
+        if system_name == 'laplace':
             def e(n):
                 return -((n * np.pi) / (box_length)) ** 2
 
@@ -77,7 +77,7 @@ def get_exact_eigenvalues(system, n_eigenfuncs, n_space_dimension, box_length, c
             ground_truth = np.flip(np.sort(tmp))[:n_eigenfuncs]
             return ground_truth
 
-        if system == 'hydrogen':
+        if system_name == 'hydrogen':
             max_n = int(np.ceil(np.sqrt(n_eigenfuncs))) + 1
             tmp = []
             for n in range(0, max_n):
@@ -89,7 +89,7 @@ def get_exact_eigenvalues(system, n_eigenfuncs, n_space_dimension, box_length, c
             return ground_truth
 
 
-def plot_output(psi, sample, weight_dict, box_length, fig, ax, n_eigenfunc=0, n_space_dimension=2, N=100):
+def plot_output(psi, sample, weight_dict, protons, box_length, fig, ax, n_eigenfunc=0, n_space_dimension=2, N=100):
     if n_space_dimension == 1:
         x = np.linspace(-box_length/2, box_length/2, N)[:, None]
 
@@ -114,7 +114,8 @@ def plot_output(psi, sample, weight_dict, box_length, fig, ax, n_eigenfunc=0, n_
         sample_points = sample(jax.random.PRNGKey(0), weight_dict, 250)
 
         c = ax.pcolormesh(x, y, z, cmap='RdBu', vmin=z_min, vmax=z_max)
-        ax.scatter(sample_points[:, 0], sample_points[:, 1], c='black', s=4)
+        ax.scatter(sample_points[:, 0], sample_points[:, 1], c='black', s=4, alpha=0.15)
+        ax.scatter(protons[:, 0], protons[:, 1], c='red', s=9)
         ax.set_title('Eigenfunction {}'.format(n_eigenfunc))
         # set the limits of the plot to the limits of the data
         ax.axis([x.min(), x.max(), y.min(), y.max()])
@@ -156,7 +157,7 @@ def uniform_sliding_stdev(data, window):
     return np.std(rolling, 1)
 
 
-def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimension, opt_state, epoch, loss, energies, system, window, n_plotting, psi_fig,
+def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimension, opt_state, epoch, loss, energies, protons, system_name, window, n_plotting, psi_fig,
                       psi_ax, energies_fig, energies_ax, n_eigenfuncs=1):
     # checkpoints.save_checkpoint('{}/checkpoints'.format(save_dir),
     #                             (weight_dict, opt_state, epoch, sigma_t_bar, j_sigma_t_bar), epoch, keep=2)
@@ -176,7 +177,7 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimensi
             ax = psi_ax.flatten()[i]
         else:
             ax = psi_ax
-        plot_output(psi, sample, params, box_length, psi_fig, ax, n_eigenfunc=i,
+        plot_output(psi, sample, params, protons, box_length, psi_fig, ax, n_eigenfunc=i,
                     n_space_dimension=n_space_dimension, N=n_plotting)
     eigenfunc_dir = f'{save_dir}/eigenfunctions'
     Path(eigenfunc_dir).mkdir(parents=True, exist_ok=True)
@@ -186,7 +187,7 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimensi
         energies_array = np.array(energies)
         Path(save_dir).mkdir(parents=True, exist_ok=True)
         energies_ax.cla()
-        ground_truth = get_exact_eigenvalues(system, n_eigenfuncs, n_space_dimension, box_length)
+        ground_truth = get_exact_eigenvalues(system_name, n_eigenfuncs, n_space_dimension, box_length)
         color = plt.cm.tab10(np.arange(n_eigenfuncs))
         for i, c in zip(range(n_eigenfuncs), color):
             energies_ax.plot([0, epoch], [ground_truth[i], ground_truth[i]], '--', c=c)
@@ -196,7 +197,7 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimensi
             stdev = uniform_sliding_stdev(energies_array[:, i], window)
             energies_ax.plot(x, av, c=c, label='Eigenvalue {}'.format(i))
             energies_ax.fill_between(x, av - stdev / 2, av + stdev / 2, color=c, alpha=.5)
-        if system == 'hydrogen':
+        if system_name == 'hydrogen':
             energies_ax.set_ylim(min(ground_truth) - .1, 0)
         energies_ax.legend()
         energies_ax.set_yscale('symlog', linthresh=.1)
