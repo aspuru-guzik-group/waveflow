@@ -13,6 +13,7 @@ from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, Wav
 from scipy.stats.sampling import NumericalInverseHermite
 import matplotlib.pyplot as plt
 from jax.config import config
+from systems import system_catalogue
 
 # config.update("jax_enable_x64", True)
 # config.update('jax_platform_name', 'cpu')
@@ -159,8 +160,9 @@ class ModelTrainer:
     def __init__(self) -> None:
         # Hyperparameter
         # Problem definition
-        self.system_name = 'hydrogen'
-        self.system = jnp.array([[-3.0, 0.0], [3.0, 0.0]])
+
+        self.system_name = 'H2+'
+        self.system = system_catalogue[self.system_name]
         # self.system = 'laplace'
         self.n_space_dimension = 2
         self.charge = 1

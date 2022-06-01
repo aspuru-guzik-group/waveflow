@@ -56,7 +56,7 @@ def get_exact_eigenvalues(system_name, n_eigenfuncs, n_space_dimension, box_leng
         if system_name == 'laplace':
             return -((quantum_nos * np.pi) / (box_length)) ** 2
 
-        if system_name == 'hydrogen':
+        if system_name == 'H':
             if charge is None:
                 raise Exception("charge is not provided")
             energies = -2 * charge ** 2 / (quantum_nos ** 2)
@@ -77,7 +77,7 @@ def get_exact_eigenvalues(system_name, n_eigenfuncs, n_space_dimension, box_leng
             ground_truth = np.flip(np.sort(tmp))[:n_eigenfuncs]
             return ground_truth
 
-        if system_name == 'hydrogen':
+        if system_name == 'H':
             max_n = int(np.ceil(np.sqrt(n_eigenfuncs))) + 1
             tmp = []
             for n in range(0, max_n):
@@ -138,7 +138,7 @@ def uniform_sliding_average(data, window):
     pad = np.ones(len(data.shape), dtype=np.int32)
     pad[-1] = window - 1
     pad = list(zip(pad, np.zeros(len(data.shape), dtype=np.int32)))
-    data = np.pad(data, pad, mode='reflect')
+    data = np.pad(data, pad, mode='edge')
 
     ret = np.cumsum(data, dtype=float)
     ret[window:] = ret[window:] - ret[:-window]
@@ -190,37 +190,27 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimensi
         ground_truth = get_exact_eigenvalues(system_name, n_eigenfuncs, n_space_dimension, box_length)
         color = plt.cm.tab10(np.arange(n_eigenfuncs))
         for i, c in zip(range(n_eigenfuncs), color):
-            energies_ax.plot([0, epoch], [ground_truth[i], ground_truth[i]], '--', c=c)
+            if ground_truth is not None:
+                energies_ax.plot([0, epoch], [ground_truth[i], ground_truth[i]], '--', c=c)
             # x = np.arange(window // 2 - 1, len(energies_array[:, i]) - (window // 2))
             x = np.arange(0, len(energies_array[:, i]))
             av = uniform_sliding_average(energies_array[:, i], window)
             stdev = uniform_sliding_stdev(energies_array[:, i], window)
             energies_ax.plot(x, av, c=c, label='Eigenvalue {}'.format(i))
             energies_ax.fill_between(x, av - stdev / 2, av + stdev / 2, color=c, alpha=.5)
-        if system_name == 'hydrogen':
+        if system_name == 'H':
             energies_ax.set_ylim(min(ground_truth) - .1, 0)
         energies_ax.legend()
         energies_ax.set_yscale('symlog', linthresh=.1)
-        energies_ax.set_yticks([0.0] + (ground_truth+0.25*ground_truth).tolist())
+        if ground_truth is not None:
+            energies_ax.set_yticks([0.0] + (ground_truth+0.25*ground_truth).tolist())
         energies_ax.minorticks_off()
         energies_ax.yaxis.set_major_formatter(StrMethodFormatter('{x:.3f}'))
         energies_fig.savefig('{}/energies'.format(save_dir, save_dir))
 
         fig, ax = plt.subplots()
-        for i in range(n_eigenfuncs):
-            ax.plot(energies_array[-500:, i], label='Eigenvalue {}'.format(i))
-        ax.legend()
-        fig.savefig('{}/energies_newest'.format(save_dir, save_dir))
-        plt.close(fig)
-
-        fig, ax = plt.subplots()
         ax.plot(loss)
         fig.savefig('{}/loss'.format(save_dir))
-        plt.close(fig)
-
-        fig, ax = plt.subplots()
-        ax.plot(loss[-500:])
-        fig.savefig('{}/loss_newest'.format(save_dir))
         plt.close(fig)
 
         np.save('{}/loss'.format(save_dir), loss)
