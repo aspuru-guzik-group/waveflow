@@ -214,7 +214,7 @@ class ModelTrainer:
 
         if self.realtime_plots:
             plt.ion()
-        plots = helper.create_plots(self.n_space_dimension, 1)
+        plots = helper.create_plots(self.n_space_dimension)
         # gradeitns_fig, gradients_ax = plt.subplots(1, 1)
         running_average = 0
 

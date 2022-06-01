@@ -194,3 +194,5 @@ cuda.sh
 results
 ./results/
 results/
+./results/*
+results/*

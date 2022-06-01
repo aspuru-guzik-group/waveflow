@@ -121,17 +121,20 @@ def plot_output(psi, sample, weight_dict, protons, box_length, fig, ax, n_eigenf
         ax.axis([x.min(), x.max(), y.min(), y.max()])
 
 
-def create_plots(n_space_dimension, neig):
+def create_plots(n_space_dimension):
     energies_fig, energies_ax = plt.subplots(1, 1)
-    if n_space_dimension == 1:
-        fig, ax = plt.subplots(1, 1)
-        return fig, ax, energies_fig, energies_ax
-    elif n_space_dimension == 2:
-        nfig = max(2, int(np.ceil(np.sqrt(neig))))
-        psi_fig, psi_ax = plt.subplots(nfig, nfig, figsize=(10, 10))
-        for ax in psi_ax.flatten():
-            ax.set_aspect('equal', adjustable='box')
-        return psi_fig, psi_ax, energies_fig, energies_ax
+    psi_fig, psi_ax = plt.subplots(figsize=(8, 7))
+    return psi_fig, psi_ax, energies_fig, energies_ax
+
+    # if n_space_dimension == 1:
+    #     fig, ax = plt.subplots(1, 1)
+    #     return fig, ax, energies_fig, energies_ax
+    # elif n_space_dimension == 2:
+    #     nfig = max(2, int(np.ceil(np.sqrt(neig))))
+    #     psi_fig, psi_ax = plt.subplots(nfig, nfig, figsize=(10, 10))
+    #     for ax in psi_ax.flatten():
+    #         ax.set_aspect('equal', adjustable='box')
+    #     return psi_fig, psi_ax, energies_fig, energies_ax
 
 
 def uniform_sliding_average(data, window):
@@ -173,11 +176,7 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimensi
     if n_space_dimension == 1:
         psi_ax.cla()
     for i in range(n_eigenfuncs):
-        if n_space_dimension == 2:
-            ax = psi_ax.flatten()[i]
-        else:
-            ax = psi_ax
-        plot_output(psi, sample, params, protons, box_length, psi_fig, ax, n_eigenfunc=i,
+        plot_output(psi, sample, params, protons, box_length, psi_fig, psi_ax, n_eigenfunc=i,
                     n_space_dimension=n_space_dimension, N=n_plotting)
     eigenfunc_dir = f'{save_dir}/eigenfunctions'
     Path(eigenfunc_dir).mkdir(parents=True, exist_ok=True)
