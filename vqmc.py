@@ -156,9 +156,9 @@ def f_fwd(primals, tangents):
     t_energies_val, t_psi_val, = tangents
 
     loss_val = _loss_fn_efficient(energies_val, psi_val)
+    grad = 2 * t_psi_val * loss_val / psi_val + (t_energies_val * psi_val - energies_val * t_psi_val) / psi_val**2
 
-    psi_val_squared = psi_val**2
-    grad = (2 * t_psi_val * loss_val + t_energies_val * psi_val - energies_val * t_psi_val) / psi_val_squared
+    loss_val = jnp.clip(loss_val, a_min=-50, a_max=50)
 
     return loss_val, grad
 
@@ -169,7 +169,7 @@ def train_step_efficient(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_p
     params = get_params(opt_state)
     loss_val, gradients = value_and_grad(loss_fn_efficient, argnums=0)(params, psi, h_fn, batch)
 
-    gradients = jax.tree_multimap(lambda x: jnp.clip(x, a_min=-10, a_max=10), gradients)
+    gradients = jax.tree_multimap(lambda x: jnp.clip(x, a_min=-2, a_max=2), gradients)
 
     return opt_update(epoch, gradients, opt_state), loss_val
 
