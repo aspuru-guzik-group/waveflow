@@ -6,13 +6,6 @@ from jax import jit, vmap, jacfwd
 from helper import compute_hessian_diagonals, vectorized_diagonal, vectorized_trace
 
 
-# @partial(jit, static_argnums=(0,))
-def laplacian(fn):
-
-    _laplacian = lambda params, x: jnp.trace(jax.hessian(fn, argnums=1)(params, x), axis1=1, axis2=2)
-    return vmap(_laplacian, in_axes=(None, 0))
-
-
 def second_difference_along_coordinate(weight_dict, fn, x, i, eps):
     # coordinate = jnp.zeros_like(x)
     # coordinate[:, i] = 1
@@ -38,6 +31,11 @@ def laplacian_numerical(fn, eps=0.1):
 
 
 
+def laplacian(fn):
+
+    _laplacian = lambda params, x: jnp.trace(jax.hessian(fn, argnums=1)(params, x), axis1=1, axis2=2)
+    return vmap(_laplacian, in_axes=(None, 0))
+
 
 def get_potential(protons, max_val=None):
     def proton_electron_potential(x):
@@ -56,6 +54,7 @@ def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), n_space_dime
         laplace = laplacian_fn(weight_dict, x)
         if eps != 0.0:
             laplace = jnp.expand_dims(laplace, axis=-1)
+
 
         return -laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
         # return v_fn(x)[:,None] * fn_x

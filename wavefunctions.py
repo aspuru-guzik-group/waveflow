@@ -6,38 +6,50 @@ from scipy.stats import NumericalInverseHermite
 
 
 
-def get_particle_in_the_box_fns(length, n):
-    def wavefunction_even(x):
+def get_particle_in_the_box_fns(length, n, n_centered_dimensions):
+    def wavefunction_even(x, zero_centered=True):
+        if not zero_centered:
+            x = x - length / 2
         normalization = jnp.sqrt(2/length)
         return jnp.sin( (n * jnp.pi * x) / length ) * normalization * jnp.heaviside(- x + length/2, 1.0) * jnp.heaviside(x + length/2, 1.0)
 
-    def wavefunction_odd(x):
+    def wavefunction_odd(x, zero_centered=True):
+        if not zero_centered:
+            x = x - length / 2
         normalization = jnp.sqrt(2/length)
         return jnp.cos( (n * jnp.pi * x) / length ) * normalization * jnp.heaviside(- x + length/2, 1.0) * jnp.heaviside(x + length/2, 1.0)
 
-    def pdf_even(x):
-        return wavefunction_even(x)**2
+    def pdf_even(x, zero_centered=True):
+        return wavefunction_even(x, zero_centered=zero_centered)**2
 
-    def pdf_odd(x):
-        return wavefunction_odd(x) ** 2
+    def pdf_odd(x, zero_centered=True):
+        return wavefunction_odd(x, zero_centered=zero_centered) ** 2
 
-    def dpdf_even(x):
+    def dpdf_even(x, zero_centered=True):
+        if not zero_centered:
+            x = x - length / 2
         # TODO currently wrong
         normalization = 2 / length
         return 2* ( (n * jnp.pi)/ length ) * jnp.sin((n * jnp.pi * x) / length) * jnp.cos((n * jnp.pi * x) / length) * normalization
 
-    def dpdf_odd(x):
+    def dpdf_odd(x, zero_centered=True):
+        if not zero_centered:
+            x = x - length / 2
         # TODO currently wrong
         normalization = 2 / length
         return -2 * ((n * jnp.pi) / length) * jnp.sin((n * jnp.pi * x) / length) * jnp.cos((n * jnp.pi * x) / length) * normalization
 
-    def cdf_even(x):
+    def cdf_even(x, zero_centered=True):
+        if not zero_centered:
+            x = x - length / 2
         normalization = 2 / length
         k = (n * jnp.pi) / length
         l = length / 2
         return - normalization * (-2*k*(l + x) + jnp.sin(2*k*l) + jnp.sin(2*k*x)) / (4*k)
 
-    def cdf_odd(x):
+    def cdf_odd(x, zero_centered=True):
+        if not zero_centered:
+            x = x - length / 2
         normalization = 2 / length
         k = (n * jnp.pi) / length
         l = length/2
@@ -45,20 +57,48 @@ def get_particle_in_the_box_fns(length, n):
 
 
     if n % 2 == 0:
-        wavefunction = wavefunction_even
-        pdf = pdf_even
-        dpdf = dpdf_even
-        cdf = cdf_even
+        wavefunction_uncentered = lambda x: wavefunction_even(x, zero_centered=False)
+        pdf_uncentered = lambda x: pdf_even(x, zero_centered=False)
+        dpdf_uncentered = lambda x: dpdf_even(x, zero_centered=False)
+        cdf_uncentered = lambda x: cdf_even(x, zero_centered=False)
     else:
-        wavefunction = wavefunction_odd
-        pdf = pdf_odd
-        dpdf = dpdf_odd
-        cdf = cdf_odd
+        wavefunction_uncentered = lambda x: wavefunction_odd(x, zero_centered=False)
+        pdf_uncentered = lambda x: pdf_odd(x, zero_centered=False)
+        dpdf_uncentered = lambda x: dpdf_odd(x, zero_centered=False)
+        cdf_uncentered = lambda x: cdf_odd(x, zero_centered=False)
 
     # For higher dimension map along last axis and return product
-    wavefunction = jax.vmap(wavefunction, in_axes=-1, out_axes=-1)
+    wavefunction_uncentered = jax.vmap(wavefunction_uncentered, in_axes=-1, out_axes=-1)
 
-    return wavefunction, pdf, dpdf, cdf
+
+    if n % 2 == 0:
+        wavefunction_centered = lambda x: wavefunction_even(x, zero_centered=True)
+        pdf_centered = lambda x: pdf_even(x, zero_centered=True)
+        dpdf_centered = lambda x: dpdf_even(x, zero_centered=True)
+        cdf_centered = lambda x: cdf_even(x, zero_centered=True)
+    else:
+        wavefunction_centered = lambda x: wavefunction_odd(x, zero_centered=True)
+        pdf_centered = lambda x: pdf_odd(x, zero_centered=True)
+        dpdf_centered = lambda x: dpdf_odd(x, zero_centered=True)
+        cdf_centered = lambda x: cdf_odd(x, zero_centered=True)
+
+    # For higher dimension map along last axis and return product
+    wavefunction_centered = jax.vmap(wavefunction_centered, in_axes=-1, out_axes=-1)
+
+    def combined_functions(x, f_centered, f_uncentered):
+        centered_dimensions = x[:, :n_centered_dimensions]
+        uncentered_dimensions = x[:, n_centered_dimensions:]
+
+
+        return jnp.concatenate([f_centered(centered_dimensions), f_uncentered(uncentered_dimensions)], axis=-1)
+
+    combined_wavefunctions = lambda x: combined_functions(x, wavefunction_centered, wavefunction_uncentered)
+    combined_pdf = lambda x: combined_functions(x, pdf_centered, pdf_uncentered)
+    combined_dpdf = lambda x: combined_functions(x, dpdf_centered, dpdf_uncentered)
+    combined_cdf = lambda x: combined_functions(x, cdf_centered, cdf_uncentered)
+
+
+    return combined_wavefunctions, combined_pdf, combined_dpdf, combined_cdf
 
 
 class ParticleInBoxWrapper:
@@ -88,14 +128,15 @@ class ParticleInBoxWrapper:
 
 def WaveFlow(transformation, prior_psi, prior_pdf, prior_sampling):
 
-    def init_fun(rng, input_dim, normalization_mean=0, normalization_length=1):
+    def init_fun(rng, n_particle, n_space_dim, normalization_mean=0, normalization_length=1):
         transformation_rng, prior_rng = jax.random.split(rng)
 
-        params, direct_fun, inverse_fun = transformation(transformation_rng, input_dim)
+        params, direct_fun, inverse_fun = transformation(transformation_rng, n_particle * n_space_dim)
         inverse_fun = jax.jit(inverse_fun)
         # prior_log_pdf, prior_sample = prior(prior_rng, input_dim)
 
         def log_pdf(params, inputs):
+            # inputs = inputs.reshape(-1, inputs.shape[-2] * inputs.shape[-1])
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
 
@@ -107,6 +148,8 @@ def WaveFlow(transformation, prior_psi, prior_pdf, prior_sampling):
             return log_probs + log_det
 
         def psi(params, inputs):
+            # inputs = inputs.reshape(-1, inputs.shape[-2] * inputs.shape[-1])
+            # print(inputs.shape)
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
 
@@ -127,9 +170,11 @@ def WaveFlow(transformation, prior_psi, prior_pdf, prior_sampling):
             return psi_val
 
         def sample(rng, params, num_samples=1):
-            prior_samples = prior_sampling.rvs(input_dim*num_samples).reshape(-1,input_dim)
+            prior_samples = prior_sampling.rvs(n_particle*n_space_dim*num_samples).reshape(-1, n_particle * n_space_dim)
             sample = inverse_fun(params, prior_samples)[0]
             sample = sample * normalization_length + normalization_mean
+
+            # sample = sample.reshape(-1, n_particle, n_space_dim)
             return sample
 
         return params, psi, log_pdf, sample

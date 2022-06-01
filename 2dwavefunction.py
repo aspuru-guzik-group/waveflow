@@ -9,8 +9,8 @@ split_key, rng = jax.random.split(jax.random.PRNGKey(0))
 
 length = 2
 n_grid_points = 100
-x = jnp.linspace(-length/2, length/2, n_grid_points)
-y = jnp.linspace(-length/2, length/2, n_grid_points)
+x = jnp.linspace(-length, length, n_grid_points)
+y = jnp.linspace(-length, length, n_grid_points)
 
 xv, yv = jnp.meshgrid(x, y)
 xv, yv = xv.reshape(-1), yv.reshape(-1)
@@ -19,9 +19,9 @@ yv = jnp.expand_dims(yv, axis=-1)
 
 grid = jnp.concatenate([xv, yv], axis=-1)
 
-psi, pdf, dpdf, cdf = get_particle_in_the_box_fns(length, 2)
+psi, pdf, dpdf, cdf = get_particle_in_the_box_fns(length, 2, 2)
 particleInBox = ParticleInBoxWrapper(psi, pdf, dpdf, cdf)
-sample = NumericalInverseHermite(particleInBox, domain=(-length/2, length/2), order=1, u_resolution=1e-7)
+#sample = NumericalInverseHermite(particleInBox, domain=(-length/2, length/2), order=1, u_resolution=1e-7)
 
 psi_grid = psi(grid)
 psi_grid = jnp.prod(psi_grid, axis=-1).reshape(100, 100)

@@ -1,3 +1,8 @@
+from jax.config import config
+# config.update('jax_platform_name', 'cpu')
+# config.update("jax_enable_x64", True)
+# config.update("jax_debug_nans", True)
+
 import jax
 
 import helper
@@ -12,15 +17,12 @@ from jax.example_libraries import stax, optimizers
 from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, WaveFlow
 from scipy.stats.sampling import NumericalInverseHermite
 import matplotlib.pyplot as plt
-from jax.config import config
 from systems import system_catalogue
 
-# config.update("jax_enable_x64", True)
-# config.update('jax_platform_name', 'cpu')
-# config.update("jax_debug_nans", True)
 
 
-def create_train_state(box_length, learning_rate, n_space_dimension=2, prior_wavefunction_n=1, rng=0):
+
+def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=2, prior_wavefunction_n=1, rng=0):
     def get_masks(input_dim, hidden_dim=64, num_hidden=1):
         masks = []
         input_degrees = jnp.arange(input_dim)
@@ -48,16 +50,16 @@ def create_train_state(box_length, learning_rate, n_space_dimension=2, prior_wav
         _, params = init_fun(rng, (input_dim,))
         return params, apply_fun
 
-    psi, prior_pdf, dpdf, cdf = get_particle_in_the_box_fns(box_length, prior_wavefunction_n)
-    particleInBox = ParticleInBoxWrapper(psi, prior_pdf, dpdf, cdf)
-    sample = NumericalInverseHermite(particleInBox, domain=(-box_length / 2, box_length / 2), order=1, u_resolution=1e-7)
+    psi_prior, pdf_prior, dpdf_prior, cdf_prior = get_particle_in_the_box_fns(box_length, prior_wavefunction_n)
+    particleInBox = ParticleInBoxWrapper(psi_prior, pdf_prior, dpdf_prior, cdf_prior)
+    sample_prior = NumericalInverseHermite(particleInBox, domain=(-box_length / 2, box_length / 2), order=1, u_resolution=1e-7)
 
     init_fun = WaveFlow(
         flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-        psi, prior_pdf, sample
+        psi_prior, pdf_prior, sample_prior
     )
 
-    params, psi, log_pdf, sample = init_fun(rng, n_space_dimension, normalization_length=box_length)
+    params, psi, log_pdf, sample = init_fun(rng, n_particle, n_space_dimension, normalization_length=box_length)
 
     opt_init, opt_update, get_params = optimizers.adam(step_size=learning_rate)
     opt_state = opt_init(params)
@@ -163,7 +165,7 @@ class ModelTrainer:
 
         self.system_name = 'H2+'
         self.system = system_catalogue[self.system_name]
-        # self.system = 'laplace'
+        self.n_particle = 1
         self.n_space_dimension = 2
         self.charge = 1
 
@@ -198,6 +200,7 @@ class ModelTrainer:
         # Create initial state
         psi, log_pdf, sample, opt_state, opt_update, get_params = create_train_state(self.box_length_model,
                                                                                  self.learning_rate,
+                                                                                 n_particle=self.n_particle,
                                                                                  n_space_dimension=self.n_space_dimension,
                                                                                  prior_wavefunction_n=self.prior_wavefunction_n,
                                                                                  rng=split_rng)
