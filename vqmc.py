@@ -117,57 +117,33 @@ def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, bat
 
 
 
-# @custom_vjp
-# def loss_fn_efficient(params, psi, h_fn, batch):
-#     psi_val = psi(params, batch)[:,None]
-#     energies_val = h_fn(params, batch)
-#     loss_val = energies_val / psi_val
-#     return loss_val.mean(), (energies_val, psi_val)
-#
-# def f_fwd(params, psi, h_fn, batch):
-#     loss_val, aux = loss_fn(params, psi, h_fn, batch)
-#     energies_val, psi_val = aux
-#     return loss_val, (energies_val, psi_val)
-#
-# def f_bwd(res, g):
-#     energies_val, psi_val = res
-#     psi_val_square = psi_val ** 2
-#
-#
-#
-#     log_pdf_grad = (2 * grad_psi_val * energies_val) / psi_val_square
-#     energies_grad = (grad_energies_val * psi_val - energies_val * grad_psi_val) / psi_val_square
-#
-#     return (log_pdf_grad + energies_grad) * g
 
-
-def loss_fn_efficient(params, psi, h_fn, batch):
+def loss_fn_efficient(params, psi, h_fn, batch, running_average):
     psi_val = psi(params, batch)[:,None]
     energies_val = h_fn(params, batch)
-    return _loss_fn_efficient(energies_val, psi_val).mean()
+    return _loss_fn_efficient(energies_val, psi_val, running_average).mean()
 
 @custom_jvp
-def _loss_fn_efficient(energies_val, psi_val):
+def _loss_fn_efficient(energies_val, psi_val, running_average):
     return energies_val / psi_val
 
 @_loss_fn_efficient.defjvp
 def f_fwd(primals, tangents):
-    energies_val, psi_val = primals
-    t_energies_val, t_psi_val, = tangents
+    energies_val, psi_val, running_average = primals
+    t_energies_val, t_psi_val, _, = tangents
 
-    loss_val = _loss_fn_efficient(energies_val, psi_val)
-    grad = 2 * t_psi_val * loss_val / psi_val + (t_energies_val * psi_val - energies_val * t_psi_val) / psi_val**2
+    local_energies = _loss_fn_efficient(energies_val, psi_val, running_average)
+    grad = 2 * t_psi_val * (local_energies - running_average) / psi_val + (t_energies_val * psi_val - energies_val * t_psi_val) / psi_val**2
 
-    loss_val = jnp.clip(loss_val, a_min=-50, a_max=50)
+    local_energies = jnp.clip(local_energies, a_min=-50, a_max=50)
 
-    return loss_val, grad
+    return local_energies, grad
 
 
-@partial(jit, static_argnums=(1, 2, 3, 4, 6))
-def train_step_efficient(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch):
+@partial(jit, static_argnums=(1, 2, 3))
+def train_step_efficient(epoch, psi, h_fn, opt_update, opt_state, params, batch, running_average):
     # TODO: Think about adding baseline in policy gradient part to the gradient to reduce variance, probably not though
-    params = get_params(opt_state)
-    loss_val, gradients = value_and_grad(loss_fn_efficient, argnums=0)(params, psi, h_fn, batch)
+    loss_val, gradients = value_and_grad(loss_fn_efficient, argnums=0)(params, psi, h_fn, batch, running_average)
 
     gradients = jax.tree_multimap(lambda x: jnp.clip(x, a_min=-2, a_max=2), gradients)
 
@@ -267,7 +243,7 @@ class ModelTrainer:
             # Run an optimization step over a training batch
             # opt_state, new_loss = train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)
             # opt_state, new_loss = train_step_efficient(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch, running_average)
-            opt_state, new_loss = train_step_efficient(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch)
+            opt_state, new_loss = train_step_efficient(epoch, psi, h_fn, opt_update, opt_state, params, batch, running_average)
             pbar.set_description('Loss {:.3f}'.format(jnp.around(jnp.asarray(new_loss), 3).item()))
             if epoch % 100 == 0:
                 running_average = jnp.array(loss[-100:]).mean()
