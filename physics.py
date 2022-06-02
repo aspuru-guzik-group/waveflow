@@ -55,7 +55,6 @@ def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), n_space_dime
         if eps != 0.0:
             laplace = jnp.expand_dims(laplace, axis=-1)
 
-
         return -laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
         # return v_fn(x)[:,None] * fn_x
 

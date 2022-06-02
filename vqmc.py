@@ -50,9 +50,24 @@ def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=
         _, params = init_fun(rng, (input_dim,))
         return params, apply_fun
 
-    psi_prior, pdf_prior, dpdf_prior, cdf_prior = get_particle_in_the_box_fns(box_length, prior_wavefunction_n)
-    particleInBox = ParticleInBoxWrapper(psi_prior, pdf_prior, dpdf_prior, cdf_prior)
-    sample_prior = NumericalInverseHermite(particleInBox, domain=(-box_length / 2, box_length / 2), order=1, u_resolution=1e-7)
+    psi_prior, pdf_prior, dpdf_prior, cdf_prior, \
+    wavefunction_centered_prior, pdf_centered_prior, dpdf_centered_prior, cdf_centered_prior, \
+    wavefunction_uncentered_prior, pdf_uncentered_prior, dpdf_uncentered_prior, cdf_uncentered_prior = get_particle_in_the_box_fns(box_length, prior_wavefunction_n, n_particle - 1)
+
+    particleInBox_centered_prior = ParticleInBoxWrapper(wavefunction_centered_prior, pdf_centered_prior, dpdf_centered_prior, cdf_centered_prior)
+    sample_centered_prior = NumericalInverseHermite(particleInBox_centered_prior, domain=(-box_length / 2, box_length / 2), order=1, u_resolution=1e-7)
+    particleInBox_uncentered_prior = ParticleInBoxWrapper(wavefunction_uncentered_prior, pdf_uncentered_prior, dpdf_uncentered_prior, cdf_uncentered_prior)
+    sample_uncentered_prior = NumericalInverseHermite(particleInBox_uncentered_prior, domain=(0, box_length), order=1, u_resolution=1e-7)
+    sample_prior = lambda n_sample, n_particle, n_space_dimension: \
+        jnp.concatenate([
+            sample_centered_prior.rvs(n_sample * (n_particle -1)).reshape(n_sample, n_particle - 1),
+            sample_uncentered_prior.rvs(n_sample * (n_particle * n_space_dimension - (n_particle -1))).reshape(n_sample, n_particle * n_space_dimension - (n_particle -1))
+        ], axis=-1)
+
+
+    # psi_prior, pdf_prior, dpdf_prior, cdf_prior = get_particle_in_the_box_fns(box_length, prior_wavefunction_n)
+    # particleInBox = ParticleInBoxWrapper(psi_prior, pdf_prior, dpdf_prior, cdf_prior)
+    # sample_prior = NumericalInverseHermite(particleInBox, domain=(-box_length / 2, box_length / 2), order=1, u_resolution=1e-7)
 
     init_fun = WaveFlow(
         flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
@@ -163,14 +178,13 @@ class ModelTrainer:
         # Hyperparameter
         # Problem definition
 
-        self.system_name = 'H2+'
-        self.system = system_catalogue[self.system_name]
-        self.n_particle = 1
+        self.system_name = 'H'
+        self.system, self.n_particle = system_catalogue[self.system_name]
         self.n_space_dimension = 2
         self.charge = 1
 
         # Flow parameter
-        self.prior_wavefunction_n = 1
+        self.prior_wavefunction_n = 2
 
         # Turn on/off real time plotting
         self.realtime_plots = True
@@ -223,9 +237,11 @@ class ModelTrainer:
 
         pbar = tqdm(range(start_epoch + 1, start_epoch + self.num_epochs + 1), disable=not show_progress)
         for epoch in pbar:
+            params = get_params(opt_state)
+
             # Save a check point
             if epoch % self.log_every == 0 or epoch == 1:
-                helper.create_checkpoint(self.save_dir, psi, sample, get_params(opt_state), self.box_length,
+                helper.create_checkpoint(self.save_dir, psi, sample, params, self.box_length,
                                          self.n_space_dimension, opt_state, epoch, loss,
                                          energies, self.system, self.system_name, self.window,
                                          self.n_plotting, *plots)
@@ -241,14 +257,14 @@ class ModelTrainer:
             # batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
             #                            shape=(self.batch_size, self.n_space_dimension))
 
-            params = get_params(opt_state)
+
             batch = sample(split_rng, params, self.batch_size)
 
 
             # Run an optimization step over a training batch
-            # opt_state, new_loss = train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)
+            opt_state, new_loss = train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)
             # opt_state, new_loss = train_step_efficient(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch, running_average)
-            opt_state, new_loss = train_step_efficient(epoch, psi, h_fn, opt_update, opt_state, params, batch, running_average)
+            # opt_state, new_loss = train_step_efficient(epoch, psi, h_fn, opt_update, opt_state, params, batch, running_average)
             pbar.set_description('Loss {:.3f}'.format(jnp.around(jnp.asarray(new_loss), 3).item()))
             if epoch % 100 == 0:
                 running_average = jnp.array(loss[-100:]).mean()

@@ -171,8 +171,8 @@ def WaveFlow(transformation, prior_psi, prior_pdf, prior_sampling):
 
             return psi_val
 
-        def sample(rng, params, num_samples=1):
-            prior_samples = prior_sampling.rvs(n_particle*n_space_dim*num_samples).reshape(-1, n_particle * n_space_dim)
+        def sample(rng, params, n_samples=1):
+            prior_samples = prior_sampling(n_samples, n_particle, n_space_dim).reshape(-1, n_particle * n_space_dim)
             sample = inverse_fun(params, prior_samples)[0]
             sample = sample * normalization_length + normalization_mean
 

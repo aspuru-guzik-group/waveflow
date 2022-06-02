@@ -30,7 +30,7 @@ particleInBox_centered = ParticleInBoxWrapper(wavefunction_centered, pdf_centere
 sample_centered = NumericalInverseHermite(particleInBox_centered, domain=(-length/2, length/2), order=1, u_resolution=1e-7)
 particleInBox_uncentered = ParticleInBoxWrapper(wavefunction_uncentered, pdf_uncentered, dpdf_uncentered, cdf_uncentered)
 sample_uncentered = NumericalInverseHermite(particleInBox_uncentered, domain=(0, length), order=1, u_resolution=1e-7)
-sample = lambda n_sample, n_particle, n_space_dimension: jnp.concatenate([sample_centered.rvs(n_sample * n_particle * n_space_dimension).reshape(n_sample, n_particle, n_space_dimension), sample_uncentered.rvs(n_sample * n_particle * n_space_dimension).reshape(n_sample, n_particle, n_space_dimension)], axis=-1)
+sample = lambda n_sample, n_particle, n_space_dimension: jnp.concatenate([sample_centered.rvs(n_sample * (n_particle -1)).reshape(n_sample, n_particle - 1), sample_uncentered.rvs(n_sample * (n_particle * n_space_dimension - (n_particle -1))).reshape(n_sample, n_particle * n_space_dimension - (n_particle -1))], axis=-1)
 
 
 
@@ -54,7 +54,7 @@ plt.imshow(cdf_grid)
 plt.show()
 
 # samples = sample.rvs(1000).reshape(-1, 2)
-samples = sample(1000, 2, n_space_dimension)[:,0,:]
+samples = sample(1000, 2, n_space_dimension)
 plt.scatter(samples[:,0], samples[:,1], s=4)
 plt.xlim(-length, length)
 plt.ylim(-length, length)
