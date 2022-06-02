@@ -29,25 +29,28 @@ particleInBox_centered = ParticleInBoxWrapper(wavefunction_centered, pdf_centere
 sample_centered = NumericalInverseHermite(particleInBox_centered, domain=(-length/2, length/2), order=1, u_resolution=1e-7)
 particleInBox_uncentered = ParticleInBoxWrapper(wavefunction_uncentered, pdf_uncentered, dpdf_uncentered, cdf_uncentered)
 sample_uncentered = NumericalInverseHermite(particleInBox_uncentered, domain=(0, length), order=1, u_resolution=1e-7)
-sample = lambda n_sample, n_particle, n_space_dimension: jnp.concatenate([sample_centered.rvs(n_sample * n_particle * n_space_dimension).reshape(n_sample, n_particle, n_space_dimension), sample_uncentered.qrvs(n_sample * n_particle * n_space_dimension).reshape(n_sample, n_particle, n_space_dimension)], axis=-1)
+sample = lambda n_sample, n_particle, n_space_dimension: jnp.concatenate([sample_centered.rvs(n_sample * n_particle * n_space_dimension).reshape(n_sample, n_particle, n_space_dimension), sample_uncentered.rvs(n_sample * n_particle * n_space_dimension).reshape(n_sample, n_particle, n_space_dimension)], axis=-1)
 
-# psi_grid = psi(grid)
-# psi_grid = jnp.prod(psi_grid, axis=-1).reshape(100, 100)
-#
-# plt.imshow(psi_grid)
-# plt.show()
-#
-# density_grid = pdf(grid)
-# density_grid = jnp.prod(density_grid, axis=-1).reshape(100, 100)
-#
-# plt.imshow(density_grid)
-# plt.show()
-#
-# cdf_grid = cdf(grid)
-# cdf_grid = jnp.prod(cdf_grid, axis=-1).reshape(100, 100)
-#
-# plt.imshow(cdf_grid)
-# plt.show()
+
+
+
+psi_grid = psi(grid)
+psi_grid = jnp.prod(psi_grid, axis=-1).reshape(100, 100)
+
+plt.imshow(psi_grid, extent=[-length, length, -length, length], origin='lower')
+plt.show()
+
+density_grid = pdf(grid)
+density_grid = jnp.prod(density_grid, axis=-1).reshape(100, 100)
+
+plt.imshow(density_grid, extent=[-length, length, -length, length], origin='lower')
+plt.show()
+
+cdf_grid = cdf(grid)
+cdf_grid = jnp.prod(cdf_grid, axis=-1).reshape(100, 100)
+
+plt.imshow(cdf_grid)
+plt.show()
 
 # samples = sample.rvs(1000).reshape(-1, 2)
 samples = sample(1000, 2, 1)[:,0,:]

@@ -100,7 +100,7 @@ def get_particle_in_the_box_fns(length, n, n_centered_dimensions):
 
     return combined_wavefunctions, combined_pdf, combined_dpdf, combined_cdf, \
             wavefunction_centered, pdf_centered, dpdf_centered, cdf_centered, \
-            wavefunction_uncentered, pdf_centered, dpdf_centered, cdf_centered
+            wavefunction_uncentered, pdf_uncentered, dpdf_uncentered, cdf_uncentered
 
 
 class ParticleInBoxWrapper():
