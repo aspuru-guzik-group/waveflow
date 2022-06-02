@@ -19,12 +19,13 @@ yv = jnp.expand_dims(yv, axis=-1)
 
 grid = jnp.concatenate([xv, yv], axis=-1)
 
+n_space_dimension = 1
+n_particle = 2
 psi, pdf, dpdf, cdf, \
 wavefunction_centered, pdf_centered, dpdf_centered, cdf_centered, \
-wavefunction_uncentered, pdf_uncentered, dpdf_uncentered, cdf_uncentered = get_particle_in_the_box_fns(length, 2, 1)
+wavefunction_uncentered, pdf_uncentered, dpdf_uncentered, cdf_uncentered = get_particle_in_the_box_fns(length, n_particle*n_space_dimension, n_particle-1)
 
-# particleInBox = ParticleInBoxWrapper(psi, pdf, dpdf, cdf)
-# sample = NumericalInverseHermite(particleInBox, domain=(-length/2, length/2), order=1, u_resolution=1e-7)
+
 particleInBox_centered = ParticleInBoxWrapper(wavefunction_centered, pdf_centered, dpdf_centered, cdf_centered)
 sample_centered = NumericalInverseHermite(particleInBox_centered, domain=(-length/2, length/2), order=1, u_resolution=1e-7)
 particleInBox_uncentered = ParticleInBoxWrapper(wavefunction_uncentered, pdf_uncentered, dpdf_uncentered, cdf_uncentered)
@@ -53,7 +54,7 @@ plt.imshow(cdf_grid)
 plt.show()
 
 # samples = sample.rvs(1000).reshape(-1, 2)
-samples = sample(1000, 2, 1)[:,0,:]
+samples = sample(1000, 2, n_space_dimension)[:,0,:]
 plt.scatter(samples[:,0], samples[:,1], s=4)
 plt.xlim(-length, length)
 plt.ylim(-length, length)
