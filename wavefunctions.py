@@ -30,7 +30,7 @@ def get_particle_in_the_box_fns(length, n, n_centered_dimensions):
             x = x - length / 2
         # TODO currently wrong
         normalization = 2 / length
-        return 2* ( (n * jnp.pi)/ length ) * jnp.sin((n * jnp.pi * x) / length) * jnp.cos((n * jnp.pi * x) / length) * normalization
+        return 2 * ( (n * jnp.pi)/ length ) * jnp.sin((n * jnp.pi * x) / length) * jnp.cos((n * jnp.pi * x) / length) * normalization
 
     def dpdf_odd(x, zero_centered=True):
         if not zero_centered:
@@ -98,10 +98,12 @@ def get_particle_in_the_box_fns(length, n, n_centered_dimensions):
     combined_cdf = lambda x: combined_functions(x, cdf_centered, cdf_uncentered)
 
 
-    return combined_wavefunctions, combined_pdf, combined_dpdf, combined_cdf
+    return combined_wavefunctions, combined_pdf, combined_dpdf, combined_cdf, \
+            wavefunction_centered, pdf_centered, dpdf_centered, cdf_centered, \
+            wavefunction_uncentered, pdf_centered, dpdf_centered, cdf_centered
 
 
-class ParticleInBoxWrapper:
+class ParticleInBoxWrapper():
     def __init__(self, psi, pdf, dpdf, cdf):
         self.psi, self.pdf, self.dpdf, self.cdf = psi, pdf, dpdf, cdf
 
