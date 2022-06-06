@@ -89,7 +89,7 @@ def loss_fn_uniform(params, psi, h_fn, batch):
 
     return (psi_val * energies_val).mean() / jax.lax.stop_gradient((psi_val**2).mean())
 
-@partial(jit, static_argnums=(1, 2, 3, 5))
+# @partial(jit, static_argnums=(1, 2, 3, 5))
 def train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch):
     params = get_params(opt_state)
     loss_val, gradients = value_and_grad(loss_fn_uniform, argnums=0)(params, psi, h_fn, batch)

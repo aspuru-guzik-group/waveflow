@@ -112,11 +112,11 @@ def plot_output(psi, sample, weight_dict, protons, box_length, fig, ax, n_eigenf
         z_min, z_max = -np.abs(z).max(), np.abs(z).max()
         # plt.imshow(z, extent=[-box_length / 2, box_length / 2, -box_length / 2, box_length / 2], origin='lower')
         # plt.show()
-        # sample_points = sample(jax.random.PRNGKey(0), weight_dict, 250)
-        # sample_points = sample_points[:, 0, :]
+        sample_points = sample(jax.random.PRNGKey(0), weight_dict, 250)
+        sample_points = sample_points[:, 0, :]
 
         c = ax.pcolormesh(x, y, z, cmap='RdBu', vmin=z_min, vmax=z_max)
-        # ax.scatter(sample_points[:, 0], sample_points[:, 1], c='black', s=4, alpha=0.2)
+        ax.scatter(sample_points[:, 0], sample_points[:, 1], c='black', s=4, alpha=0.2)
         ax.scatter(protons[:, 0], protons[:, 1], c='red', s=9)
         ax.set_title('Eigenfunction {}'.format(n_eigenfunc))
         # set the limits of the plot to the limits of the data

@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 import jax
 from scipy.stats import NumericalInverseHermite
-from sine_square_dist import sine_square_dist, sample_sine_square_dist
+from sine_square_dist import normalized_sine, sine_square_dist, sample_sine_square_dist
 
 def get_particle_in_the_box_fns(n):
     def wavefunction_even(x, length):
@@ -200,9 +200,9 @@ def WaveFlow(transformation):
 
             # inputs = (inputs - normalization_mean) / normalization_length
 
-            u, log_det = direct_fun(params, inputs)
+            u, log_det = direct_fun(params[:-2], inputs)
 
-            log_probs = jnp.log(jnp.prod(prior_pdf(u), axis=-1) + 1e-9)
+            log_probs = jnp.log(jnp.prod(sine_square_dist((params[-2], params[-1]), u), axis=-1) + 1e-9)
             return log_probs + log_det
 
         def psi(params, inputs):
@@ -213,9 +213,9 @@ def WaveFlow(transformation):
 
             # inputs = (inputs - normalization_mean) / normalization_length
 
-            u, log_det = direct_fun(params, inputs)
+            u, log_det = direct_fun(params[:-2], inputs)
 
-            psi = jnp.prod(prior_psi(u, params[-1]), axis=-1)
+            psi = jnp.prod(normalized_sine((params[-2], params[-1]), u), axis=-1)
             # return jnp.expand_dims(psi * jnp.exp(0.5*log_det), axis=-1)
             psi_val = psi * jnp.exp(0.5 * log_det)
 
@@ -229,7 +229,7 @@ def WaveFlow(transformation):
 
         def sample(rng, params, n_samples=1):
             # prior_samples = prior_sampling.rvs(n_samples * n_particle * n_space_dim).reshape(n_samples, n_particle * n_space_dim)
-            prior_samples = sample_sine_square_dist(n_samples * n_particle * n_space_dim, params[-2], params[-1]).reshape(-1, n_particle * n_space_dim)
+            prior_samples = sample_sine_square_dist((params[-2], params[-1]), n_samples * n_particle * n_space_dim).reshape(-1, n_particle * n_space_dim)
             sample = inverse_fun(params, prior_samples)[0]
             # sample = sample * normalization_length + normalization_mean
 
