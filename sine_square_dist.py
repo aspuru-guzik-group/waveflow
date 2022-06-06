@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 from jax import jit
+import jax
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -17,10 +18,10 @@ def normalized_sine(params, x):
 def sine_square_dist(params, x):
     return jnp.sin(jnp.pi * x)**2 / simple_sine_squared_cdf(params[0], params[1]) * jnp.heaviside(x - params[0], 1.0) * jnp.heaviside(params[1] - x, 1.0)
 
-
-def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
-    x = np.random.uniform(low=xmin, high=xmax, size=num_samples)
-    y = np.random.uniform(low=0, high=ymax, size=num_samples)
+@jit
+def rejection_sampling(rng, function, num_samples, xmin=-10, xmax=10, ymax=1):
+    x = jax.random.uniform(rng, minval=xmin, maxval=xmax, shape=num_samples)
+    y = jax.random.uniform(rng, minval=0, maxval=ymax, shape=num_samples)
     passed = (y < function(x)).astype(bool)
     all_x = x[passed]
 
@@ -29,8 +30,8 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
         full_batch = True
 
     while not full_batch:
-        x = np.random.uniform(low=xmin, high=xmax, size=num_samples)
-        y = np.random.uniform(low=0, high=ymax, size=num_samples)
+        x = jax.random.uniform(rng, minval=xmin, maxval=xmax, shape=num_samples)
+        y = jax.random.uniform(rng, minval=0, maxval=ymax, shape=num_samples)
         passed = (y < function(x)).astype(bool)
         all_x = jnp.concatenate([all_x, x[passed]])
 
@@ -40,9 +41,32 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 
     return all_x[:num_samples]
 
-def sample_sine_square_dist(params, n_sample):
+def sample_sine_square_dist(rng, params, num_samples):
+    # xmin, xmax = params
+    # return rejection_sampling(rng, lambda x: sine_square_dist(params, x), n_sample, xmin=xmin, xmax=xmax, ymax=1 / simple_sine_squared_cdf(xmin, xmax))
+
     xmin, xmax = params
-    return rejection_sampling(lambda x: sine_square_dist(params, x), n_sample, xmin=xmin, xmax=xmax, ymax=1 / simple_sine_squared_cdf(xmin, xmax))
+    ymax = 1 / simple_sine_squared_cdf(xmin, xmax)
+    function = lambda x: sine_square_dist(params, x)
+    x = jax.random.uniform(rng, minval=xmin, maxval=xmax, shape=(num_samples,))
+    y = jax.random.uniform(rng, minval=0, maxval=ymax, shape=(num_samples,))
+    passed = (y < function(x)).astype(bool)
+    all_x = x[passed]
+
+    full_batch = False
+    if all_x.shape[0] > num_samples:
+        full_batch = True
+
+    while not full_batch:
+        x = jax.random.uniform(rng, minval=xmin, maxval=xmax, shape=(num_samples,))
+        y = jax.random.uniform(rng, minval=0, maxval=ymax, shape=(num_samples,))
+        passed = (y < function(x)).astype(bool)
+        all_x = jnp.concatenate([all_x, x[passed]])
+
+        if all_x.shape[0] > num_samples:
+            full_batch = True
+
+    return all_x[:num_samples]
 
 
 if __name__ == '__main__':

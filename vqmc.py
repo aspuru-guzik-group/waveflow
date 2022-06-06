@@ -1,7 +1,7 @@
 from jax.config import config
 # config.update('jax_platform_name', 'cpu')
 # config.update("jax_enable_x64", True)
-config.update("jax_debug_nans", True)
+# config.update("jax_debug_nans", True)
 
 import jax
 
@@ -18,7 +18,7 @@ from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, Wav
 from scipy.stats.sampling import NumericalInverseHermite
 import matplotlib.pyplot as plt
 from systems import system_catalogue
-import line_profiler_pycharm
+from line_profiler_pycharm import profile
 
 
 
@@ -70,7 +70,7 @@ def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=
         flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
     )
 
-    params, psi, log_pdf, sample = init_fun(rng, n_particle, n_space_dimension, prior_wavefunction_n=prior_wavefunction_n)
+    params, psi, log_pdf, sample = init_fun(rng, n_particle, n_space_dimension, prior_wavefunction_n=prior_wavefunction_n, normalization_length=10)
 
     opt_init, opt_update, get_params = optimizers.adam(step_size=learning_rate)
     opt_state = opt_init(params)
@@ -139,7 +139,7 @@ def loss_fn_efficient(params, psi, h_fn, batch, running_average):
 
 @custom_jvp
 def _loss_fn_efficient(energies_val, psi_val, running_average):
-    return energies_val / psi_val
+    return energies_val / (psi_val + 1e-7)
 
 @_loss_fn_efficient.defjvp
 def f_fwd(primals, tangents):
@@ -200,7 +200,7 @@ class ModelTrainer:
         self.box_length_model = 5
         self.box_length = 15
 
-
+    @profile
     def start_training(self, show_progress=True, callback=None):
         """
         Function for training the model
@@ -229,7 +229,7 @@ class ModelTrainer:
             plt.ion()
         plots = helper.create_plots(self.n_space_dimension)
         # gradeitns_fig, gradients_ax = plt.subplots(1, 1)
-        running_average = 0
+        running_average = jnp.zeros(1)
 
         pbar = tqdm(range(start_epoch + 1, start_epoch + self.num_epochs + 1), disable=not show_progress)
         for epoch in pbar:

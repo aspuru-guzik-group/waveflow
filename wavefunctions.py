@@ -182,7 +182,7 @@ class ParticleInBoxWrapper():
 
 def WaveFlow(transformation):
 
-    def init_fun(rng, n_particle, n_space_dim, prior_wavefunction_n=1):
+    def init_fun(rng, n_particle, n_space_dim, prior_wavefunction_n=1, normalization_mean=0, normalization_length=1):
         transformation_rng, prior_rng = jax.random.split(rng)
 
         params, direct_fun, inverse_fun = transformation(transformation_rng, n_particle * n_space_dim)
@@ -198,7 +198,7 @@ def WaveFlow(transformation):
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
 
-            # inputs = (inputs - normalization_mean) / normalization_length
+            inputs = (inputs - normalization_mean) / normalization_length
 
             u, log_det = direct_fun(params[:-2], inputs)
 
@@ -211,7 +211,7 @@ def WaveFlow(transformation):
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
 
-            # inputs = (inputs - normalization_mean) / normalization_length
+            inputs = (inputs - normalization_mean) / normalization_length
 
             u, log_det = direct_fun(params[:-2], inputs)
 
@@ -229,9 +229,9 @@ def WaveFlow(transformation):
 
         def sample(rng, params, n_samples=1):
             # prior_samples = prior_sampling.rvs(n_samples * n_particle * n_space_dim).reshape(n_samples, n_particle * n_space_dim)
-            prior_samples = sample_sine_square_dist((params[-2], params[-1]), n_samples * n_particle * n_space_dim).reshape(-1, n_particle * n_space_dim)
+            prior_samples = sample_sine_square_dist(rng, (params[-2], params[-1]), n_samples * n_particle * n_space_dim).reshape(-1, n_particle * n_space_dim)
             sample = inverse_fun(params[:-2], prior_samples)[0]
-            # sample = sample * normalization_length + normalization_mean
+            sample = sample * normalization_length + normalization_mean
 
             # sample = sample.reshape(-1, n_particle, n_space_dim)
             return sample
