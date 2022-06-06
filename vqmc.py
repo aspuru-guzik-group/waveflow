@@ -12,7 +12,7 @@ from functools import partial
 import flows
 import jax.numpy as jnp
 
-from jax import grad, jit, random, value_and_grad, custom_vjp, custom_jvp
+from jax import grad, jit, value_and_grad, custom_jvp
 from jax.example_libraries import stax, optimizers
 from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, WaveFlow
 from scipy.stats.sampling import NumericalInverseHermite
@@ -50,31 +50,27 @@ def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=
         _, params = init_fun(rng, (input_dim,))
         return params, apply_fun
 
-    psi_prior, pdf_prior, dpdf_prior, cdf_prior, \
-    wavefunction_centered_prior, pdf_centered_prior, dpdf_centered_prior, cdf_centered_prior, \
-    wavefunction_uncentered_prior, pdf_uncentered_prior, dpdf_uncentered_prior, cdf_uncentered_prior = get_particle_in_the_box_fns(box_length, prior_wavefunction_n, n_particle - 1)
+    # psi_prior, pdf_prior, dpdf_prior, cdf_prior, \
+    # wavefunction_centered_prior, pdf_centered_prior, dpdf_centered_prior, cdf_centered_prior, \
+    # wavefunction_uncentered_prior, pdf_uncentered_prior, dpdf_uncentered_prior, cdf_uncentered_prior = get_particle_in_the_box_fns(box_length, prior_wavefunction_n, n_particle - 1)
+    #
+    # particleInBox_centered_prior = ParticleInBoxWrapper(wavefunction_centered_prior, pdf_centered_prior, dpdf_centered_prior, cdf_centered_prior)
+    # sample_centered_prior = NumericalInverseHermite(particleInBox_centered_prior, domain=(-box_length / 2, box_length / 2), order=1, u_resolution=1e-7)
+    # particleInBox_uncentered_prior = ParticleInBoxWrapper(wavefunction_uncentered_prior, pdf_uncentered_prior, dpdf_uncentered_prior, cdf_uncentered_prior)
+    # sample_uncentered_prior = NumericalInverseHermite(particleInBox_uncentered_prior, domain=(0, box_length), order=1, u_resolution=1e-7)
+    # sample_prior = lambda n_sample, n_particle, n_space_dimension: \
+    #     jnp.concatenate([
+    #         sample_centered_prior.rvs(n_sample * (n_particle -1)).reshape(n_sample, n_particle - 1),
+    #         sample_uncentered_prior.rvs(n_sample * (n_particle * n_space_dimension - (n_particle -1))).reshape(n_sample, n_particle * n_space_dimension - (n_particle -1))
+    #     ], axis=-1)
 
-    particleInBox_centered_prior = ParticleInBoxWrapper(wavefunction_centered_prior, pdf_centered_prior, dpdf_centered_prior, cdf_centered_prior)
-    sample_centered_prior = NumericalInverseHermite(particleInBox_centered_prior, domain=(-box_length / 2, box_length / 2), order=1, u_resolution=1e-7)
-    particleInBox_uncentered_prior = ParticleInBoxWrapper(wavefunction_uncentered_prior, pdf_uncentered_prior, dpdf_uncentered_prior, cdf_uncentered_prior)
-    sample_uncentered_prior = NumericalInverseHermite(particleInBox_uncentered_prior, domain=(0, box_length), order=1, u_resolution=1e-7)
-    sample_prior = lambda n_sample, n_particle, n_space_dimension: \
-        jnp.concatenate([
-            sample_centered_prior.rvs(n_sample * (n_particle -1)).reshape(n_sample, n_particle - 1),
-            sample_uncentered_prior.rvs(n_sample * (n_particle * n_space_dimension - (n_particle -1))).reshape(n_sample, n_particle * n_space_dimension - (n_particle -1))
-        ], axis=-1)
 
-
-    # psi_prior, pdf_prior, dpdf_prior, cdf_prior = get_particle_in_the_box_fns(box_length, prior_wavefunction_n)
-    # particleInBox = ParticleInBoxWrapper(psi_prior, pdf_prior, dpdf_prior, cdf_prior)
-    # sample_prior = NumericalInverseHermite(particleInBox, domain=(-box_length / 2, box_length / 2), order=1, u_resolution=1e-7)
 
     init_fun = WaveFlow(
         flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-        psi_prior, pdf_prior, sample_prior
     )
 
-    params, psi, log_pdf, sample = init_fun(rng, n_particle, n_space_dimension, normalization_length=box_length)
+    params, psi, log_pdf, sample = init_fun(rng, n_particle, n_space_dimension, prior_wavefunction_n=prior_wavefunction_n)
 
     opt_init, opt_update, get_params = optimizers.adam(step_size=learning_rate)
     opt_state = opt_init(params)
