@@ -190,8 +190,8 @@ def WaveFlow(transformation):
         # prior_log_pdf, prior_sample = prior(prior_rng, input_dim)
         # params.append( - jnp.ones(n_particle * n_space_dim) * prior_wavefunction_n / 2)
         # params.append( jnp.ones(n_particle * n_space_dim) * prior_wavefunction_n / 2)
-        params.append(-jnp.ones(1) * prior_wavefunction_n / 2)
-        params.append( jnp.ones(1) * prior_wavefunction_n / 2)
+        params.append(-jnp.ones(1) * 1.5 * prior_wavefunction_n / 2)
+        params.append( jnp.ones(1) * 1.5 * prior_wavefunction_n / 2)
 
         def log_pdf(params, inputs):
             # inputs = inputs.reshape(-1, inputs.shape[-2] * inputs.shape[-1])
@@ -230,7 +230,7 @@ def WaveFlow(transformation):
         def sample(rng, params, n_samples=1):
             # prior_samples = prior_sampling.rvs(n_samples * n_particle * n_space_dim).reshape(n_samples, n_particle * n_space_dim)
             prior_samples = sample_sine_square_dist((params[-2], params[-1]), n_samples * n_particle * n_space_dim).reshape(-1, n_particle * n_space_dim)
-            sample = inverse_fun(params, prior_samples)[0]
+            sample = inverse_fun(params[:-2], prior_samples)[0]
             # sample = sample * normalization_length + normalization_mean
 
             # sample = sample.reshape(-1, n_particle, n_space_dim)

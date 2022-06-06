@@ -1,7 +1,7 @@
 from jax.config import config
 # config.update('jax_platform_name', 'cpu')
 # config.update("jax_enable_x64", True)
-# config.update("jax_debug_nans", True)
+config.update("jax_debug_nans", True)
 
 import jax
 
@@ -18,7 +18,7 @@ from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, Wav
 from scipy.stats.sampling import NumericalInverseHermite
 import matplotlib.pyplot as plt
 from systems import system_catalogue
-
+import line_profiler_pycharm
 
 
 
@@ -89,7 +89,7 @@ def loss_fn_uniform(params, psi, h_fn, batch):
 
     return (psi_val * energies_val).mean() / jax.lax.stop_gradient((psi_val**2).mean())
 
-# @partial(jit, static_argnums=(1, 2, 3, 5))
+@partial(jit, static_argnums=(1, 2, 3, 5))
 def train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch):
     params = get_params(opt_state)
     loss_val, gradients = value_and_grad(loss_fn_uniform, argnums=0)(params, psi, h_fn, batch)
@@ -253,14 +253,14 @@ class ModelTrainer:
             # batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
             #                            shape=(self.batch_size, self.n_space_dimension))
 
-
+            print(params[-2], params[-1])
             batch = sample(split_rng, params, self.batch_size)
 
 
             # Run an optimization step over a training batch
-            opt_state, new_loss = train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)
+            # opt_state, new_loss = train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)
             # opt_state, new_loss = train_step_efficient(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, batch, running_average)
-            # opt_state, new_loss = train_step_efficient(epoch, psi, h_fn, opt_update, opt_state, params, batch, running_average)
+            opt_state, new_loss = train_step_efficient(epoch, psi, h_fn, opt_update, opt_state, params, batch, running_average)
             pbar.set_description('Loss {:.3f}'.format(jnp.around(jnp.asarray(new_loss), 3).item()))
             if epoch % 100 == 0:
                 running_average = jnp.array(loss[-100:]).mean()

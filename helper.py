@@ -113,7 +113,7 @@ def plot_output(psi, sample, weight_dict, protons, box_length, fig, ax, n_eigenf
         # plt.imshow(z, extent=[-box_length / 2, box_length / 2, -box_length / 2, box_length / 2], origin='lower')
         # plt.show()
         sample_points = sample(jax.random.PRNGKey(0), weight_dict, 250)
-        sample_points = sample_points[:, 0, :]
+        # sample_points = sample_points[:, 0, :]
 
         c = ax.pcolormesh(x, y, z, cmap='RdBu', vmin=z_min, vmax=z_max)
         ax.scatter(sample_points[:, 0], sample_points[:, 1], c='black', s=4, alpha=0.2)
