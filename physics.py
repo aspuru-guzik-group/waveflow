@@ -5,25 +5,12 @@ from functools import partial
 from jax import jit, vmap, jacfwd
 from helper import compute_hessian_diagonals, vectorized_diagonal, vectorized_trace
 
-def laplacian2(fun,x,params):
-    x = jnp.expand_dims(x,axis=1) #add new dimensionality for vmap
-    _hess = lambda  _x,params: hessian(fun,argnums=0)(_x,params).reshape(_x.shape[1],_x.shape[1])
-    hess_ = vmap(_hess,in_axes=(0,None))(x,params)
-    lap_ = jnp.einsum('ijj', hess_) #simialar to: vmap(jnp.trace,in_axes=0)(hess_)
-    return lap_
 
 # @partial(jit, static_argnums=(0,))
 def laplacian(fn):
 
     _laplacian = lambda params, x: jnp.trace(jax.hessian(fn, argnums=1)(params, x), axis1=1, axis2=2)
     return vmap(_laplacian, in_axes=(None, 0))
-
-
-def get_hydrogen_potential():
-    def hygrogen_potential(x):
-        return - 1 / jnp.linalg.norm(x, axis=-1)
-
-    return hygrogen_potential
 
 
 def second_difference_along_coordinate(weight_dict, fn, x, i, eps):
@@ -47,7 +34,24 @@ def laplacian_numerical(fn, eps=0.1):
     return _laplace_numerical
 
 
-def construct_hamiltonian_function(fn, system='hydrogen', eps=0.0, box_length=1):
+
+
+
+
+
+def get_potential(protons, max_val=None):
+    def proton_electron_potential(x):
+        potential = - 1 / jnp.linalg.norm(protons[None] - x[:, None], axis=-1)
+        if max_val is not None:
+            potential = jnp.clip(potential, a_max=max_val)
+
+        potential = jnp.sum(potential, axis=-1)
+        return potential
+
+    return proton_electron_potential
+
+
+def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), n_space_dimensions=2, eps=0.0, max_potential_val=None):
     def _construct(weight_dict, x):
         laplace = laplacian_fn(weight_dict, x)
         if eps != 0.0:
@@ -56,13 +60,7 @@ def construct_hamiltonian_function(fn, system='hydrogen', eps=0.0, box_length=1)
         return -laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
         # return v_fn(x)[:,None] * fn_x
 
-    if system == 'hydrogen':
-        v_fn = get_hydrogen_potential()
-    elif system == 'laplace':
-        v_fn = lambda x: 0 * x.sum(-1)
-    else:
-        print('System "{}" not supported'.format(system))
-        exit()
+    v_fn = get_potential(protons, max_potential_val)
 
     if eps > 0.0:
         laplacian_fn = laplacian_numerical(fn, eps=eps)

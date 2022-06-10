@@ -103,12 +103,14 @@ def WaveFlow(transformation, prior_psi, prior_pdf, prior_sampling):
 
             u, log_det = direct_fun(params, inputs)
 
-            log_probs = jnp.log(jnp.prod(prior_pdf(u), axis=-1 ) + 1e-9)
+            log_probs = jnp.log(jnp.prod(prior_pdf(u), axis=-1) + 1e-9)
             return log_probs + log_det
 
         def psi(params, inputs):
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
+
+            inputs = (inputs - normalization_mean) / normalization_length
 
             u, log_det = direct_fun(params, inputs)
 
@@ -126,7 +128,9 @@ def WaveFlow(transformation, prior_psi, prior_pdf, prior_sampling):
 
         def sample(rng, params, num_samples=1):
             prior_samples = prior_sampling.rvs(input_dim*num_samples).reshape(-1,input_dim)
-            return inverse_fun(params, prior_samples)[0]
+            sample = inverse_fun(params, prior_samples)[0]
+            sample = sample * normalization_length + normalization_mean
+            return sample
 
         return params, psi, log_pdf, sample
 
