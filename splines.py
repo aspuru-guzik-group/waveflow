@@ -2,8 +2,10 @@
 # following: J. O. Ramsay, Stat. Sci. 3, 425 (1988)
 # Chong Sun <sunchong137@gmail.com>
 
-# TODO replace with jax?
-import numpy as np
+
+import jax.numpy as jnp
+import copy
+
 
 class MSplines(object):
     '''
@@ -24,7 +26,7 @@ class MSplines(object):
             knots: sorted 1d array, the internal breakpoints that define the splines.
             fix_point: if True, evaluate the splines at fixed points; else, also generate a list of functions.
         '''
-        self.knots = np.asarray(knots)
+        self.knots = jnp.asarray(knots)
         self.bounds = (knots[0], knots[-1]) # lower and upper points, should be the two ends of the interval
         self.nknots = self.num_splines + self.degree
 
@@ -58,9 +60,9 @@ class MSplines(object):
         try:
             nx = len(coord)
         except:
-            coord = np.array([coord])
+            coord = jnp.array([coord])
             nx = 1 # coord is a number
-        splines_fp = np.zeros((self.num_splines, nx)) # store the values of the splines at coord as a matrix
+        splines_fp = jnp.zeros((self.num_splines, nx)) # store the values of the splines at coord as a matrix
 
         # Put the first order splines into the matrix
         count_x = 0
@@ -77,7 +79,7 @@ class MSplines(object):
 
         for k in range(2, self.degree+1): #TODO check if +1 is needed
             # k as in eq(2) in Ramsay paper
-            splines_fp_temp = np.copy(splines_fp)
+            splines_fp_temp = jnp.copy(splines_fp)
             _p = k / (k - 1.0)
             for i in range(self.num_splines):
                 _p1 = _p / (self.knots[i + k] - self.knots[i])
@@ -126,7 +128,7 @@ def isplines(coord, num_splines, knots, degree=3, msplines=None):
     try:
         nx = len(coord)
     except:
-        coord = np.array([coord])
+        coord = jnp.array([coord])
         nx = 1  # coord is a number
     assert len(knots) >= num_splines + degree + 1
     # generate M-Splines if not provided
@@ -138,7 +140,7 @@ def isplines(coord, num_splines, knots, degree=3, msplines=None):
     assert len(group_x) == num_splines # see constraints
 
     # get I splines
-    splines_fp = np.zeros((num_splines, nx))
+    splines_fp = jnp.zeros((num_splines, nx))
     # evaluate the prefactors
     pre_fact = knots[(degree+1):(num_splines+degree+1)] - knots[:num_splines]
     pre_fact /= (degree + 1)
@@ -148,7 +150,7 @@ def isplines(coord, num_splines, knots, degree=3, msplines=None):
         min_j = max(0, ix - degree + 1)
         splines_fp[:min_j, count_x:(count_x+l)] = 1
         for j in range(min_j, ix+1):
-            splines_fp[j, count_x:(count_x+l)] = np.dot(pre_fact[j:ix+1], msplines[j:ix+1, count_x:(count_x+l)])
+            splines_fp[j, count_x:(count_x+l)] = jnp.dot(pre_fact[j:ix+1], msplines[j:ix+1, count_x:(count_x+l)])
         count_x += l
 
     return splines_fp
@@ -167,7 +169,7 @@ def isplines_int(coord, num_splines, knots, degree=3, msplines=None):
     try:
         nx = len(coord)
     except:
-        coord = np.array([coord])
+        coord = jnp.array([coord])
         nx = 1  # coord is a number
     #assert len(knots) >= num_splines + degree + 1
     # generate M-Splines if not provided
@@ -178,16 +180,44 @@ def isplines_int(coord, num_splines, knots, degree=3, msplines=None):
     assert nx == msplines.shape[-1]
     #assert len(group_x) == num_splines  # see constraints
 
-    splines_fp = np.zeros((num_splines, nx))
+    splines_fp = jnp.zeros((num_splines, nx))
     # start integration
     diff = coord[1:] - coord[:-1]
     for ix in range(1, nx):
         splines_fp[:, ix] = splines_fp[:, ix-1] + msplines[:, ix] * diff[ix-1]
 
-    return splines_fp   
+    return splines_fp
 
-def gen_knots():
-    pass
+def gen_simple_knots(num_splines, degree, bounds):
+    '''
+    Generate a sequence of simple knots.
+    Args:
+        num_splines: int, number of splines to generate
+        degree: the spline is continuous up to the (degree)th derivative. This is different from M-Splines.
+        bounds: list or array. The boundaries that divide the region. bounds[0] and bounds[-1] are
+                the minimum and maximum of the region.
+    Returns:
+        1D array of size (num_splines + degree) storing the values of the knots.
+    '''
+    bounds = jnp.asarray(bounds)
+    num_bounds = len(bounds)
+    assert num_bounds > 1
+
+    num_internal = num_splines - degree # TODO check if this is correct
+    targ_num_bounds = num_internal + 2
+
+    if num_bounds != targ_num_bounds: # the number of boundary points has to be greater than this number
+        bounds = jnp.linspace(bounds[0], bounds[-1], num_internal + 2, endpoint=True)
+        num_bounds = targ_num_bounds
+
+    num_knots = num_splines + degree
+    knots = jnp.empty(num_knots, dtype=jnp.float32)
+    knots = knots.at[:degree].set(bounds[0])
+    knots = knots.at[degree:num_splines].set(copy.deepcopy(bounds[1:-1]))
+    knots = knots.at[num_splines:].set(bounds[-1])
+
+    return knots
+
 
 def mono_func():
     pass
