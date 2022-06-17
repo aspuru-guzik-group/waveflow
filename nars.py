@@ -105,7 +105,7 @@ def NARS():
                 normalization_constant = psi_square_on_domain.sum() * dx
                 max_val = jnp.max(psi_square_on_domain / normalization_constant)[None]
 
-                xmin, xmax = params
+
                 function = lambda x: backbone_apply_fun(params[n], integration_points) ** 2 / normalization_constant
 
                 rng, rng_split = jax.random.split(rng)
@@ -148,7 +148,6 @@ init_fun = NARS()
 params, apply_fun, sample_fun = init_fun(jax.random.PRNGKey(42), 2, 16)
 
 psi_val, pdf_val = apply_fun(params, jnp.array([0.0, 0.0, 0.0]))
-
 print(psi_val)
 print(pdf_val)
 

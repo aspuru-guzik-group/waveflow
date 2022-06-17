@@ -16,7 +16,7 @@ class MSplines(object):
             degree: the spline is continuous up to the (degree - 1)th derivative.
         '''
         self.num_splines = num_splines
-        self.degree = degree # k value in the paper
+        self.degree = degree # degree value in the paper
 
     def update_knots(self, knots, fix_point=False):
         '''
@@ -76,7 +76,7 @@ class MSplines(object):
                     break
 
         for k in range(2, self.degree+1): #TODO check if +1 is needed
-            # k as in eq(2) in Ramsay paper
+            # degree as in eq(2) in Ramsay paper
             splines_fp_temp = np.copy(splines_fp)
             _p = k / (k - 1.0)
             for i in range(self.num_splines):

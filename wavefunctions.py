@@ -95,17 +95,17 @@ def get_particle_in_the_box_fns(n):
 #         if not zero_centered:
 #             x = x - length / 2
 #         normalization = 2 / length
-#         k = (n * jnp.pi) / length
+#         degree = (n * jnp.pi) / length
 #         l = length / 2
-#         return - normalization * (-2*k*(l + x) + jnp.sin(2*k*l) + jnp.sin(2*k*x)) / (4*k)
+#         return - normalization * (-2*degree*(l + x) + jnp.sin(2*degree*l) + jnp.sin(2*degree*x)) / (4*degree)
 #
 #     def cdf_odd(x, zero_centered=True):
 #         if not zero_centered:
 #             x = x - length / 2
 #         normalization = 2 / length
-#         k = (n * jnp.pi) / length
+#         degree = (n * jnp.pi) / length
 #         l = length/2
-#         return normalization * (2*k*(l + x) + jnp.sin(2*k*l) + jnp.sin(2*k*x)) / (4*k)
+#         return normalization * (2*degree*(l + x) + jnp.sin(2*degree*l) + jnp.sin(2*degree*x)) / (4*degree)
 #
 #
 #     if n % 2 == 0:
