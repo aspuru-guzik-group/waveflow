@@ -69,11 +69,11 @@ def MSplines(x, n_splines, degree, knots=None, bounds=None, verbose=0):
     # k = 1
     # Mx = 1/(t_i+1 - t_i), if t_i =< x < t_i+1, otherwise 0.
     Mx = np.zeros(n_splines) # TODO 
-    #j = np.searchsorted(knots, x, 'right') 
+    #j = np.searchsorted(knots, x, 'right') - 1
     for j in range(n_knots - 1): # TODO replace with numpy.searchsorted()
         if x >= knots[j] and x < knots[j+1]:
             break
-    Mx[j] = 1.0
+    Mx[j] = 1.0 / (knots[j+1] - knots[j])
 
     # k > 1
     for k in range(2, degree+1):
@@ -107,14 +107,15 @@ if __name__ == "__main__":
     bounds = [0, 1]
     n_splines = 6
     degree = 3
-    knots = np.array([0, 0, 0, 0.3, 0.5, 0.6, 1., 1., 1.])
+    #knots = np.array([0, 0, 0, 0.3, 0.5, 0.6, 1., 1., 1.])
+    bounds = np.array([0, 0.3, 0.5, 0.6, 1.0])
     shift = 1e-3
     L = 0.0
     R = 1.0
-    mesh = np.linspace(L+shift, R-shift, 100)
+    mesh = np.linspace(L+shift, R-shift, 200)
     Mx = []
     for x in mesh:
-        m = MSplines(x, n_splines, degree, knots, verbose="DEBUG")
+        m = MSplines(x, n_splines, degree, bounds=bounds, verbose="DEBUG")
         Mx.append(m)
     Mx = np.asarray(Mx)
     for i in range(n_splines):
