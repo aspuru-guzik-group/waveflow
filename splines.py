@@ -42,6 +42,7 @@ def gen_simple_knots(n_splines, degree, bounds):
     knots[n_splines:] *= bounds[-1]
     return knots
 
+
 def MSplines(x, n_splines, degree, knots=None, bounds=None, verbose=0):
     '''
     Generate M-Splines. 
@@ -58,13 +59,18 @@ def MSplines(x, n_splines, degree, knots=None, bounds=None, verbose=0):
         x.
     '''
 
-    if verbose == "DEBUG":
-        print("evaluating the splines at {}".format(x))
-    
+ 
     if knots is None:
         knots = gen_simple_knots(n_splines, degree, bounds)
     n_knots = len(knots)
+
+    if verbose == "DEBUG":
+        print("evaluating the splines at {}".format(x))
+        print("Number of splines: {}; order: {}".format(n_splines, degree))
+        print("Number of knots: {}".format(n_knots))
+   
     assert n_knots == degree + n_splines
+
 
     # k = 1
     # Mx = 1/(t_i+1 - t_i), if t_i =< x < t_i+1, otherwise 0.
@@ -99,6 +105,67 @@ def MSplines(x, n_splines, degree, knots=None, bounds=None, verbose=0):
 
     return Mx
 
+def ISplines(x, n_splines, degree, knots=None, bounds=None, verbose=0): 
+
+    '''
+    Generate I-Splines. 
+    for t_j <= x < t_{j+1}:
+        - Ix[i] = 0, if i > j
+        - Ix[i] = \sum_{m=i+1}^j (t_{m+k+1} - t_m) Mx_{k+1}[m] / (k+1), if
+          j-k <= i <= j
+        - Ix[i] = 1, if i < j-k
+    Args:
+        x:           float, at where the splines are evalutated.
+        n_splines:   int, the 'n' value. Number of splines to generate
+        degree:      int, the 'k' value. The spline is continuous up to the
+        (degree)th derivative. This is different from M-Splines.
+        knots:       the knots used to define the splines.
+        bounds:      the boundary points to divide the interval.    
+
+    Returns:
+        1D array of size (n_splines) storing the values of splines at point
+        x.
+    '''
+
+    if verbose == "DEBUG":
+        print("evaluating the splines at {}".format(x))
+    
+    if knots is None:
+        knots = gen_simple_knots(n_splines, degree+1, bounds)
+    n_knots = len(knots)
+    assert n_knots == degree + n_splines + 1
+
+
+    ## find the j value
+    #j = np.searchsorted(knots, x, 'right') - 1
+    for j in range(n_knots - 1): # TODO replace with numpy.searchsorted()
+        if x >= knots[j] and x < knots[j+1]:
+            break
+
+
+    if bounds is not None:
+        x_min = bounds[0]
+        x_max = bounds[-1]
+    else:
+        x_min = knots[0]
+        x_max = knots[-1]
+
+
+    Mx = MSplines(x, n_splines, degree+1, knots=knots, bounds=bounds,
+            verbose=verbose)
+    Ix = np.zeros(n_splines)
+    Ix[(j+1):] = 0.0
+    Ix[:(j-degree)] = 1.0
+    for i in range(j-degree, j+1):
+        _p1 = (knots[(i+degree+2):(j+degree+2)] - knots[(i+1):(j+1)]) 
+        Ix[i] = np.sum(_p1 * Mx[(i+1):(j+1)]) / (degree+1)
+    
+
+    return Ix
+
+
+   
+
 
 if __name__ == "__main__":
 
@@ -113,11 +180,21 @@ if __name__ == "__main__":
     L = 0.0
     R = 1.0
     mesh = np.linspace(L+shift, R-shift, 200)
-    Mx = []
+    #Mx = []
+    #for x in mesh:
+    #    m = MSplines(x, n_splines, degree, bounds=bounds, verbose="DEBUG")
+    #    Mx.append(m)
+    #Mx = np.asarray(Mx)
+    #for i in range(n_splines):
+    #    plt.plot(mesh, Mx[:, i])
+    #plt.show()
+
+    Ix = []
     for x in mesh:
-        m = MSplines(x, n_splines, degree, bounds=bounds, verbose="DEBUG")
-        Mx.append(m)
-    Mx = np.asarray(Mx)
+        I = ISplines(x, n_splines, degree-1, bounds=bounds, verbose="DEBUG")
+        Ix.append(I)
+
+    Ix = np.asarray(Ix)
     for i in range(n_splines):
-        plt.plot(mesh, Mx[:, i])
+        plt.plot(mesh, Ix[:, i])
     plt.show()
