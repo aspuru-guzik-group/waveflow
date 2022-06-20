@@ -21,15 +21,14 @@ def mspline(x, t, c, k):
 
 
 def I(x, k, i, t):
-   j = np.searchsorted(t, x, 'right') - 0
+   j = np.searchsorted(t, x, 'right') - 1
    if i > j:
       return 0
-   # elif i < j - k + 1:
-   elif i < j - k:
+   elif i <= j - k:
       return 1
    else:
       #return np.array([(t[m+k+1] - t[m]) * M(x, k+1, m, t)/(k+1) for m in range(i, j+1)]).sum()
-      return np.array([(t[m + k + 1] - t[m]) * M(x, k + 1, m, t) / (k + 1) for m in range(i, j)]).sum()
+      return np.array([(t[m + k + 1] - t[m]) * M(x, k + 1, m, t) / (k + 1) for m in range(i, j+1)]).sum()
 def ispline(x, t, c, k):
    n = len(t) - k - 1
    assert (n >= k + 1) and (len(c) >= n)
@@ -72,10 +71,10 @@ def compare_splines():
 
 
    degree = 3
-   # knots = np.linspace(0,1,11)
+   # knots = np.linspace(0,1,6)
    knots = np.array([0, 1/3, 2/3, 1])
-   knots = np.repeat(knots, ((knots == knots[0]) * (degree)).clip(min=1))
-   knots = np.repeat(knots, ((knots == knots[-1]) * (degree)).clip(min=1))
+   knots = np.repeat(knots, ((knots == knots[0]) * (degree+1)).clip(min=1))
+   knots = np.repeat(knots, ((knots == knots[-1]) * (degree+1)).clip(min=1))
    n_knots = len(knots)
 
    # weights = np.array([0, 0, 1, 0, 1, 1, 1, 1, 3, 2, 0, 1])
@@ -86,7 +85,7 @@ def compare_splines():
             'We got number of weights: {}; Degree {}; Number of knots + 2*degree {}'.format(len(weights), degree, n_knots))
       exit()
 
-   n_points = 1000
+   n_points = 9999
    xx = np.linspace(knots[0] - 1, knots[-1] + 1, n_points)
    dx = (xx[-1] - xx[0])/n_points
 
@@ -98,16 +97,19 @@ def compare_splines():
    # ax.plot(xx, mspline_naive, 'r-', lw=3, label='naive')
    # ax.plot(xx, ispline_naive, 'b-', lw=3, label='inaive')
    # ax.plot(xx, ispline_nummerical, 'g-', lw=3, label='inummerical')
-   # for i in range(7):
-   #    print(i, '/', len(weights))
-   #    ax.plot(xx, np.array([I(x, degree, i, knots) for x in xx]), 'b', label='I naive {}'.format(i))
-   #    ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]).cumsum()*dx, 'r', label='I nummerical {}'.format(i))
+   for i in range(len(weights)):
+      print(i, '/', len(weights))
+      ax.plot(xx, np.array([I(x, degree, i, knots) for x in xx]), 'b', label='I naive {}'.format(i))
+      # ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]).cumsum()*dx, 'r', label='I nummerical {}'.format(i))
+      ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]), label='M {}'.format(i))
+   i = 1
+   ax.plot(xx, np.array([I(x, degree, i, knots) for x in xx]), 'b', label='I naive {}'.format(i))
 
-   i = 2
-   ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]), label='M {}'.format(i))
-   max_M = np.array([M(x, degree, i, knots) for x in xx]).max()
-   ax.plot(xx, np.array([I(x, degree, i, knots) for x in xx])*max_M, label='I {}'.format(i))
-   ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]).cumsum() * dx * max_M, label='I nummeric {}'.format(i))
+   # i = 1
+   # ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]), label='M {}'.format(i))
+   # max_M = np.array([M(x, degree, i, knots) for x in xx]).max()
+   # ax.plot(xx, np.array([I(x, degree, i, knots) for x in xx])*max_M, label='I {}'.format(i))
+   # ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]).cumsum() * dx * max_M, label='I nummeric {}'.format(i))
 
    ax.grid(True)
    ax.legend(loc='best')
