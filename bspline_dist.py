@@ -20,6 +20,7 @@ def mspline(x, t, c, k):
    return sum(c[i] * M(x, k, i, t) for i in range(len(c)))
 
 
+
 def I(x, k, i, t):
    j = np.searchsorted(t, x, 'right') - 1
    if i > j:
@@ -53,67 +54,89 @@ def bspline(x, t, c, k):
    return sum(c[i] * B(x, k, i, t) for i in range(n))
 
 
-# def IB(x, k, i, t):
-#
-#    # For now assuming cardinal splines
-#    h = t[1] - t[0]
-#
-#    if i+k+2 == len(t):
-#       return 0
-#    else:
-#       return h * B(x, k+1, i, t) + I(x, k, i+1, t)
+def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
+   x = np.random.uniform(low=xmin, high=xmax, size=num_samples)
+   y = np.random.uniform(low=0, high=ymax, size=num_samples)
+   passed = (y < function(x)).astype(bool)
+   all_x = x[passed]
+
+   full_batch = False
+   if all_x.shape[0] > num_samples:
+      full_batch = True
+
+   while not full_batch:
+      x = np.random.uniform(low=xmin, high=xmax, size=num_samples)
+      y = np.random.uniform(low=0, high=ymax, size=num_samples)
+      passed = (y < function(x)).astype(bool)
+      all_x = np.concatenate([all_x, x[passed]])
+
+      if all_x.shape[0] > num_samples:
+         full_batch = True
+
+   return all_x[:num_samples]
 
 
 
-
-#@profile
-def compare_splines():
-
+# @profile
+def test_splines():
 
    degree = 3
-   # knots = np.linspace(0,1,6)
-   knots = np.array([0, 1/3, 2/3, 1])
-   knots = np.repeat(knots, ((knots == knots[0]) * (degree+1)).clip(min=1))
-   knots = np.repeat(knots, ((knots == knots[-1]) * (degree+1)).clip(min=1))
-   n_knots = len(knots)
+   internal_knots = np.linspace(0, 1, 6)
 
-   # weights = np.array([0, 0, 1, 0, 1, 1, 1, 1, 3, 2, 0, 1])
-   weights = np.random.rand(n_knots - degree)
-   weights = weights / sum(weights)
-   if n_knots - degree != len(weights):
-      print('We need number of weights plus degree = number of knots + 2 * degree.\n'
-            'We got number of weights: {}; Degree {}; Number of knots + 2*degree {}'.format(len(weights), degree, n_knots))
-      exit()
+   mknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree).clip(min=1))
+   mknots = np.repeat(mknots, ((mknots == mknots[-1]) * degree).clip(min=1))
+   mweights = np.random.rand(len(mknots) - degree)
+   mweights[0] = 0
+   mweights[-1] = 0
+   mweights = mweights / sum(mweights)
 
-   n_points = 9999
-   xx = np.linspace(knots[0] - 1, knots[-1] + 1, n_points)
-   dx = (xx[-1] - xx[0])/n_points
+   iknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * (degree + 1)).clip(min=1))
+   iknots = np.repeat(iknots, ((iknots == iknots[-1]) * (degree + 1)).clip(min=1))
+   iweights = np.random.rand(len(iknots) - degree)
+   iweights[0] = 0
+   iweights[-1] = 0
+   iweights = iweights / sum(iweights)
 
-   # mspline_naive = np.array([mspline(x, knots, weights, degree) for x in xx])
-   # ispline_naive = np.array([ispline(x, knots, weights, degree) for x in xx])
-   # ispline_nummerical = mspline_naive.cumsum() * dx
+   n_points = 1000
+   xx = np.linspace(internal_knots[0] - 1, internal_knots[-1] + 1, n_points)
+   dx = (xx[-1] - xx[0]) / n_points
+
+
 
    fig, ax = plt.subplots()
-   # ax.plot(xx, mspline_naive, 'r-', lw=3, label='naive')
-   # ax.plot(xx, ispline_naive, 'b-', lw=3, label='inaive')
-   # ax.plot(xx, ispline_nummerical, 'g-', lw=3, label='inummerical')
-   for i in range(len(weights)):
-      print(i, '/', len(weights))
-      ax.plot(xx, np.array([I(x, degree, i, knots) for x in xx]), 'b', label='I naive {}'.format(i))
-      # ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]).cumsum()*dx, 'r', label='I nummerical {}'.format(i))
-      ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]), label='M {}'.format(i))
-   i = 1
-   ax.plot(xx, np.array([I(x, degree, i, knots) for x in xx]), 'b', label='I naive {}'.format(i))
+   # for i in range(len(mweights)):
+   #    ax.plot(xx, np.array([M(x, degree, i, mknots) for x in xx]), label='M {}'.format(i))
+   #
+   ax.plot(xx, np.array([mspline(x, mknots, mweights, degree) for x in xx]), label='M Spline')
 
-   # i = 1
-   # ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]), label='M {}'.format(i))
-   # max_M = np.array([M(x, degree, i, knots) for x in xx]).max()
-   # ax.plot(xx, np.array([I(x, degree, i, knots) for x in xx])*max_M, label='I {}'.format(i))
-   # ax.plot(xx, np.array([M(x, degree, i, knots) for x in xx]).cumsum() * dx * max_M, label='I nummeric {}'.format(i))
+   max_val = np.max(mweights) * len(mknots)
+   s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 10000, xmin=0, xmax=1, ymax=max_val)
+   ax.hist(np.array(s), density=True, bins=100)
 
    ax.grid(True)
    ax.legend(loc='best')
-
    plt.show()
 
-compare_splines()
+   fig, ax = plt.subplots()
+   for i in range(len(iweights)):
+      ax.plot(xx, np.array([I(x, degree, i, iknots) for x in xx]), label='I naive {}'.format(i))
+
+   ax.plot(xx, np.array([ispline(x, iknots, iweights, degree) for x in xx]), label='I Spline')
+
+   ax.grid(True)
+   ax.legend(loc='best')
+   plt.show()
+
+
+
+test_splines()
+
+
+
+
+
+
+
+
+
+
