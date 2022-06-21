@@ -2,6 +2,7 @@ from scipy.interpolate import BSpline
 import matplotlib.pyplot as plt
 import numpy as np
 from line_profiler_pycharm import profile
+import tqdm
 
 def M(x, k, i, t):
    if k == 1:
@@ -15,7 +16,11 @@ def M(x, k, i, t):
    if t[i+k] - t[i] == 0:
       return 0
    else:
-      return k * ( (x - t[i]) * M(x, k-1, i, t) + (t[i+k] - x) * M(x, k-1, i+1, t) ) / ( (k-1) * (t[i+k] - t[i]) )
+      # M_k_minus_one_i = cache['{};{}'.format(k - 1, i)] if '{};{}'.format(k - 1, i) in cache else M(x, k - 1, i, t, cache)
+      # M_k_minus_one_i_plus_one = cache['{};{}'.format(k - 1, i + 1)] if '{};{}'.format(k - 1, i + 1) in cache else M(x, k - 1, i + 1, t, cache)
+
+      # return k * ( (x - t[i]) * M_k_minus_one_i + (t[i+k] - x) * M_k_minus_one_i_plus_one ) / ( (k-1) * (t[i+k] - t[i]) )
+      return k * ((x - t[i]) * M(x, k - 1, i, t) + (t[i + k] - x) * M(x, k - 1, i + 1, t)) / ((k - 1) * (t[i + k] - t[i]))
 def mspline(x, t, c, k):
    return sum(c[i] * M(x, k, i, t) for i in range(len(c)))
 
@@ -80,7 +85,7 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 # @profile
 def test_splines():
 
-   degree = 3
+   degree = 5
    internal_knots = np.linspace(0, 1, 6)
 
    mknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree).clip(min=1))
@@ -110,7 +115,10 @@ def test_splines():
    ax.plot(xx, np.array([mspline(x, mknots, mweights, degree) for x in xx]), label='M Spline')
 
    max_val = np.max(mweights) * len(mknots)
-   s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 10000, xmin=0, xmax=1, ymax=max_val)
+   # for i in tqdm.tqdm(range(1000)):
+   #    s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1, ymax=max_val)
+   s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1,
+                          ymax=max_val)
    ax.hist(np.array(s), density=True, bins=100)
 
    ax.grid(True)
