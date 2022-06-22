@@ -4,7 +4,18 @@ import numpy as np
 from line_profiler_pycharm import profile
 import tqdm
 
-def M(x, k, i, t):
+def M(x, k, i, t, max_k):
+   is_superflious_node = i < (max_k - 1) or i >= len(t) - max_k
+   is_first_node = i + k <= max_k-1 or i >= len(t) - max_k
+   if not is_superflious_node and t[i+1] - t[i] == 0:
+      print(i)
+   if is_superflious_node and not t[i+1] - t[i] == 0:
+      print(i)
+   if t[i+k] - t[i] == 0 and not is_first_node:
+      print(i)
+   if is_first_node and not t[i+k] - t[i] == 0:
+      print(i)
+
    if k == 1:
       if x >= t[i] and x < t[i+1]:
          if t[i+1] - t[i] == 0:
@@ -20,9 +31,9 @@ def M(x, k, i, t):
       # M_k_minus_one_i_plus_one = cache['{};{}'.format(k - 1, i + 1)] if '{};{}'.format(k - 1, i + 1) in cache else M(x, k - 1, i + 1, t, cache)
 
       # return k * ( (x - t[i]) * M_k_minus_one_i + (t[i+k] - x) * M_k_minus_one_i_plus_one ) / ( (k-1) * (t[i+k] - t[i]) )
-      return k * ((x - t[i]) * M(x, k - 1, i, t) + (t[i + k] - x) * M(x, k - 1, i + 1, t)) / ((k - 1) * (t[i + k] - t[i]))
+      return k * ((x - t[i]) * M(x, k - 1, i, t, max_k) + (t[i + k] - x) * M(x, k - 1, i + 1, t, max_k)) / ((k - 1) * (t[i + k] - t[i]))
 def mspline(x, t, c, k):
-   return sum(c[i] * M(x, k, i, t) for i in range(len(c)))
+   return sum(c[i] * M(x, k, i, t, k) for i in range(len(c)))
 
 
 

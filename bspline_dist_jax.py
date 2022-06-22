@@ -8,7 +8,7 @@ from line_profiler_pycharm import profile
 from functools import partial
 from jax.config import config
 
-config.update('jax_disable_jit', True)
+# config.update('jax_disable_jit', True)
 
 # from collections import Iterable
 import collections
@@ -24,25 +24,25 @@ class hash_list(list):
 
 
 #@partial(jit, static_argnums=(1, 2, 3))
-def M(x, k, i, t):
-   is_superflious_node = (t[i+k] - t[i]) == 0
-
+def M(x, k, i, t, max_k):
+   cond1 = i < (max_k - 1) or i >= len(t) - max_k # true if t[i+1] - t[i] == 0
    x_minus_ti = x - t[i]
    if k == 1:
-      return jax.lax.cond(is_superflious_node,
-                           lambda x: 0.0,
-                           lambda x: np.heaviside(x_minus_ti, 1) * np.heaviside(t[i+1] - x,  1) * 1 / (t[i+1] - t[i]), x)
+      return jax.lax.cond(cond1,
+                          lambda x: 0.0,
+                          lambda x: np.heaviside(x_minus_ti, 1) * np.heaviside(t[i+1] - x,  1) * 1 / (t[i+1] - t[i]), x)
 
-   return jax.lax.cond(is_superflious_node, lambda x: 0.0, lambda x: k * ( x_minus_ti * M(x, k-1, i, t) + (t[i+k] - x) * M(x, k-1, i+1, t) ) / ( (k-1) * (t[i+k] - t[i]) ), x)
+   cond2 = i + k <= max_k - 1 or i >= len(t) - max_k # true if t[i+k] - t[i] == 0
+   return jax.lax.cond(cond2, lambda x: 0.0, lambda x: k * ( x_minus_ti * M(x, k-1, i, t, max_k) + (t[i+k] - x) * M(x, k-1, i+1, t, max_k) ) / ( (k-1) * (t[i+k] - t[i]) ), x)
 
 def multiply_weight_and_M(i, weights, x, k, t):
-   return weights[i] * M(x, k, i, t)
+   return weights[i] * M(x, k, i, t, k)
 
 def mspline(x, t, c, k):
    # index_array = np.arange(0, len(c), 1)
    # multiply_weight_and_M_vec = vmap(lambda i: multiply_weight_and_M(i, c, x, k, t))
    # return multiply_weight_and_M_vec(index_array).sum()
-   return sum(c[i] * M(x, k, i, t) for i in range(len(c)))
+   return sum(c[i] * M(x, k, i, t, k) for i in range(len(c)))
 
 
 
@@ -66,7 +66,7 @@ def MSpline_fun():
    def init_fun(rng, k, internal_knots, initial_params=None, cardinal_splines=True):
       internal_knots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * k).clip(min=1))
       knots = np.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * k).clip(min=1))
-      knots = hash_list(knots)
+      # knots = hash_list(knots)
       n_knots = len(knots)
 
       if initial_params is not None:
@@ -117,10 +117,12 @@ def test_jax_splines():
 
    n_points = 256
    params = np.repeat(params[:,None], n_points, axis=1).T
+   # knots = np.repeat(knots[:,None], n_points, axis=1).T
+   # params = (params, knots)
    xx = np.linspace(internal_knots[0] - 1, internal_knots[-1] + 1, n_points)
 
+   # apply_fun_vec = vmap(jit(partial(lambda params, x: apply_fun(params, x, knots)), static_argnums=(2)), in_axes=(0, 0))
    apply_fun_vec = vmap(jit(partial(lambda params, x: apply_fun(params, x, knots)), static_argnums=(2)), in_axes=(0, 0))
-   # apply_fun_vec = vmap(lambda params, x: apply_fun(params, x, knots), in_axes=(0, 0))
 
    apply_fun_vec(params, xx)
 
