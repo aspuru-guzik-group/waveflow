@@ -40,13 +40,13 @@ def multiply_weight_and_M(i, weights, x, k, t):
 
 def mspline(x, t, c, k):
    # index_array = np.arange(0, len(c), 1)
-   # multiply_weight_and_M_vec = vmap(lambda i: multiply_weight_and_M(i, c, x, k, t))
-   # return multiply_weight_and_M_vec(index_array).sum()
+   # multiply_weight_and_M_vec = vmap(multiply_weight_and_M, in_axes=(0, None, None, None, None))
+   # return multiply_weight_and_M_vec(index_array, c, x, k , t).sum()
    return sum(c[i] * M(x, k, i, t, k) for i in range(len(c)))
 
 
 
-def I(x, k, i, t):
+def I(x, k, i, t, max_k):
    j = np.searchsorted(t, x, 'right') - 1
    if i > j:
       return 0
@@ -54,11 +54,11 @@ def I(x, k, i, t):
       return 1
    else:
       #return np.array([(t[m+k+1] - t[m]) * M(x, k+1, m, t)/(k+1) for m in range(i, j+1)]).sum()
-      return np.array([(t[m + k + 1] - t[m]) * M(x, k + 1, m, t) / (k + 1) for m in range(i, j+1)]).sum()
+      return np.array([(t[m + k + 1] - t[m]) * M(x, k + 1, m, t, max_k) / (k + 1) for m in range(i, j+1)]).sum()
 def ispline(x, t, c, k):
    n = len(t) - k - 1
    assert (n >= k + 1) and (len(c) >= n)
-   return sum(c[i] * I(x, k, i, t) for i in range(n))
+   return sum(c[i] * I(x, k, i, t, k) for i in range(n))
 
 
 def MSpline_fun():
@@ -66,7 +66,6 @@ def MSpline_fun():
    def init_fun(rng, k, internal_knots, initial_params=None, cardinal_splines=True):
       internal_knots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * k).clip(min=1))
       knots = np.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * k).clip(min=1))
-      # knots = hash_list(knots)
       n_knots = len(knots)
 
       if initial_params is not None:
@@ -94,8 +93,26 @@ def MSpline_fun():
 
          pass
 
-      def sample_fun(rng, params):
-         pass
+      def sample_fun(rng, params, num_samples):
+         x = np.random.uniform(low=0, high=1, size=num_samples * 4)
+         y = np.random.uniform(low=0, high=ymax, size=num_samples * 4)
+         passed = (y < function(x)).astype(bool)
+         all_x = x[passed]
+
+         full_batch = False
+         if all_x.shape[0] > num_samples:
+            full_batch = True
+
+         while not full_batch:
+            x = np.random.uniform(low=0, high=1, size=num_samples)
+            y = np.random.uniform(low=0, high=ymax, size=num_samples)
+            passed = (y < function(x)).astype(bool)
+            all_x = np.concatenate([all_x, x[passed]])
+
+            if all_x.shape[0] > num_samples:
+               full_batch = True
+
+         return all_x[:num_samples]
 
 
       # apply_fun = vmap(apply_fun, in_axes=1)
@@ -122,7 +139,9 @@ def test_jax_splines():
    xx = np.linspace(internal_knots[0] - 1, internal_knots[-1] + 1, n_points)
 
    # apply_fun_vec = vmap(jit(partial(lambda params, x: apply_fun(params, x, knots)), static_argnums=(2)), in_axes=(0, 0))
-   apply_fun_vec = vmap(jit(partial(lambda params, x: apply_fun(params, x, knots)), static_argnums=(2)), in_axes=(0, 0))
+   apply_fun_vec = jit(partial(vmap(lambda params, x: apply_fun(params, x, knots), in_axes=(0, 0))), static_argnums=(2))
+   # apply_fun_vec = vmap(jit(partial(lambda params, x: apply_fun(params, x, None)), static_argnums=(2)), in_axes=(0, 0))
+   # apply_fun_vec = jit(partial(vmap(apply_fun, in_axes=(0, 0))), static_argnums=(2))
 
    apply_fun_vec(params, xx)
 

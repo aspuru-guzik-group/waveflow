@@ -71,8 +71,8 @@ def bspline(x, t, c, k):
 
 
 def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
-   x = np.random.uniform(low=xmin, high=xmax, size=num_samples)
-   y = np.random.uniform(low=0, high=ymax, size=num_samples)
+   x = np.random.uniform(low=xmin, high=xmax, size=num_samples * 4)
+   y = np.random.uniform(low=0, high=ymax, size=num_samples * 4)
    passed = (y < function(x)).astype(bool)
    all_x = x[passed]
 
@@ -126,8 +126,8 @@ def test_splines():
    ax.plot(xx, np.array([mspline(x, mknots, mweights, degree) for x in xx]), label='M Spline')
 
    max_val = np.max(mweights) * len(mknots)
-   # for i in tqdm.tqdm(range(1000)):
-   #    s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1, ymax=max_val)
+   for i in tqdm.tqdm(range(1000)):
+      s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1, ymax=max_val)
    s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1,
                           ymax=max_val)
    ax.hist(np.array(s), density=True, bins=100)
