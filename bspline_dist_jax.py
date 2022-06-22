@@ -1,5 +1,4 @@
 import tqdm
-from scipy.interpolate import BSpline
 import matplotlib.pyplot as plt
 import jax.numpy as np
 from jax import jit, vmap
@@ -7,23 +6,10 @@ import jax
 from line_profiler_pycharm import profile
 from functools import partial
 from jax.config import config
-
 # config.update('jax_disable_jit', True)
 
-# from collections import Iterable
-import collections
-
-class hash_list(list):
-   def __init__(self, *args):
-      if len(args) == 1 and isinstance(args[0], collections.Iterable):
-         args = args[0]
-      super().__init__(args)
-
-   def __hash__(self):
-      return hash(e for e in self)
 
 
-#@partial(jit, static_argnums=(1, 2, 3))
 def M(x, k, i, t, max_k):
    cond1 = i < (max_k - 1) or i >= len(t) - max_k # true if t[i+1] - t[i] == 0
    x_minus_ti = x - t[i]
@@ -78,25 +64,37 @@ def MSpline_fun():
          initial_params = initial_params / sum(initial_params)
 
 
-      def apply_fun(params, x, knots=None):
-         if knots is None:
-            knots = params[1]
+      def apply_fun(params, x):
+         if not cardinal_splines:
+            knots_ = params[1]
             params = params[0]
+         else:
+            knots_ = knots
 
-         return mspline(x, knots, params, k)
+         return mspline(x, knots_, params, k)
+
+      apply_fun_vec = jit(partial(vmap(apply_fun, in_axes=(0, 0))))
 
 
-      def reverse_fun(params, x, knots=None):
-         if knots is None:
+      def reverse_fun(params, x):
+         if not cardinal_splines:
             knots = params[1]
             params = params[0]
 
          pass
 
       def sample_fun(rng, params, num_samples):
-         x = np.random.uniform(low=0, high=1, size=num_samples * 4)
-         y = np.random.uniform(low=0, high=ymax, size=num_samples * 4)
-         passed = (y < function(x)).astype(bool)
+         if not cardinal_splines:
+            ymax = params[0].max()
+         else:
+            ymax = params.max()
+
+         rng, split_rng = jax.random.split(rng)
+         x = jax.random.uniform(split_rng, minval=0, maxval=1, shape=(num_samples * 4,))
+         rng, split_rng = jax.random.split(rng)
+         y = jax.random.uniform(split_rng, minval=0, maxval=ymax, shape=(num_samples * 4,))
+
+         passed = (y < apply_fun_vec(params, x)).astype(bool)
          all_x = x[passed]
 
          full_batch = False
@@ -104,9 +102,12 @@ def MSpline_fun():
             full_batch = True
 
          while not full_batch:
-            x = np.random.uniform(low=0, high=1, size=num_samples)
-            y = np.random.uniform(low=0, high=ymax, size=num_samples)
-            passed = (y < function(x)).astype(bool)
+            rrng, split_rng = jax.random.split(rng)
+            x = jax.random.uniform(split_rng, minval=0, maxval=1, shape=(num_samples * 4,))
+            rng, split_rng = jax.random.split(rng)
+            y = jax.random.uniform(split_rng, minval=0, maxval=ymax, shape=(num_samples * 4,))
+
+            passed = (y < apply_fun_vec(params, x)).astype(bool)
             all_x = np.concatenate([all_x, x[passed]])
 
             if all_x.shape[0] > num_samples:
@@ -114,13 +115,10 @@ def MSpline_fun():
 
          return all_x[:num_samples]
 
+      sample_fun_vec = sample_fun#jit(partial(vmap(sample_fun, in_axes=(None, 0))))
 
-      # apply_fun = vmap(apply_fun, in_axes=1)
-      if cardinal_splines:
-         return initial_params, apply_fun, reverse_fun, sample_fun, knots
-      else:
-         initial_params = (initial_params, knots)
-         return initial_params, apply_fun, reverse_fun, sample_fun
+
+      return initial_params, apply_fun_vec, reverse_fun, sample_fun_vec, knots
 
    return init_fun
 
@@ -130,7 +128,7 @@ def test_jax_splines():
    k = 5
    internal_knots = np.linspace(0, 1, 15)
    init_fun = MSpline_fun()
-   params, apply_fun, reverse_fun, sample_fun, knots = init_fun(rng, k, internal_knots)
+   params, apply_fun_vec, reverse_fun, sample_fun_vec, knots = init_fun(rng, k, internal_knots, cardinal_splines=True)
 
    n_points = 256
    params = np.repeat(params[:,None], n_points, axis=1).T
@@ -138,15 +136,12 @@ def test_jax_splines():
    # params = (params, knots)
    xx = np.linspace(internal_knots[0] - 1, internal_knots[-1] + 1, n_points)
 
-   # apply_fun_vec = vmap(jit(partial(lambda params, x: apply_fun(params, x, knots)), static_argnums=(2)), in_axes=(0, 0))
-   apply_fun_vec = jit(partial(vmap(lambda params, x: apply_fun(params, x, knots), in_axes=(0, 0))), static_argnums=(2))
-   # apply_fun_vec = vmap(jit(partial(lambda params, x: apply_fun(params, x, None)), static_argnums=(2)), in_axes=(0, 0))
-   # apply_fun_vec = jit(partial(vmap(apply_fun, in_axes=(0, 0))), static_argnums=(2))
 
-   apply_fun_vec(params, xx)
+   s = sample_fun_vec(rng, params, 1000)
 
    fig, ax = plt.subplots()
-   ax.plot(xx, apply_fun_vec(params, xx), label='M Spline')
+   # ax.plot(xx, apply_fun_vec(params, xx), label='M Spline')
+   ax.hist(np.array(s), density=True, bins=100)
 
    ax.grid(True)
    ax.legend(loc='best')
