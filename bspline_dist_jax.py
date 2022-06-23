@@ -157,12 +157,21 @@ from jax.config import config
 #
 # test_jax_splines()
 
+@partial(jit, static_agrnums=(1,))
+def generate_rng_array(rng, n_keys):
+   rng_array = np.zeros(n_keys)
+   for n in n_keys:
+      rng, split_rng = jax.random.split(rng)
+      rng_array.at[n].set(split_rng)
+
+   return rng_array
 
 def apply_fun(params, x):
    return params[0] * x**2 + params[1] * x
 
 
-def sample_fun(rng, params, num_samples, ymax):
+gloabl_rng = jax.random.PRNGKey(1)
+def sample_fun(rng_array, params, num_samples, ymax):
    def rejection_sample(args):
       rng, all_x, i = args
       rng, split_rng = jax.random.split(rng)
@@ -176,21 +185,25 @@ def sample_fun(rng, params, num_samples, ymax):
       return rng, all_x, i
 
    all_x = np.zeros(num_samples)
-   _, all_x, _ = jax.lax.while_loop(lambda i: i[2] < num_samples, rejection_sample, (rng, all_x, 0))
+   _, all_x, _ = jax.lax.while_loop(lambda i: i[2] < num_samples, rejection_sample, (rng_array, all_x, 0))
    return all_x
 
-sample_fun_vec = partial(vmap(sample_fun, in_axes=(None, 0, None, None)))
-apply_fun_vec = vmap(apply_fun, in_axes=(None, 0))
+sample_fun_vec = vmap(sample_fun, in_axes=(0, 0, None, None))
+apply_fun_vec = vmap(apply_fun, in_axes=(0, 0))
 
 rng = jax.random.PRNGKey(0)
+n_points = 10
 params = jax.random.uniform(rng, minval=0, maxval=1, shape=(2,))
-xx = np.linspace(0, 1, 100)
+params = np.repeat(params[:, None], n_points, axis=1).T
+rng_array = generate_rng_array(rng, n_points)
+xx = np.linspace(0, 1, n_points)
 
 fig, ax = plt.subplots()
 ax.plot(xx, apply_fun_vec(params, xx))
-s = sample_fun_vec(rng, params, 10000, 2)
-ax.hist(np.array(s), density=True, bins=200)
 
 ax.grid(True)
 ax.legend(loc='best')
 plt.show()
+
+s = sample_fun_vec(rng, params, 1, 2).reshape(-1)
+ax.hist(np.array(s), density=True, bins=100)
