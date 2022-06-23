@@ -39,10 +39,11 @@ if dataset == 'gm':
     params_gt, log_pdf_gt, sample_gt = init_fun(init_key, input_dim)
 
     X = sample_gt(rng, params_gt, 10000)
+    sample_log_pdf_gt = log_pdf_gt(params_gt, X)
+
     scaler = preprocessing.StandardScaler()
     X = scaler.fit_transform(X)
 
-    log_pdfs_gt = log_pdf_gt(params_gt, X)
 
 else:
     #################################################################################
@@ -98,7 +99,7 @@ def get_masks(input_dim, hidden_dim=64, num_hidden=1):
 
 def masked_transform(rng, input_dim):
     masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
-    act = stax.Tanh
+    act = stax.Relu
     init_fun, apply_fun = stax.serial(
         flows.MaskedDense(masks[0]),
         act,
@@ -165,7 +166,7 @@ for epoch in pbar:
         plt.show()
 
         plt.plot(losses)
-        plt.axhline(y=log_pdf_gt, color='r', linestyle='-')
+        plt.axhline(y=sample_log_pdf_gt.mean(), color='r', linestyle='-')
         plt.show()
 
 
