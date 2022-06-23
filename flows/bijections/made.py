@@ -56,3 +56,39 @@ def MADE(transform):
         return params, direct_fun, inverse_fun
 
     return init_fun
+
+
+
+def MMAF(transform):
+
+    def init_fun(rng, input_dim, **kwargs):
+        params, apply_fun = transform(rng, input_dim)
+
+        def direct_fun(params, inputs, **kwargs):
+            log_weight, bias, sp_outputs = apply_fun(params, inputs).split(2, axis=1)
+            log_weight = np.clip(log_weight, -8, 8)
+            outputs = (inputs - bias) * np.exp(-log_weight)
+            log_det_jacobian = -log_weight.sum(-1)
+            # sp_outputs =
+            return outputs, log_det_jacobian, sp_outputs
+
+        def inverse_fun(params, inputs, **kwargs):
+            outputs = np.zeros_like(inputs)
+            for i_col in range(inputs.shape[1]):
+                log_weight, bias = apply_fun(params, outputs).split(2, axis=1)
+                log_weight = np.clip(log_weight, -8, 8)
+                outputs = jax.ops.index_update(
+                    outputs, jax.ops.index[:, i_col], inputs[:, i_col] * np.exp(log_weight[:, i_col]) + bias[:, i_col]
+                )
+
+            log_det_jacobian = -log_weight.sum(-1)
+            return outputs, log_det_jacobian
+
+        return params, direct_fun, inverse_fun
+
+    return init_fun
+
+
+
+
+

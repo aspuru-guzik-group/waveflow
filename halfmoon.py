@@ -14,51 +14,68 @@ from helper import test_calibration
 from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
 
-config.update("jax_debug_nans", True)
+# config.update("jax_debug_nans", True)
 
-n_samples = 1000
-plot_range = [(-1, 1), (-1, 1)]
+dataset = ['gm', 'hm'][0]
+n_samples = 10000
+length = 4
+plot_range = [(-length/2, length/2), (-length/2, length/2)]
 n_bins = 100
 rng, flow_rng = random.split(random.PRNGKey(0))
 
-inputs = datasets.make_blobs(center_box=(-1,1), cluster_std=0.1, random_state=3)[0]
-input_dim = inputs.shape[1]
-init_key, sample_key = random.split(random.PRNGKey(0))
 
-gmm = mixture.GaussianMixture(3)
-gmm.fit(inputs)
-init_fun = flows.GMM(gmm.means_, gmm.covariances_, gmm.weights_)
+if dataset == 'gm':
+    #####################################################################
+    ##################### Make Mixture of Gaussians #####################
+    #####################################################################
 
-params_gt, log_pdf_gt, sample_gt = init_fun(init_key, input_dim)
-# log_pdfs_gt = log_pdf_gt(params_gt, inputs)
+    inputs = datasets.make_blobs(center_box=(-1,1), cluster_std=0.1, random_state=3)[0]
+    input_dim = inputs.shape[1]
+    init_key, sample_key = random.split(random.PRNGKey(0))
 
-X = sample_gt(rng, params_gt, n_samples)
-# scaler = preprocessing.StandardScaler()
-# X = scaler.fit_transform(X)
-# plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
-# plt.show()
-#
-length = 2
-x = np.linspace(-length / 2, length / 2, 100)
-y = np.linspace(-length / 2, length / 2, 100)
+    gmm = mixture.GaussianMixture(3)
+    gmm.fit(inputs)
+    init_fun = flows.GMM(gmm.means_, gmm.covariances_, gmm.weights_)
+    params_gt, log_pdf_gt, sample_gt = init_fun(init_key, input_dim)
 
-xv, yv = np.meshgrid(x, y)
-xv, yv = xv.reshape(-1), yv.reshape(-1)
-xv = np.expand_dims(xv, axis=-1)
-yv = np.expand_dims(yv, axis=-1)
-grid = np.concatenate([xv, yv], axis=-1)
-gt_grid = np.exp(log_pdf_gt(params_gt, grid).reshape(100, 100))
-# plt.imshow(gt_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
-# plt.show()
+    X = sample_gt(rng, params_gt, 10000)
+    scaler = preprocessing.StandardScaler()
+    X = scaler.fit_transform(X)
 
-# X = sample_gt(rng, params_gt, 1000000)
-# plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)#[-1]
-# plt.show()
+    log_pdfs_gt = log_pdf_gt(params_gt, X)
 
-# scaler = preprocessing.StandardScaler()
-# X, _ = datasets.make_moons(n_samples=n_samples, noise=.05)
-# X = scaler.fit_transform(X)
-# plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)[-1]
+else:
+    #################################################################################
+    ################################# Make Halfmoon #################################
+    #################################################################################
+
+    scaler = preprocessing.StandardScaler()
+    X, _ = datasets.make_moons(n_samples=n_samples, noise=.05)
+    X = scaler.fit_transform(X)
+    plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)[-1]
+    plt.show()
+
+
+#################################################################################
+################################# Plot GT #######################################
+#################################################################################
+if False:
+    length = 2
+    x = np.linspace(-length / 2, length / 2, 100)
+    y = np.linspace(-length / 2, length / 2, 100)
+
+    xv, yv = np.meshgrid(x, y)
+    xv, yv = xv.reshape(-1), yv.reshape(-1)
+    xv = np.expand_dims(xv, axis=-1)
+    yv = np.expand_dims(yv, axis=-1)
+    grid = np.concatenate([xv, yv], axis=-1)
+    gt_grid = np.exp(log_pdf_gt(params_gt, grid).reshape(100, 100))
+    plt.imshow(gt_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+    plt.show()
+
+    plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)#[-1]
+    plt.show()
+
 
 
 
@@ -81,7 +98,7 @@ def get_masks(input_dim, hidden_dim=64, num_hidden=1):
 
 def masked_transform(rng, input_dim):
     masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
-    act = stax.Relu
+    act = stax.Tanh
     init_fun, apply_fun = stax.serial(
         flows.MaskedDense(masks[0]),
         act,
@@ -92,22 +109,13 @@ def masked_transform(rng, input_dim):
     _, params = init_fun(rng, (input_dim,))
     return params, apply_fun
 
-# init_fun = flows.Flow(
-#     flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-#     flows.Normal(),
-# )
-
-length=2
-psi, pdf, dpdf, cdf = get_particle_in_the_box_fns(length, 3)
-particleInBox = ParticleInBoxWrapper(psi, pdf, dpdf, cdf)
-sample = NumericalInverseHermite(particleInBox, domain=(-length/2, length/2), order=1, u_resolution=1e-7)
-
-init_fun = WaveFlow(
+init_fun = flows.Flow(
     flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-    psi, pdf, sample
+    flows.Normal(),
 )
 
-params, psi, log_pdf, sample = init_fun(flow_rng, input_dim)
+
+params, log_pdf, sample = init_fun(flow_rng, input_dim)
 
 opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
 opt_state = opt_init(params)
@@ -115,9 +123,9 @@ opt_state = opt_init(params)
 
 
 def loss(params, inputs):
-    groundtruth = log_pdf_gt(params_gt, inputs)
-    gt_weight = jax.lax.stop_gradient(np.exp(log_pdf_gt(params, inputs)))
-    weight = jax.lax.stop_gradient(np.exp(log_pdf(params, inputs)))
+    # groundtruth = log_pdf_gt(params_gt, inputs)
+    # gt_weight = jax.lax.stop_gradient(np.exp(log_pdf_gt(params, inputs)))
+    # weight = jax.lax.stop_gradient(np.exp(log_pdf(params, inputs)))
 
     # loss_val = (weight * (log_pdf(params, inputs) - groundtruth)).mean()
     # loss_val = ((log_pdf(params, inputs) - groundtruth)).mean()
@@ -125,12 +133,12 @@ def loss(params, inputs):
     # loss_val = (gt_weight * (groundtruth - log_pdf(params, inputs))).mean()
     # loss_val = ((groundtruth - log_pdf(params, inputs))).mean()
 
-    loss_val = ((np.exp(groundtruth) - np.exp(log_pdf(params, inputs)))**2).mean()
+    # loss_val = ((np.exp(groundtruth) - np.exp(log_pdf(params, inputs)))**2).mean()
 
-    #loss_val = -log_pdf(params, inputs).mean()
+    loss_val = -log_pdf(params, inputs).mean()
     return loss_val
 
-# @jit
+@jit
 def step(i, opt_state, inputs):
     params = get_params(opt_state)
     gradients = grad(loss)(params, inputs)
@@ -139,18 +147,11 @@ def step(i, opt_state, inputs):
 
 
 
-
+losses = []
 pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
-    losses = []
-    if epoch % 100 == 0:
+    if epoch % 5000 == 0:
         params = get_params(opt_state)
-        sample_rng, rng = random.split(rng)
-        # X_syn = sample(rng, params, X.shape[0])
-        #
-        # plt.hist2d(X_syn[:, 0], X_syn[:, 1], bins=n_bins, range=plot_range)
-        # plt.show()
-        #
         x = np.linspace(-length / 2, length / 2, 100)
         y = np.linspace(-length / 2, length / 2, 100)
 
@@ -159,40 +160,33 @@ for epoch in pbar:
         xv = np.expand_dims(xv, axis=-1)
         yv = np.expand_dims(yv, axis=-1)
         grid = np.concatenate([xv, yv], axis=-1)
-        psi_grid = psi(params, grid).reshape(100, 100)
-        plt.imshow(psi_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        pdf_grid = np.exp(log_pdf(params, grid).reshape(100, 100))
+        plt.imshow(pdf_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
         plt.show()
 
-        plt.imshow(psi_grid**2, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        plt.plot(losses)
+        plt.axhline(y=log_pdf_gt, color='r', linestyle='-')
         plt.show()
 
-
-        # pdf_vals = np.exp(log_pdf(params, grid)).reshape(100, 100)
-        #
-        # X_syn = sample(rng, params, 10000)
-        # hist = np.histogram2d(X_syn[:, 0], X_syn[:, 1], bins=np.linspace(-length / 2, length / 2, 101), density=True)[0].T
-        # plt.imshow(hist, extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
-        # plt.show()
-        #
-        # plt.imshow(pdf_vals, extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
-        # plt.show()
-        #
-        # plt.imshow(np.abs(hist - pdf_vals), extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
-        # plt.show()
 
 
 
 
     split_rng, rng = random.split(rng)
-    # X = random.permutation(split_rng, X)
+    X = random.permutation(split_rng, X)
     # X = sample(split_rng, params, n_samples)
     # X = sample_gt(split_rng, params_gt, n_samples)
-    X = jax.random.uniform(split_rng, (n_samples,2), minval=-length/2, maxval=length/2)
+    # X = jax.random.uniform(split_rng, (n_samples,2), minval=-length/2, maxval=length/2)
 
 
     opt_state, loss_val = step(epoch, opt_state, X)
     losses.append(loss_val)
 
-    pbar.set_description('Loss {}'.format(np.array(losses).mean()))
+    pbar.set_description('Loss {}'.format(np.array(loss_val).mean()))
 
-params = get_params(opt_state)
+
+# sample_rng, rng = random.split(rng)
+# X_syn = sample(rng, params, X.shape[0])
+#
+# plt.hist2d(X_syn[:, 0], X_syn[:, 1], bins=n_bins, range=plot_range)
+# plt.show()

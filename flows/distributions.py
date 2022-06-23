@@ -85,3 +85,27 @@ def Flow(transformation, prior=Normal()):
         return params, log_pdf, sample
 
     return init_fun
+
+
+
+
+def MFlow(transformation, prior=Normal()):
+
+    def init_fun(rng, input_dim):
+        transformation_rng, prior_rng = random.split(rng)
+
+        params, direct_fun, inverse_fun = transformation(transformation_rng, input_dim)
+        prior_params, prior_log_pdf, prior_sample = prior(prior_rng, input_dim)
+
+        def log_pdf(params, inputs):
+            u, log_det = direct_fun(params, inputs)
+            log_probs = prior_log_pdf(prior_params, u)
+            return log_probs + log_det
+
+        def sample(rng, params, num_samples=1):
+            prior_samples = prior_sample(rng, prior_params, num_samples)
+            return inverse_fun(params, prior_samples)[0]
+
+        return params, log_pdf, sample
+
+    return init_fun
