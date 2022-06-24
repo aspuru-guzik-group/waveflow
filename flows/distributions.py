@@ -1,4 +1,5 @@
 import jax.numpy as np
+from jax.nn import softmax
 from jax import random
 from jax.scipy.special import logsumexp
 from jax.scipy.stats import norm, multivariate_normal
@@ -108,7 +109,8 @@ def MFlow(transformation, sp_transformation, spline_degree, spline_knots):
             u, log_det = direct_fun(transform_params, inputs)
 
             prior_params = sp_transform_apply_fun(sp_transform_params, inputs)
-            prior
+            prior_params = softmax(np.concatenate(prior_params[:, None].split(inputs.shape[-1], axis=-1), axis=1))
+            prior_params = prior_params.reshape(-1, prior_params.shape[-1])
             log_probs = mspline_apply_fun_vec(prior_params, u)
             return log_probs + log_det
 
