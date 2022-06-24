@@ -111,7 +111,9 @@ def MFlow(transformation, sp_transformation, spline_degree, spline_knots):
             prior_params = sp_transform_apply_fun(sp_transform_params, inputs)
             prior_params = softmax(np.concatenate(prior_params[:, None].split(inputs.shape[-1], axis=-1), axis=1))
             prior_params = prior_params.reshape(-1, prior_params.shape[-1])
-            log_probs = mspline_apply_fun_vec(prior_params, u)
+            log_probs = mspline_apply_fun_vec(prior_params, (1/6)*(u.reshape(-1) + 3 ))
+            log_probs = log_probs.reshape(u.shape[0], -1)
+            log_probs = np.log(np.prod(log_probs, axis=-1))
             return log_probs + log_det
 
         def sample(rng, params, num_samples=1):
