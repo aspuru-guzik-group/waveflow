@@ -10,13 +10,14 @@ from scipy.stats.sampling import NumericalInverseHermite, SimpleRatioUniforms
 import jax
 import flows
 from helper import test_calibration
+from bspline_dist_jax import MSpline_fun
 
 from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
 
 # config.update("jax_debug_nans", True)
 
-dataset = ['gm', 'hm'][0]
+dataset = ['gm', 'hm', 'c'][2]
 n_samples = 10000
 length = 4
 plot_range = [(-length/2, length/2), (-length/2, length/2)]
@@ -29,7 +30,7 @@ if dataset == 'gm':
     ##################### Make Mixture of Gaussians #####################
     #####################################################################
 
-    inputs = datasets.make_blobs(center_box=(-1,1), cluster_std=0.1, random_state=3)[0]
+    inputs = datasets.make_blobs(center_box=(-1, 1), cluster_std=0.1, random_state=3)[0]
     input_dim = inputs.shape[1]
     init_key, sample_key = random.split(random.PRNGKey(0))
 
@@ -45,22 +46,9 @@ if dataset == 'gm':
     X = scaler.fit_transform(X)
 
 
-else:
     #################################################################################
-    ################################# Make Halfmoon #################################
+    ################################# Plot GT #######################################
     #################################################################################
-
-    scaler = preprocessing.StandardScaler()
-    X, _ = datasets.make_moons(n_samples=n_samples, noise=.05)
-    X = scaler.fit_transform(X)
-    plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)[-1]
-    plt.show()
-
-
-#################################################################################
-################################# Plot GT #######################################
-#################################################################################
-if False:
     length = 2
     x = np.linspace(-length / 2, length / 2, 100)
     y = np.linspace(-length / 2, length / 2, 100)
@@ -69,13 +57,42 @@ if False:
     xv, yv = xv.reshape(-1), yv.reshape(-1)
     xv = np.expand_dims(xv, axis=-1)
     yv = np.expand_dims(yv, axis=-1)
-    grid = np.concatenate([xv, yv], axis=-1)
+    grid = np.concatenate([xv, yv], axis=-1) * 2
     gt_grid = np.exp(log_pdf_gt(params_gt, grid).reshape(100, 100))
-    plt.imshow(gt_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+    plt.imshow(gt_grid, extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
     plt.show()
 
-    plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)#[-1]
+    plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)  # [-1]
     plt.show()
+
+elif dataset == 'hm':
+    #################################################################################
+    ################################# Make Halfmoon #################################
+    #################################################################################
+
+    X, _ = datasets.make_moons(n_samples=n_samples, noise=.05)
+
+
+    scaler = preprocessing.StandardScaler()
+    X = scaler.fit_transform(X)
+    plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
+    plt.show()
+
+    sample_log_pdf_gt = None
+
+else:
+    #################################################################################
+    ################################# Make Halfmoon #################################
+    #################################################################################
+
+    X, _ = datasets.make_circles(n_samples=n_samples, noise=.05, factor=0.5)
+
+    scaler = preprocessing.StandardScaler()
+    X = scaler.fit_transform(X)
+    plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
+    plt.show()
+
+    sample_log_pdf_gt = None
 
 
 
@@ -99,7 +116,7 @@ def get_masks(input_dim, hidden_dim=64, num_hidden=1):
 
 def masked_transform(rng, input_dim):
     masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
-    act = stax.Relu
+    act = stax.Tanh
     init_fun, apply_fun = stax.serial(
         flows.MaskedDense(masks[0]),
         act,
@@ -110,9 +127,32 @@ def masked_transform(rng, input_dim):
     _, params = init_fun(rng, (input_dim,))
     return params, apply_fun
 
-init_fun = flows.Flow(
+
+
+# init_fun = flows.Flow(
+#     flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
+#     flows.Normal(),
+# )
+
+def masked_sp_transform(rng, input_dim, output_shape):
+    masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
+    act = stax.Tanh
+    init_fun, apply_fun = stax.serial(
+        flows.MaskedDense(masks[0]),
+        act,
+        flows.MaskedDense(masks[1]),
+        act,
+        flows.MaskedDense(masks[2].tile(output_shape)),
+    )
+    _, params = init_fun(rng, (input_dim,))
+    return params, apply_fun
+
+
+
+init_fun = flows.MFlow(
     flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-    flows.Normal(),
+    masked_sp_transform,
+    spline_degree=3, spline_knots=10
 )
 
 
@@ -166,7 +206,7 @@ for epoch in pbar:
         plt.show()
 
         plt.plot(losses)
-        plt.axhline(y=sample_log_pdf_gt.mean(), color='r', linestyle='-')
+        if sample_log_pdf_gt is not None: plt.axhline(y=sample_log_pdf_gt.mean(), color='r', linestyle='-')
         plt.show()
 
 

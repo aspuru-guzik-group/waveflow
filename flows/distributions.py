@@ -2,7 +2,7 @@ import jax.numpy as np
 from jax import random
 from jax.scipy.special import logsumexp
 from jax.scipy.stats import norm, multivariate_normal
-
+from bspline_dist_jax import MSpline_fun
 
 def Normal():
     """
@@ -89,23 +89,35 @@ def Flow(transformation, prior=Normal()):
 
 
 
-def MFlow(transformation, prior=Normal()):
+def MFlow(transformation, sp_transformation, spline_degree, spline_knots):
 
     def init_fun(rng, input_dim):
-        transformation_rng, prior_rng = random.split(rng)
+        rng, transformation_rng = random.split(rng)
+        rng, sp_transformation_rng = random.split(rng)
 
-        params, direct_fun, inverse_fun = transformation(transformation_rng, input_dim)
-        prior_params, prior_log_pdf, prior_sample = prior(prior_rng, input_dim)
+        transform_params, direct_fun, inverse_fun = transformation(transformation_rng, input_dim)
+        # prior_params, prior_log_pdf, prior_sample = prior(prior_rng, input_dim)
+        internal_knots = np.linspace(0, 1, spline_knots)
+        mspline_init_fun = MSpline_fun()
+
+        prior_params_init, mspline_apply_fun_vec, mspline_sample_fun_vec, knots = mspline_init_fun(rng, spline_degree, internal_knots, cardinal_splines=True)
+        sp_transform_params, sp_transform_apply_fun = sp_transformation(transformation_rng, input_dim, prior_params_init.shape)
 
         def log_pdf(params, inputs):
-            u, log_det = direct_fun(params, inputs)
-            log_probs = prior_log_pdf(prior_params, u)
+            transform_params, sp_transform_params = params
+            u, log_det = direct_fun(transform_params, inputs)
+
+            prior_params = sp_transform_apply_fun(sp_transform_params, inputs)
+            prior
+            log_probs = mspline_apply_fun_vec(prior_params, u)
             return log_probs + log_det
 
         def sample(rng, params, num_samples=1):
+            transform_params, sp_transform_params = params
             prior_samples = prior_sample(rng, prior_params, num_samples)
-            return inverse_fun(params, prior_samples)[0]
 
-        return params, log_pdf, sample
+            return inverse_fun(transform_params, prior_samples)[0]
+
+        return (transform_params, sp_transform_params), log_pdf, sample
 
     return init_fun

@@ -141,7 +141,7 @@ def test_jax_splines():
       s = sample_fun_vec(rng_array, params, 1)
 
 
-
-test_jax_splines()
+if __name__ == '__main__':
+   test_jax_splines()
 
 
