@@ -2,7 +2,7 @@ import jax.numpy as np
 from jax.nn import softmax
 from jax import random
 from jax.scipy.special import logsumexp
-from jax.scipy.stats import norm, multivariate_normal
+from jax.scipy.stats import norm, multivariate_normal, uniform
 from bspline_dist_jax import MSpline_fun
 
 def Normal():
@@ -17,6 +17,24 @@ def Normal():
 
         def sample(rng, params, num_samples=1):
             return random.normal(rng, (num_samples, input_dim))
+
+        return (), log_pdf, sample
+
+    return init_fun
+
+
+def Uniform():
+    """
+    Returns:
+        A function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
+    """
+
+    def init_fun(rng, input_dim):
+        def log_pdf(params, inputs):
+            return uniform.logpdf(inputs).sum(1)
+
+        def sample(rng, params, num_samples=1):
+            return random.uniform(rng, (num_samples, input_dim))
 
         return (), log_pdf, sample
 
@@ -76,7 +94,7 @@ def Flow(transformation, prior=Normal()):
 
         def log_pdf(params, inputs):
             u, log_det = direct_fun(params, inputs)
-            log_probs = prior_log_pdf(prior_params, u)
+            log_probs = prior_log_pdf(prior_params, (u+6)/50)
             return log_probs + log_det
 
         def sample(rng, params, num_samples=1):
@@ -111,7 +129,7 @@ def MFlow(transformation, sp_transformation, spline_degree, spline_knots):
             prior_params = sp_transform_apply_fun(sp_transform_params, inputs)
             prior_params = softmax(np.concatenate(prior_params[:, None].split(inputs.shape[-1], axis=-1), axis=1))
             prior_params = prior_params.reshape(-1, prior_params.shape[-1])
-            log_probs = mspline_apply_fun_vec(prior_params, (1/6)*(u.reshape(-1) + 3 ))
+            log_probs = mspline_apply_fun_vec(prior_params, np.clip(u.reshape(-1) + 2, a_min=0, a_max=1 ))
             log_probs = log_probs.reshape(u.shape[0], -1)
             log_probs = np.log(np.prod(log_probs, axis=-1))
             return log_probs + log_det

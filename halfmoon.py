@@ -15,11 +15,11 @@ from bspline_dist_jax import MSpline_fun
 from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
 
-# config.update("jax_debug_nans", True)
+config.update("jax_debug_nans", True)
 
 dataset = ['gm', 'hm', 'c'][2]
-n_samples = 10000
-length = 4
+n_samples = 3000
+length = 12
 plot_range = [(-length/2, length/2), (-length/2, length/2)]
 n_bins = 100
 rng, flow_rng = random.split(random.PRNGKey(0))
@@ -129,10 +129,10 @@ def masked_transform(rng, input_dim):
 
 
 
-# init_fun = flows.Flow(
-#     flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-#     flows.Normal(),
-# )
+init_fun = flows.Flow(
+    flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
+    flows.Uniform(),
+)
 
 def masked_sp_transform(rng, input_dim, output_shape):
     masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
@@ -149,11 +149,11 @@ def masked_sp_transform(rng, input_dim, output_shape):
 
 
 
-init_fun = flows.MFlow(
-    flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-    masked_sp_transform,
-    spline_degree=3, spline_knots=10
-)
+# init_fun = flows.MFlow(
+#     flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
+#     masked_sp_transform,
+#     spline_degree=3, spline_knots=10
+# )
 
 
 params, log_pdf, sample = init_fun(flow_rng, input_dim)
@@ -182,8 +182,8 @@ def loss(params, inputs):
 @jit
 def step(i, opt_state, inputs):
     params = get_params(opt_state)
-    gradients = grad(loss)(params, inputs)
     loss_val = loss(params, inputs)
+    gradients = grad(loss)(params, inputs)
     return opt_update(i, gradients, opt_state), loss_val
 
 
@@ -191,7 +191,7 @@ def step(i, opt_state, inputs):
 losses = []
 pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
-    if epoch % 5000 == 0:
+    if epoch % 500 == 0:
         params = get_params(opt_state)
         x = np.linspace(-length / 2, length / 2, 100)
         y = np.linspace(-length / 2, length / 2, 100)
