@@ -96,8 +96,8 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 # @profile
 def test_splines():
 
-   degree = 5
-   internal_knots = np.linspace(0, 1, 6)
+   degree = 3
+   internal_knots = np.linspace(0, 1, 8)
 
    mknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree).clip(min=1))
    mknots = np.repeat(mknots, ((mknots == mknots[-1]) * degree).clip(min=1))
