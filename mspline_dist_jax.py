@@ -8,7 +8,7 @@ from functools import partial
 from helper import binary_search
 from jax.config import config
 import numpy as onp
-config.update('jax_disable_jit', True)
+# config.update('jax_disable_jit', True)
 
 
 def M(x, k, i, t, max_k):
@@ -23,7 +23,17 @@ def M(x, k, i, t, max_k):
    cond2 = i + k <= max_k - 1 or i >= len(t) - max_k # true if t[i+k] - t[i] == 0
    res = jax.lax.cond(cond2, lambda x: np.zeros_like(x), lambda x: k * ( x_minus_ti * M(x, k-1, i, t, max_k) + (t[i+k] - x) * M(x, k-1, i+1, t, max_k) ) / ( (k-1) * (t[i+k] - t[i]) ), x)
    return res
+
+def apply_M_and_multiply(i, x, t, c_i, k):
+   return c_i * M(x, k, i, t, k+1)
+apply_M_and_multiply_vec = vmap(apply_M_and_multiply, in_axes=(0, None, None, 0, None))
 def mspline(x, t, c, k, zero_border=True):
+   # idx_array = np.arange(0, len(c))
+   # if zero_border:
+   #    idx_array = idx_array + 1
+   #
+   # weighted_bases = apply_M_and_multiply_vec(idx_array, x, t, c, k)
+   # return weighted_bases.sum()
    if zero_border:
       return sum(c[i] * M(x, k, i+1, t, k) for i in range(len(c)))
    else:
@@ -56,12 +66,20 @@ def I(x, k, i, t, max_k, max_j):
                        )
    return res
 
-
+def apply_I_and_multiply(i, x, t, c_i, k):
+   return c_i * I(x, k, i, t, k+1, len(t))
+apply_I_and_multiply_vec = vmap(apply_I_and_multiply, in_axes=(0, None, None, 0, None))
 def ispline(x, t, c, k, zero_border=True):
+   idx_array = np.arange(0, len(c))
    if zero_border:
-      return sum(c[i] * I(x, k, i+1, t, k+1, len(t)) for i in range(len(c)))
-   else:
-      return sum(c[i] * I(x, k, i, t, k + 1, len(t)) for i in range(len(c)))
+      idx_array = idx_array + 1
+
+   weighted_bases = apply_I_and_multiply_vec(idx_array, x, t, c, k)
+   return weighted_bases.sum()
+   # if zero_border:
+   #    return sum(c[i] * I(x, k, i+1, t, k+1, len(t)) for i in range(len(c)))
+   # else:
+   #    return sum(c[i] * I(x, k, i, t, k + 1, len(t)) for i in range(len(c)))
 
 
 def MSpline_fun():
@@ -213,20 +231,28 @@ def test_splines(testcase):
       ax.legend(loc='best')
       plt.show()
 
-      fig, ax = plt.subplots()
-      for i in range(len(params_m[0])):
-         ax.plot(xx, np.array([M(x, k, i, knots_m, k) for x in xx]), label='M {}'.format(i))
+      # fig, ax = plt.subplots()
+      # for i in range(len(params_m[0])):
+      #    ax.plot(xx, np.array([M(x, k, i, knots_m, k) for x in xx]), label='M {}'.format(i))
+      #
+      # ax.grid(True)
+      # ax.legend(loc='best')
+      # plt.show()
 
-      ax.grid(True)
-      ax.legend(loc='best')
-      plt.show()
+      n_knots = len(knots_m)
+      for _ in tqdm.tqdm(range(1000)):
+         # params_m = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k - 2,))
+         # params_m = np.repeat(params_m[:, None], n_points, axis=1).T
+         rng, split_rng = jax.random.split(rng)
+         xx = jax.random.uniform(rng, shape=(n_points,))
+         apply_fun_vec_m(params_m, xx)
 
    #############
    # I Splines #
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, reverse_fun_vec_i, derivative_fun_vec, knots_i = init_fun_i(rng, k, internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.0001)
+      params_i, apply_fun_vec_i, reverse_fun_vec_i, derivative_fun_vec, knots_i = init_fun_i(rng, k, internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.001)
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
@@ -252,7 +278,10 @@ def test_splines(testcase):
       ax.legend(loc='best')
       plt.show()
 
+      n_knots = len(knots_i)
       for _ in tqdm.tqdm(range(1000)):
+         params_i = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k - 2,))
+         params_i = np.repeat(params_i[:, None], n_points, axis=1).T
          rng, split_rng = jax.random.split(rng)
          xx = jax.random.uniform(rng, shape=(n_points,))
          reverse_fun_vec_i(params_i, xx)
