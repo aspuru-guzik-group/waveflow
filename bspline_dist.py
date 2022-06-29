@@ -18,13 +18,13 @@ def M(x, k, i, t, max_k):
 
    if k == 1:
       if x >= t[i] and x < t[i+1]:
-         if t[i+1] - t[i] == 0:
+         if is_superflious_node:#t[i+1] - t[i] == 0:
             return 0
          else:
             return 1 / (t[i+1] - t[i])
       else:
          return 0
-   if t[i+k] - t[i] == 0:
+   if is_first_node:#t[i+k] - t[i] == 0:
       return 0
    else:
       # M_k_minus_one_i = cache['{};{}'.format(k - 1, i)] if '{};{}'.format(k - 1, i) in cache else M(x, k - 1, i, t, cache)
@@ -37,7 +37,7 @@ def mspline(x, t, c, k):
 
 
 
-def I(x, k, i, t):
+def I(x, k, i, t, max_k):
    j = np.searchsorted(t, x, 'right') - 1
    if i > j:
       return 0
@@ -45,11 +45,11 @@ def I(x, k, i, t):
       return 1
    else:
       #return np.array([(t[m+k+1] - t[m]) * M(x, k+1, m, t)/(k+1) for m in range(i, j+1)]).sum()
-      return np.array([(t[m + k + 1] - t[m]) * M(x, k + 1, m, t) / (k + 1) for m in range(i, j+1)]).sum()
+      return np.array([(t[m + k + 1] - t[m]) * M(x, k + 1, m, t, max_k) / (k + 1) for m in range(i, j+1)]).sum()
 def ispline(x, t, c, k):
    n = len(t) - k - 1
    assert (n >= k + 1) and (len(c) >= n)
-   return sum(c[i] * I(x, k, i, t) for i in range(n))
+   return sum(c[i] * I(x, k, i, t, k+1) for i in range(n))
 
 
 def B(x, k, i, t):
@@ -113,7 +113,7 @@ def test_splines():
    iweights[-1] = 0
    iweights = iweights / sum(iweights)
 
-   n_points = 1000
+   n_points = 100
    xx = np.linspace(internal_knots[0] - 1, internal_knots[-1] + 1, n_points)
    dx = (xx[-1] - xx[0]) / n_points
 
@@ -121,30 +121,34 @@ def test_splines():
 
    fig, ax = plt.subplots()
    # for i in range(len(mweights)):
-   #    ax.plot(xx, np.array([M(x, degree, i, mknots) for x in xx]), label='M {}'.format(i))
+   #    ax.plot(xx, np.array([M(x, degree, i, mknots, degree) for x in xx]), label='M {}'.format(i))
    #
-   ax.plot(xx, np.array([mspline(x, mknots, mweights, degree) for x in xx]), label='M Spline')
+   # ax.plot(xx, np.array([mspline(x, mknots, mweights, degree) for x in xx]), label='M Spline')
 
    max_val = np.max(mweights) * len(mknots)
-   for i in tqdm.tqdm(range(1000)):
-      s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1, ymax=max_val)
-   s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1,
-                          ymax=max_val)
-   ax.hist(np.array(s), density=True, bins=100)
+   # for i in tqdm.tqdm(range(1000)):
+   #    s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1, ymax=max_val)
+   # s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1,
+   #                        ymax=max_val)
+   # ax.hist(np.array(s), density=True, bins=100)
 
-   ax.grid(True)
-   ax.legend(loc='best')
-   plt.show()
+   # ax.grid(True)
+   # ax.legend(loc='best')
+   # plt.show()
 
    fig, ax = plt.subplots()
-   for i in range(len(iweights)):
-      ax.plot(xx, np.array([I(x, degree, i, iknots) for x in xx]), label='I naive {}'.format(i))
+   # for i in range(len(iweights)):
+   #    ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1) for x in xx]), label='I naive {}'.format(i))
 
-   ax.plot(xx, np.array([ispline(x, iknots, iweights, degree) for x in xx]), label='I Spline')
+   i = 4
+   ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1) for x in xx]), label='I naive {}'.format(i))
+
+   # ax.plot(xx, np.array([ispline(x, iknots, iweights, degree) for x in xx]), label='I Spline')
 
    ax.grid(True)
    ax.legend(loc='best')
    plt.show()
+
 
 
 
