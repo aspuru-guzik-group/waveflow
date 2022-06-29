@@ -5,9 +5,10 @@ from jax import jit, vmap
 import jax
 from line_profiler_pycharm import profile
 from functools import partial
+from helper import binary_search
 from jax.config import config
 import numpy as onp
-# config.update('jax_disable_jit', True)
+config.update('jax_disable_jit', True)
 
 
 def M(x, k, i, t, max_k):
@@ -128,7 +129,7 @@ def MSpline_fun():
 
 def ISpline_fun():
 
-   def init_fun(rng, k, internal_knots, cardinal_splines=True, zero_border=True):
+   def init_fun(rng, k, internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=1e-3):
       internal_knots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * (k+1)).clip(min=1))
       knots = np.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * (k+1)).clip(min=1))
       n_knots = len(knots)
@@ -151,14 +152,8 @@ def ISpline_fun():
 
       apply_fun_vec = jit(partial(vmap(apply_fun, in_axes=(0, 0))))
 
-      def reverse_fun(params, x):
-         if not cardinal_splines:
-            knots_ = params[1]
-            params = params[0]
-         else:
-            knots_ = knots
-
-         pass
+      def reverse_fun(params, y):
+         return binary_search(lambda x: apply_fun(params, x) - y, 0.0, 1.0, tol=reverse_fun_tol)
 
       reverse_fun_vec = jit(partial(vmap(reverse_fun, in_axes=(0, 0))))
 
@@ -231,7 +226,7 @@ def test_splines(testcase):
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, reverse_fun_vec_i, derivative_fun_vec, knots_i = init_fun_i(rng, k, internal_knots, cardinal_splines=True, zero_border=True)
+      params_i, apply_fun_vec_i, reverse_fun_vec_i, derivative_fun_vec, knots_i = init_fun_i(rng, k, internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.0001)
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
@@ -242,18 +237,25 @@ def test_splines(testcase):
       #    I_vec = lambda x: I(x, k, i, knots_i, k+1, len(knots_i))
       #    ax.plot(xx, [I_vec(xx[i]) for i in range(xx.shape[0])], label='I {}'.format(i))
       # ax.plot(xx, [apply_fun_vec_i(params_i[i], xx[i]) for i in range(xx.shape[0])], label='I Spline')
+      ys_reversed = reverse_fun_vec_i(params_i, xx)
+      ax.plot(xx, ys_reversed, label='I Spline Reversed')
       ys = apply_fun_vec_i(params_i, xx)
       ax.plot(xx, ys, label='I Spline')
-      ax.plot(xx, np.gradient(ys, (xx[-1]-xx[0])/n_points), label='dI/dx nummerical', linewidth=6)
+      # ax.plot(xx, np.gradient(ys, (xx[-1]-xx[0])/n_points), label='dI/dx nummerical', linewidth=6)
       # ax.grid(True)
       # ax.legend(loc='best')
       # plt.show()
       # fig, ax = plt.subplots()
-      ax.plot(xx, derivative_fun_vec(params_i, xx)[0], label='dI/dx', linewidth=1.5)
+      # ax.plot(xx, derivative_fun_vec(params_i, xx)[0], label='dI/dx', linewidth=1.5)
 
       ax.grid(True)
       ax.legend(loc='best')
       plt.show()
+
+      for _ in tqdm.tqdm(range(1000)):
+         rng, split_rng = jax.random.split(rng)
+         xx = jax.random.uniform(rng, shape=(n_points,))
+         reverse_fun_vec_i(params_i, xx)
 
 
    #############

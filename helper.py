@@ -9,14 +9,6 @@ import pickle
 from matplotlib.ticker import StrMethodFormatter, NullFormatter
 
 
-def test_calibration(x, params, log_pdf):
-    pdf_vals = jnp.exp(log_pdf(params, x))
-
-    plt.hist(pdf_vals)
-    plt.show()
-
-
-
 def vectorized_diagonal(m):
     return vmap(jnp.diag)(m)
 
@@ -218,4 +210,20 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimensi
         np.save('{}/energies'.format(save_dir), energies)
 
 
+def binary_search(func, low=0.0, high=1.0, tol=1e-3):
 
+    def cond(state):
+        low, high = state
+        midpoint = 0.5 * (low + high)
+        return (low + tol/2 < midpoint) & (midpoint < high - tol/2)
+
+    def body(state):
+        low, high = state
+        midpoint = 0.5 * (low + high)
+        update_upper = func(midpoint) > 0
+        low = jnp.where(update_upper, low, midpoint)
+        high = jnp.where(update_upper, midpoint, high)
+        return (low, high)
+
+    solution, _ = jax.lax.while_loop(cond, body, (low, high))
+    return solution
