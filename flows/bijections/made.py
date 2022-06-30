@@ -58,7 +58,7 @@ def MADE(transform):
     return init_fun
 
 
-def IMADE(transform, spline_degree=3, n_internal_knots=12):
+def IMADE(transform, spline_degree=4, n_internal_knots=12):
 
 
     def init_fun(rng, input_dim, **kwargs):
