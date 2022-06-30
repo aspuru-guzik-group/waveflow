@@ -6,28 +6,32 @@ import jax
 from line_profiler_pycharm import profile
 from functools import partial
 from helper import binary_search
+import os
+from pathlib import Path
 from jax.config import config
 import numpy as onp
+from mspline_dist import M as M_onp
+from mspline_dist import I as I_onp
 # config.update('jax_disable_jit', True)
 
-
+#@partial(jit, static_argnums=(1,2,4))
 def M(x, k, i, t, max_k):
 
-   cond1 = i < (max_k - 1) or i >= len(t) - max_k # true if t[i+1] - t[i] == 0
+   is_superflious_node = i < (max_k - 1) or i >= len(t) - max_k # true if t[i+1] - t[i] == 0
    x_minus_ti = x - t[i]
    if k == 1:
-      return jax.lax.cond(cond1,
+      return jax.lax.cond(is_superflious_node,
                           lambda x: np.zeros_like(x),
-                          lambda x: np.heaviside(x_minus_ti, 1) * np.heaviside(t[i+1] - x,  1) * 1 / (t[i+1] - t[i]), x)
+                          lambda x: np.heaviside(x_minus_ti, 1) * np.heaviside(t[i+1] - x,  0) * 1 / (t[i+1] - t[i]), x)
 
-   cond2 = i + k <= max_k - 1 or i >= len(t) - max_k # true if t[i+k] - t[i] == 0
-   res = jax.lax.cond(cond2, lambda x: np.zeros_like(x), lambda x: k * ( x_minus_ti * M(x, k-1, i, t, max_k) + (t[i+k] - x) * M(x, k-1, i+1, t, max_k) ) / ( (k-1) * (t[i+k] - t[i]) ), x)
+   is_first_node = i + k <= max_k - 1 or i >= len(t) - max_k # true if t[i+k] - t[i] == 0
+   res = jax.lax.cond(is_first_node, lambda x: np.zeros_like(x), lambda x: k * ( x_minus_ti * M(x, k-1, i, t, max_k) + (t[i+k] - x) * M(x, k-1, i+1, t, max_k) ) / ( (k-1) * (t[i+k] - t[i]) ), x)
    return res
 
 def apply_M_and_multiply(i, x, t, c_i, k):
    return c_i * M(x, k, i, t, k+1)
 apply_M_and_multiply_vec = vmap(apply_M_and_multiply, in_axes=(0, None, None, 0, None))
-def mspline(x, t, c, k, zero_border=True):
+def mspline(x, t, c, k, zero_border=True, cached_bases=None):
    # idx_array = np.arange(0, len(c))
    # if zero_border:
    #    idx_array = idx_array + 1
@@ -35,8 +39,12 @@ def mspline(x, t, c, k, zero_border=True):
    # weighted_bases = apply_M_and_multiply_vec(idx_array, x, t, c, k)
    # return weighted_bases.sum()
    if zero_border:
+      if cached_bases is not None:
+         return sum(c[i] * cached_bases[i+1][x] for i in range(len(c)))
       return sum(c[i] * M(x, k, i+1, t, k) for i in range(len(c)))
    else:
+      if cached_bases is not None:
+         return sum(c[i] * cached_bases[i][x] for i in range(len(c)))
       return sum(c[i] * M(x, k, i, t, k) for i in range(len(c)))
 
 
@@ -84,9 +92,10 @@ def ispline(x, t, c, k, zero_border=True):
 
 def MSpline_fun():
 
-   def init_fun(rng, k, internal_knots, cardinal_splines=True, zero_border=True):
-      internal_knots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * k).clip(min=1))
-      knots = np.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * k).clip(min=1))
+   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, use_cached_bases=False, cached_bases_path='./cached_bases/M/', n_mesh_points=1000):
+      internal_knots = onp.linspace(0, 1, n_internal_knots)
+      internal_knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[0]) * k).clip(min=1))
+      knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * k).clip(min=1))
       n_knots = len(knots)
 
       knot_diff = np.diff(knots)
@@ -94,11 +103,40 @@ def MSpline_fun():
       knot_diff = knot_diff.min()
       if zero_border:
          initial_params = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k - 2,))
-         ymax_multiplier = 1/ knot_diff
+         ymax_multiplier = 1 / knot_diff
       else:
          initial_params = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k,))
          ymax_multiplier = k / knot_diff
       initial_params = initial_params / sum(initial_params)
+
+      if use_cached_bases:
+         Path(cached_bases_path).mkdir(exist_ok=True, parents=True)
+         if not cardinal_splines:
+            print('Only cardinal splines can be cached! Exiting...')
+            exit()
+         cached_bases_path = '{}/degree_{}_niknots_{}_nmp_{}.npy'.format(cached_bases_path, k, n_knots - k, n_mesh_points)
+
+         if os.path.exists(cached_bases_path):
+            print('Bases found, loading...')
+            cached_bases = np.load(cached_bases_path)
+            print('Done!')
+         else:
+            print('No bases found, precomputing...')
+            mesh = onp.linspace(0, 1, n_mesh_points)
+            cached_bases = []
+            for i in tqdm.tqdm(range(n_knots - k)):
+               cached_bases.append(np.array([M_onp(x, k, i, knots, k) for x in mesh]))
+
+            cached_bases = np.array(cached_bases)
+            np.save(cached_bases_path, cached_bases)
+            print('Done!')
+      else:
+         cached_bases = None
+
+      # Convert to from onp array to jax device array
+      knots = np.array(knots)
+
+
 
 
       def apply_fun(params, x):
@@ -108,7 +146,10 @@ def MSpline_fun():
          else:
             knots_ = knots
 
-         return mspline(x, knots_, params, k, zero_border)
+         if use_cached_bases:
+            x = (x * n_mesh_points).astype(np.int32)
+
+         return mspline(x, knots_, params, k, zero_border, cached_bases)
 
       apply_fun_vec = jit(partial(vmap(apply_fun, in_axes=(0, 0))))
 
@@ -147,7 +188,8 @@ def MSpline_fun():
 
 def ISpline_fun():
 
-   def init_fun(rng, k, internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=1e-3):
+   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=1e-3):
+      internal_knots = np.linspace(0, 1, n_internal_knots)
       internal_knots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * (k+1)).clip(min=1))
       knots = np.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * (k+1)).clip(min=1))
       n_knots = len(knots)
@@ -203,41 +245,45 @@ def test_splines(testcase):
    #############
    rng = jax.random.PRNGKey(4)
    k = 3
-   n_points = 1000
-   internal_knots = np.linspace(0, 1, 8)
-   xx = np.linspace(internal_knots[0], internal_knots[-1], n_points)
+   n_points = 100
+   n_internal_knots = 10
+   xx = np.linspace(0, 1, n_points)
 
    #############
    # M Splines #
    #############
    if testcase == 'm':
       init_fun_m = MSpline_fun()
-      params_m, apply_fun_vec_m, sample_fun_vec_m, knots_m = init_fun_m(rng, k, internal_knots, cardinal_splines=True, zero_border=False)
+      params_m, apply_fun_vec_m, sample_fun_vec_m, knots_m = init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True)
 
       params_m = np.repeat(params_m[:,None], n_points, axis=1).T
       # knots_m = np.repeat(knots_m[:,None], n_points, axis=1).T
       # params_m = (params_m, knots_m)
 
 
+
+
       rng_array = jax.random.split(rng, n_points)
       s = sample_fun_vec_m(rng_array, params_m, 1).T
 
       fig, ax = plt.subplots()
-      ax.plot(xx, apply_fun_vec_m(params_m, xx), label='M Spline')
-      ax.hist(np.array(s), density=True, bins=100)
-
-
-      ax.grid(True)
-      ax.legend(loc='best')
-      plt.show()
-
-      # fig, ax = plt.subplots()
-      # for i in range(len(params_m[0])):
-      #    ax.plot(xx, np.array([M(x, k, i, knots_m, k) for x in xx]), label='M {}'.format(i))
+      # ax.plot(xx, apply_fun_vec_m(params_m, xx), label='M Spline')
+      # ax.hist(np.array(s), density=True, bins=100)
+      #
       #
       # ax.grid(True)
       # ax.legend(loc='best')
       # plt.show()
+
+
+      fig, ax = plt.subplots()
+      for i in range(4):
+         ax.plot(xx, np.array([M(x, k, i, knots_m, k) for x in xx]), label='M {}'.format(i))
+         ax.plot(xx, np.array([M_onp(x, k, i, knots_m, k) for x in xx]), label='M_onp {}'.format(i))
+
+      ax.grid(True)
+      ax.legend(loc='best')
+      plt.show()
 
       n_knots = len(knots_m)
       for _ in tqdm.tqdm(range(1000)):
@@ -308,6 +354,6 @@ def test_splines(testcase):
 
 
 if __name__ == '__main__':
-   test_splines('i')
+   test_splines('m')
 
 

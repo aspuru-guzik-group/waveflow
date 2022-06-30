@@ -3,7 +3,7 @@ from jax.nn import softmax
 from jax import random
 from jax.scipy.special import logsumexp
 from jax.scipy.stats import norm, multivariate_normal, uniform
-from bspline_dist_jax import MSpline_fun
+from mspline_dist_jax import MSpline_fun, ISpline_fun
 
 def Normal():
     """
@@ -94,7 +94,7 @@ def Flow(transformation, prior=Normal()):
 
         def log_pdf(params, inputs):
             u, log_det = direct_fun(params, inputs)
-            log_probs = prior_log_pdf(prior_params, (u+6)/50)
+            log_probs = prior_log_pdf(prior_params, u)
             return log_probs + log_det
 
         def sample(rng, params, num_samples=1):

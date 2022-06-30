@@ -44,7 +44,6 @@ def I(x, k, i, t, max_k):
    elif i <= j - k:
       return 1
    else:
-      #return np.array([(t[m+k+1] - t[m]) * M(x, k+1, m, t)/(k+1) for m in range(i, j+1)]).sum()
       return np.array([(t[m + k + 1] - t[m]) * M(x, k + 1, m, t, max_k) / (k + 1) for m in range(i, j+1)]).sum()
 def ispline(x, t, c, k):
    n = len(t) - k - 1
@@ -96,8 +95,8 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 # @profile
 def test_splines():
 
-   degree = 3
-   internal_knots = np.linspace(0, 1, 8)
+   degree = 1
+   internal_knots = np.linspace(0, 1, 10)
 
    mknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree).clip(min=1))
    mknots = np.repeat(mknots, ((mknots == mknots[-1]) * degree).clip(min=1))
@@ -113,37 +112,35 @@ def test_splines():
    iweights[-1] = 0
    iweights = iweights / sum(iweights)
 
-   n_points = 100
-   xx = np.linspace(internal_knots[0] - 1, internal_knots[-1] + 1, n_points)
+   n_points = 1000
+   xx = np.linspace(internal_knots[0], internal_knots[-1], n_points)
    dx = (xx[-1] - xx[0]) / n_points
 
-
+   print(M(1/9, degree, 0, mknots, degree))
+   exit()
 
    fig, ax = plt.subplots()
-   # for i in range(len(mweights)):
-   #    ax.plot(xx, np.array([M(x, degree, i, mknots, degree) for x in xx]), label='M {}'.format(i))
-   #
-   # ax.plot(xx, np.array([mspline(x, mknots, mweights, degree) for x in xx]), label='M Spline')
+   for i in range(len(mweights)):
+      ax.plot(xx, np.array([M(x, degree, i, mknots, degree) for x in xx]), label='M {}'.format(i))
 
-   max_val = np.max(mweights) * len(mknots)
+   ax.plot(xx, np.array([mspline(x, mknots, mweights, degree) for x in xx]), label='M Spline')
+
+   # max_val = np.max(mweights) * len(mknots)
    # for i in tqdm.tqdm(range(1000)):
    #    s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1, ymax=max_val)
    # s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1,
    #                        ymax=max_val)
    # ax.hist(np.array(s), density=True, bins=100)
 
-   # ax.grid(True)
-   # ax.legend(loc='best')
-   # plt.show()
+   ax.grid(True)
+   ax.legend(loc='best')
+   plt.show()
 
    fig, ax = plt.subplots()
-   # for i in range(len(iweights)):
-   #    ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1) for x in xx]), label='I naive {}'.format(i))
+   for i in range(len(iweights)):
+      ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1) for x in xx]), label='I naive {}'.format(i))
 
-   i = 4
-   ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1) for x in xx]), label='I naive {}'.format(i))
-
-   # ax.plot(xx, np.array([ispline(x, iknots, iweights, degree) for x in xx]), label='I Spline')
+   ax.plot(xx, np.array([ispline(x, iknots, iweights, degree) for x in xx]), label='I Spline')
 
    ax.grid(True)
    ax.legend(loc='best')
@@ -151,8 +148,8 @@ def test_splines():
 
 
 
-
-test_splines()
+if __name__ == '__main__':
+   test_splines()
 
 
 

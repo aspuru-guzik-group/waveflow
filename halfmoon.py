@@ -9,18 +9,17 @@ from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, Wav
 from scipy.stats.sampling import NumericalInverseHermite, SimpleRatioUniforms
 import jax
 import flows
-from helper import test_calibration
-from bspline_dist_jax import MSpline_fun
 
 from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
 
-config.update("jax_debug_nans", True)
+# config.update("jax_debug_nans", True)
 
 dataset = ['gm', 'hm', 'c'][2]
 n_samples = 3000
-length = 12
+length = 3
 plot_range = [(-length/2, length/2), (-length/2, length/2)]
+margin = 1e-3
 n_bins = 100
 rng, flow_rng = random.split(random.PRNGKey(0))
 
@@ -42,7 +41,7 @@ if dataset == 'gm':
     X = sample_gt(rng, params_gt, 10000)
     sample_log_pdf_gt = log_pdf_gt(params_gt, X)
 
-    scaler = preprocessing.StandardScaler()
+    scaler = preprocessing.MinMaxScaler(feature_range=(margin, 1-margin))
     X = scaler.fit_transform(X)
 
 
@@ -73,7 +72,7 @@ elif dataset == 'hm':
     X, _ = datasets.make_moons(n_samples=n_samples, noise=.05)
 
 
-    scaler = preprocessing.StandardScaler()
+    scaler = preprocessing.MinMaxScaler(feature_range=(margin, 1-margin))
     X = scaler.fit_transform(X)
     plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
     plt.show()
@@ -87,7 +86,7 @@ else:
 
     X, _ = datasets.make_circles(n_samples=n_samples, noise=.05, factor=0.5)
 
-    scaler = preprocessing.StandardScaler()
+    scaler = preprocessing.MinMaxScaler(feature_range=(margin, 1-margin))
     X = scaler.fit_transform(X)
     plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
     plt.show()
@@ -114,27 +113,9 @@ def get_masks(input_dim, hidden_dim=64, num_hidden=1):
         masks += [np.transpose(np.expand_dims(d1, -1) >= np.expand_dims(d0, 0)).astype(np.float32)]
     return masks
 
-def masked_transform(rng, input_dim):
-    masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
-    act = stax.Tanh
-    init_fun, apply_fun = stax.serial(
-        flows.MaskedDense(masks[0]),
-        act,
-        flows.MaskedDense(masks[1]),
-        act,
-        flows.MaskedDense(masks[2].tile(2)),
-    )
-    _, params = init_fun(rng, (input_dim,))
-    return params, apply_fun
 
 
-
-init_fun = flows.Flow(
-    flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-    flows.Uniform(),
-)
-
-def masked_sp_transform(rng, input_dim, output_shape):
+def masked_transform(rng, input_dim, output_shape=2):
     masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
     act = stax.Tanh
     init_fun, apply_fun = stax.serial(
@@ -146,6 +127,16 @@ def masked_sp_transform(rng, input_dim, output_shape):
     )
     _, params = init_fun(rng, (input_dim,))
     return params, apply_fun
+
+# init_fun = flows.Flow(
+#     flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
+#     flows.Normal(),
+# )
+
+init_fun = flows.Flow(
+    flows.Serial(*(flows.IMADE(masked_transform), flows.Reverse()) * 5),
+    flows.Normal(),
+)
 
 
 
