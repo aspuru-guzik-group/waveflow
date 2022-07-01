@@ -11,6 +11,7 @@ from pathlib import Path
 from jax.config import config
 import numpy as onp
 from mspline_dist import M as M_onp
+from mspline_dist import dM as dM_onp
 from mspline_dist import I as I_onp
 # config.update('jax_disable_jit', True)
 
