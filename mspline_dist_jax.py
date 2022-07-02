@@ -188,7 +188,7 @@ def MSpline_fun():
       sample_fun_vec = vmap(sample_fun, in_axes=(0, 0, None))
 
 
-      return initial_params, apply_fun_vec, sample_fun_vec, knots, cached_bases_dict
+      return initial_params, apply_fun_vec, sample_fun_vec, knots
 
    return init_fun
 
@@ -253,7 +253,7 @@ def test_splines(testcase):
    ### SETUP ###
    #############
    rng = jax.random.PRNGKey(4)
-   k = 3
+   k = 4
    n_points = 1000
    n_internal_knots = 10
    xx = np.linspace(0, 1, n_points)
@@ -263,7 +263,7 @@ def test_splines(testcase):
    #############
    if testcase == 'm':
       init_fun_m = MSpline_fun()
-      params_m, apply_fun_vec_m, sample_fun_vec_m, knots_m, cached_bases_dict = init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True)
+      params_m, apply_fun_vec_m, sample_fun_vec_m, knots_m = init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, use_cached_bases=True)
 
       params_m = np.repeat(params_m[:,None], n_points, axis=1).T
       # knots_m = np.repeat(knots_m[:,None], n_points, axis=1).T
@@ -276,28 +276,16 @@ def test_splines(testcase):
       # s = sample_fun_vec_m(rng_array, params_m, 1).T
 
 
-      # fig, ax = plt.subplots()
-      # ax.plot(xx, apply_fun_vec_m(params_m, xx), label='M Spline')
-      # apply_fun_vec_m_grad = grad(apply_fun_vec_m, argnums=(1,))
-      # ax.plot(xx, apply_fun_vec_m_grad(params_m, xx), label='dM/dx Spline')
+      fig, ax = plt.subplots()
+      ax.plot(xx, apply_fun_vec_m(params_m, xx), label='M Spline')
+      ax.plot(xx, apply_fun_vec_grad(params_m, xx), label='dM/dx Spline')
       # ax.hist(np.array(s), density=True, bins=100)
 
 
-      # ax.grid(True)
-      # ax.legend(loc='best')
-      # plt.show()
+      ax.grid(True)
+      ax.legend(loc='best')
+      plt.show()
 
-      M_cached_grad = jit(grad(lambda x, i: M_cached(x, i, cached_bases_dict), argnums=0))
-      for i in range(4):
-         fig, ax = plt.subplots()
-         # ax.plot(xx, np.array([M(x, k, i, knots_m, k) for x in xx]), label='M {}'.format(i))
-         ax.plot(xx, np.array([M_cached(x, i, cached_bases_dict) for x in xx]), label='M {}'.format(i))
-         ax.plot(xx, np.array([M_cached_grad(x, i) for x in xx]), label='dM/dx {}'.format(i))
-         # ax.plot(xx, np.array([M_onp(x, k, i, knots_m, k) for x in xx]), label='M_onp {}'.format(i))
-
-         ax.grid(True)
-         ax.legend(loc='best')
-         plt.show()
 
       n_knots = len(knots_m)
       for _ in tqdm.tqdm(range(1000)):
