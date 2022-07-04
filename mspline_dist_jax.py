@@ -30,7 +30,6 @@ def M(x, k, i, t, max_k):
    return res
 
 @custom_jvp
-@jit
 def M_cached(x, i, cached_bases_dict, n_derivative=0):
       x = (x * cached_bases_dict[0].shape[-1]).astype(np.int32)
       return cached_bases_dict[n_derivative][i][x]
@@ -40,12 +39,22 @@ def f_fwd(primals, tangents):
    x, i, cached_bases_dict, n_derivative = primals
    t_x, _, _, _ = tangents
 
-   x = (x * cached_bases_dict[0].shape[-1]).astype(np.int32)
-   grad = cached_bases_dict[n_derivative+1][i][x] * t_x
+   grad = M_cached(x, i, cached_bases_dict, n_derivative=n_derivative+1) * t_x
    return M_cached(x, i, cached_bases_dict, n_derivative=n_derivative), grad
 
 
+
+def apply_M_and_multiply(i, c_i, x,  cached_bases):
+   return c_i * M_cached(x, i, cached_bases)
+apply_M_and_multiply_vec = vmap(apply_M_and_multiply, in_axes=(0, 0, None, None))
+
 def mspline(x, t, c, k, zero_border=True, cached_bases=None):
+   # idx_array = np.arange(0, len(c))
+   # if zero_border:
+   #    idx_array = idx_array + 1
+   #
+   # weighted_bases = apply_M_and_multiply_vec(idx_array, c, x, cached_bases)
+   # return weighted_bases.sum()
 
    if zero_border:
       if cached_bases is not None:
@@ -83,20 +92,38 @@ def I(x, k, i, t, max_k, max_j):
                        )
    return res
 
+
+@custom_jvp
+def I_cached(x, i, cached_bases_dict, n_derivative=0):
+      x = (x * cached_bases_dict[0].shape[-1]).astype(np.int32)
+      return cached_bases_dict[n_derivative][i][x]
+
+@I_cached.defjvp
+def f_fwd(primals, tangents):
+   x, i, cached_bases_dict, n_derivative = primals
+   t_x, _, _, _ = tangents
+
+   grad = I_cached(x, i, cached_bases_dict, n_derivative=n_derivative+1) * t_x
+   return I_cached(x, i, cached_bases_dict, n_derivative=n_derivative), grad
+
 def apply_I_and_multiply(i, x, t, c_i, k):
    return c_i * I(x, k, i, t, k+1, len(t))
 apply_I_and_multiply_vec = vmap(apply_I_and_multiply, in_axes=(0, None, None, 0, None))
-def ispline(x, t, c, k, zero_border=True):
-   idx_array = np.arange(0, len(c))
-   if zero_border:
-      idx_array = idx_array + 1
-
-   weighted_bases = apply_I_and_multiply_vec(idx_array, x, t, c, k)
-   return weighted_bases.sum()
+def ispline(x, t, c, k, zero_border=True, cached_bases_dict=None):
+   # idx_array = np.arange(0, len(c))
    # if zero_border:
-   #    return sum(c[i] * I(x, k, i+1, t, k+1, len(t)) for i in range(len(c)))
-   # else:
-   #    return sum(c[i] * I(x, k, i, t, k + 1, len(t)) for i in range(len(c)))
+   #    idx_array = idx_array + 1
+   #
+   # weighted_bases = apply_I_and_multiply_vec(idx_array, x, t, c, k)
+   # return weighted_bases.sum()
+   if zero_border:
+      if cached_bases_dict is not None:
+         return sum(c[i] * I_cached(x, i + 1, cached_bases_dict) for i in range(len(c)))
+      return sum(c[i] * I(x, k, i + 1, t, k + 1, len(t)) for i in range(len(c)))
+   else:
+      if cached_bases_dict is not None:
+         return sum(c[i] * I_cached(x, i, cached_bases_dict) for i in range(len(c)))
+      return sum(c[i] * I(x, k, i, t, k + 1, len(t)) for i in range(len(c)))
 
 
 def MSpline_fun():
@@ -131,7 +158,6 @@ def MSpline_fun():
             if os.path.exists(cached_bases_path):
                print('Bases found, loading...')
                cached_bases_dict.append(np.load(cached_bases_path))
-               print('Done!')
             else:
                print('No bases found, precomputing...')
                mesh = onp.linspace(0, 1, n_mesh_points)
@@ -161,6 +187,7 @@ def MSpline_fun():
          return mspline(x, knots_, params, k, zero_border, cached_bases_dict)
 
       apply_fun_vec = jit(vmap(apply_fun, in_axes=(0, 0)))
+      # apply_fun_vec_grad = jit(vmap(grad(apply_fun, argnums=1), in_axes=(0, 0)))
 
       @partial(jit, static_argnums=(2,))
       def sample_fun(rng_array, params, num_samples):
@@ -197,10 +224,10 @@ def MSpline_fun():
 
 def ISpline_fun():
 
-   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=1e-3):
-      internal_knots = np.linspace(0, 1, n_internal_knots)
-      internal_knots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * (k+1)).clip(min=1))
-      knots = np.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * (k+1)).clip(min=1))
+   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=1e-3, use_cached_bases=False, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000):
+      internal_knots = onp.linspace(0, 1, n_internal_knots)
+      internal_knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[0]) * (k+1)).clip(min=1))
+      knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * (k+1)).clip(min=1))
       n_knots = len(knots)
 
       if zero_border:
@@ -210,6 +237,46 @@ def ISpline_fun():
       initial_params = initial_params / sum(initial_params)
 
 
+
+      if use_cached_bases:
+         Path(cached_bases_path_root).mkdir(exist_ok=True, parents=True)
+         if not cardinal_splines:
+            print('Only cardinal splines can be cached! Exiting...')
+            exit()
+
+
+         cached_bases_dict = []
+         for n_derivative in tqdm.tqdm(range(0, 4)):
+
+            cached_bases_path = '{}/degree_{}_niknots_{}_nmp_{}_nd_{}.npy'.format(cached_bases_path_root, k, n_knots - k, n_mesh_points, n_derivative)
+            if os.path.exists(cached_bases_path):
+               print('Bases found, loading...')
+               cached_bases_dict.append(np.load(cached_bases_path))
+            else:
+               print('No bases found, precomputing...')
+               mesh = onp.linspace(0, 1, n_mesh_points)
+               cached_bases = []
+
+
+               for i in tqdm.tqdm(range(n_knots - k)):
+                  if n_derivative == 0:
+                     cached_bases.append(np.array([I_onp(x, k, i, knots, k) for x in mesh]))
+                  else:
+                     # First derivative of kth degree I-Spline is kth degree M-Spline
+                     cached_bases.append(np.array([M_onp(x, k-n_derivative+1, i, knots, k-n_derivative+1) for x in mesh]))
+
+               cached_bases = np.array(cached_bases)
+               np.save(cached_bases_path, cached_bases)
+               cached_bases_dict.append(cached_bases)
+               print('Done!')
+         cached_bases_dict = np.array(cached_bases_dict)
+      else:
+         cached_bases_dict = np.array([None])
+
+      # Convert to from onp array to jax device array
+      knots = np.array(knots)
+
+
       def apply_fun(params, x):
          if not cardinal_splines:
             knots_ = params[1]
@@ -217,7 +284,7 @@ def ISpline_fun():
          else:
             knots_ = knots
 
-         return ispline(x, knots_, params, k, zero_border=zero_border)
+         return ispline(x, knots_, params, k, zero_border=zero_border, cached_bases_dict=cached_bases_dict)
 
       apply_fun_vec = jit(partial(vmap(apply_fun, in_axes=(0, 0))))
 
@@ -242,7 +309,7 @@ def ISpline_fun():
       # derivative_fun_vec = jit(partial(vmap(jax.grad(apply_fun, argnums=(1,)), in_axes=(0, 0))))
 
 
-      return initial_params, apply_fun_vec, reverse_fun_vec, derivative_fun_vec, knots
+      return initial_params, apply_fun_vec, reverse_fun_vec, knots
 
    return init_fun
 
@@ -255,7 +322,7 @@ def test_splines(testcase):
    rng = jax.random.PRNGKey(4)
    k = 4
    n_points = 1000
-   n_internal_knots = 10
+   n_internal_knots = 50
    xx = np.linspace(0, 1, n_points)
 
    #############
@@ -265,7 +332,7 @@ def test_splines(testcase):
       init_fun_m = MSpline_fun()
       params_m, apply_fun_vec_m, sample_fun_vec_m, knots_m = init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, use_cached_bases=True)
 
-      params_m = np.repeat(params_m[:,None], n_points, axis=1).T
+      params_m = np.repeat(params_m[:, None], n_points, axis=1).T
       # knots_m = np.repeat(knots_m[:,None], n_points, axis=1).T
       # params_m = (params_m, knots_m)
 
@@ -278,7 +345,7 @@ def test_splines(testcase):
 
       fig, ax = plt.subplots()
       ax.plot(xx, apply_fun_vec_m(params_m, xx), label='M Spline')
-      ax.plot(xx, apply_fun_vec_grad(params_m, xx), label='dM/dx Spline')
+      ax.plot(xx, onp.gradient(apply_fun_vec_m(params_m, xx), (xx[-1] - xx[0])/n_points, edge_order=2), label='dM/dx Spline nummerical')
       # ax.hist(np.array(s), density=True, bins=100)
 
 
@@ -288,7 +355,7 @@ def test_splines(testcase):
 
 
       n_knots = len(knots_m)
-      for _ in tqdm.tqdm(range(1000)):
+      for _ in tqdm.tqdm(range(10000)):
          params_m = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k - 2,))
          params_m = np.repeat(params_m[:, None], n_points, axis=1).T
          rng, split_rng = jax.random.split(rng)
@@ -300,7 +367,7 @@ def test_splines(testcase):
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, reverse_fun_vec_i, derivative_fun_vec, knots_i = init_fun_i(rng, k, internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.001)
+      params_i, apply_fun_vec_i, reverse_fun_vec_i, knots_i = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.001, use_cached_bases=True)
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
