@@ -109,6 +109,7 @@ def f_fwd(primals, tangents):
 def apply_I_and_multiply(i, x, t, c_i, k):
    return c_i * I(x, k, i, t, k+1, len(t))
 apply_I_and_multiply_vec = vmap(apply_I_and_multiply, in_axes=(0, None, None, 0, None))
+@partial(jit, static_argnums=(4))
 def ispline(x, t, c, k, zero_border=True, cached_bases_dict=None):
    # idx_array = np.arange(0, len(c))
    # if zero_border:
@@ -229,11 +230,13 @@ def ISpline_fun():
       internal_knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[0]) * (k+1)).clip(min=1))
       knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * (k+1)).clip(min=1))
       n_knots = len(knots)
+      n_bases = n_knots - k
 
       if zero_border:
-         initial_params = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k - 2,))
+         initial_params = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_bases - 2,))
       else:
-         initial_params = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k,))
+         initial_params = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_bases,))
+      initial_params = np.abs(initial_params)
       initial_params = initial_params / sum(initial_params)
 
 
@@ -244,11 +247,11 @@ def ISpline_fun():
             print('Only cardinal splines can be cached! Exiting...')
             exit()
 
-
+         knots_ = knots[1:-1]
          cached_bases_dict = []
          for n_derivative in tqdm.tqdm(range(0, 4)):
 
-            cached_bases_path = '{}/degree_{}_niknots_{}_nmp_{}_nd_{}.npy'.format(cached_bases_path_root, k, n_knots - k, n_mesh_points, n_derivative)
+            cached_bases_path = '{}/degree_{}_niknots_{}_nmp_{}_nd_{}.npy'.format(cached_bases_path_root, k, n_bases, n_mesh_points, n_derivative)
             if os.path.exists(cached_bases_path):
                print('Bases found, loading...')
                cached_bases_dict.append(np.load(cached_bases_path))
@@ -258,12 +261,15 @@ def ISpline_fun():
                cached_bases = []
 
 
-               for i in tqdm.tqdm(range(n_knots - k)):
+               for i in tqdm.tqdm(range(n_bases)):
                   if n_derivative == 0:
                      cached_bases.append(np.array([I_onp(x, k, i, knots, k) for x in mesh]))
                   else:
                      # First derivative of kth degree I-Spline is kth degree M-Spline
-                     cached_bases.append(np.array([M_onp(x, k-n_derivative+1, i, knots, k-n_derivative+1) for x in mesh]))
+                     for x in mesh:
+                        M_onp(x, k - n_derivative + 2, i, knots_, k - n_derivative + 2)
+                     cached_bases.append(np.array([M_onp(x, k-n_derivative+2, i, knots_, k-n_derivative+2) for x in mesh]))
+                     # pass
 
                cached_bases = np.array(cached_bases)
                np.save(cached_bases_path, cached_bases)
@@ -275,6 +281,10 @@ def ISpline_fun():
 
       # Convert to from onp array to jax device array
       knots = np.array(knots)
+      # (0.0, 4, 12, array([0., 0., 0., 0., 0.11111111,
+      #                     0.22222222, 0.33333333, 0.44444444, 0.55555556, 0.66666667,
+      #                     0.77777778, 0.88888889, 1., 1., 1.,
+      #                     1.]), 4)
 
 
       def apply_fun(params, x):
@@ -287,6 +297,7 @@ def ISpline_fun():
          return ispline(x, knots_, params, k, zero_border=zero_border, cached_bases_dict=cached_bases_dict)
 
       apply_fun_vec = jit(partial(vmap(apply_fun, in_axes=(0, 0))))
+      apply_fun_vec_grad = jit(partial(vmap(grad(apply_fun, argnums=1), in_axes=(0, 0))))
 
       def reverse_fun(params, y):
          return binary_search(lambda x: apply_fun(params, x) - y, 0.0, 1.0, tol=reverse_fun_tol)
@@ -309,7 +320,7 @@ def ISpline_fun():
       # derivative_fun_vec = jit(partial(vmap(jax.grad(apply_fun, argnums=(1,)), in_axes=(0, 0))))
 
 
-      return initial_params, apply_fun_vec, reverse_fun_vec, knots
+      return initial_params, apply_fun_vec, reverse_fun_vec, knots, apply_fun_vec_grad, derivative_fun_vec, cached_bases_dict
 
    return init_fun
 
@@ -322,7 +333,7 @@ def test_splines(testcase):
    rng = jax.random.PRNGKey(4)
    k = 4
    n_points = 1000
-   n_internal_knots = 50
+   n_internal_knots = 10
    xx = np.linspace(0, 1, n_points)
 
    #############
@@ -367,7 +378,7 @@ def test_splines(testcase):
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, reverse_fun_vec_i, knots_i = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.001, use_cached_bases=True)
+      params_i, apply_fun_vec_i, reverse_fun_vec_i, knots_i, apply_fun_vec_i_grad, derivative_fun_vec, cached_bases_dict = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.001, use_cached_bases=True)
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
@@ -378,10 +389,17 @@ def test_splines(testcase):
       #    I_vec = lambda x: I(x, k, i, knots_i, k+1, len(knots_i))
       #    ax.plot(xx, [I_vec(xx[i]) for i in range(xx.shape[0])], label='I {}'.format(i))
       # ax.plot(xx, [apply_fun_vec_i(params_i[i], xx[i]) for i in range(xx.shape[0])], label='I Spline')
-      ys_reversed = reverse_fun_vec_i(params_i, xx)
-      ax.plot(xx, ys_reversed, label='I Spline Reversed')
+      # ys_reversed = reverse_fun_vec_i(params_i, xx)
+      # ax.plot(xx, ys_reversed, label='I Spline Reversed')
       ys = apply_fun_vec_i(params_i, xx)
-      ax.plot(xx, ys, label='I Spline')
+      # ax.plot(xx, ys, label='I Spline', linewidth=6)
+
+      ax.plot(xx, onp.gradient(ys, 1/n_points, edge_order=2), linewidth=6, label='dI/dx Spline nummerical')
+      # ax.plot(xx, [ispline(x, knots_i, params_i[0], k, zero_border=False, cached_bases_dict=cached_bases_dict) for x in xx], label='I Spline 2')
+      # ax.plot(xx, [ispline(x, knots_i, params_i[0], k, zero_border=False, cached_bases_dict=cached_bases_dict[1:]) for x in xx], label='dI/ dx Spline 2')
+      # ax.plot(xx, apply_fun_vec_i_grad(params_i, xx), label='dI/dx Spline analytical')
+      ax.plot(xx, derivative_fun_vec(params_i, xx), label='dI/dx Spline analytical')
+
       # ax.plot(xx, np.gradient(ys, (xx[-1]-xx[0])/n_points), label='dI/dx nummerical', linewidth=6)
       # ax.grid(True)
       # ax.legend(loc='best')
@@ -402,27 +420,10 @@ def test_splines(testcase):
          reverse_fun_vec_i(params_i, xx)
 
 
-   #############
-   ### Speed ###
-   #############
-   if testcase == 'performance':
-      print('M performance... ')
-      for _ in tqdm.tqdm(range(1000)):
-         rng, split_rng = jax.random.split(rng)
-         xx = jax.random.uniform(split_rng, minval=0, maxval=1, shape=(n_points,))
-         apply_fun_vec_m(params_m, xx)
-         rng_array = jax.random.split(rng, n_points)
-         s = sample_fun_vec_m(rng_array, params_m, 1)
-
-      print('I performance... ')
-      for _ in tqdm.tqdm(range(1000)):
-         rng, split_rng = jax.random.split(rng)
-         xx = jax.random.uniform(rng, shape=(n_points,))
-         apply_fun_vec_i(params_i, xx)
 
 
 
 if __name__ == '__main__':
-   test_splines('m')
+   test_splines('i')
 
 
