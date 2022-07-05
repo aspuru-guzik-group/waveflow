@@ -47,7 +47,11 @@ def mspline(x, t, c, k, n_derivatives=0):
 
 
 def I(x, k, i, t, max_k, n_derivatives=0):
-   j = np.searchsorted(t, x, 'right') - 1
+   if x == 0.0:
+      j = k
+   else:
+      j = np.searchsorted(t, x, 'left') - 1
+
    if i > j or i == len(t) - (k + 1):
       return 0
    elif i <= j - k:
@@ -109,7 +113,7 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 # @profile
 def test_splines(test_case):
 
-   degree = 3
+   degree = 4
    internal_knots = np.linspace(0, 1, 10)
 
    mknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree).clip(min=1))
@@ -165,10 +169,21 @@ def test_splines(test_case):
       plt.show()
 
    elif test_case == 'i':
+      # I(xx[-1], degree, len(iweights)-2, iknots, degree + 1, n_derivatives=1)
       fig, ax = plt.subplots()
       for i in range(len(iweights)):
-         ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]), label='I naive {}'.format(i))
+         ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]))
 
+         # ax.plot(xx, np.gradient(np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=0) for x in xx]), dx, edge_order=2),
+         #         linewidth=6, label='dI/dx nummerical {}'.format(i))
+         # ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=1) for x in xx]),
+         #         label='dI/dx analytical {}'.format(i))
+
+      ax.grid(True)
+      ax.legend(loc='best')
+      plt.show()
+
+      fig, ax = plt.subplots()
       ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=0) for x in xx]), label='I Spline')
 
       print(np.array([ispline(x, iknots, iweights, degree, n_derivatives=1) for x in xx]).sum() * dx)
