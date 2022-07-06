@@ -13,6 +13,7 @@ from jax.config import config
 import numpy as onp
 from mspline_dist import M as M_onp
 from mspline_dist import I as I_onp
+from scipy.misc import derivative
 # config.update('jax_disable_jit', True)
 
 #@partial(jit, static_argnums=(1,2,4))
@@ -135,15 +136,11 @@ def MSpline_fun():
       knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * k).clip(min=1))
       n_knots = len(knots)
 
-      knot_diff = np.diff(knots)
-      knot_diff = knot_diff[knot_diff != 0]
-      knot_diff = knot_diff.min()
+
       if zero_border:
          initial_params = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k - 2,))
-         ymax_multiplier = 1 / knot_diff
       else:
          initial_params = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k,))
-         ymax_multiplier = k / knot_diff
       initial_params = initial_params / sum(initial_params)
 
       if use_cached_bases:
@@ -192,6 +189,7 @@ def MSpline_fun():
 
       @partial(jit, static_argnums=(2,))
       def sample_fun(rng_array, params, num_samples):
+         assert cardinal_splines
          def rejection_sample(args):
             rng, all_x, i = args
             rng, split_rng = jax.random.split(rng)
@@ -205,9 +203,9 @@ def MSpline_fun():
             return rng, all_x, i
 
          if not cardinal_splines:
-            ymax = params[0].max() * ymax_multiplier
+            ymax = params[0].max() * n_knots
          else:
-            ymax = params.max() * ymax_multiplier
+            ymax = params.max() * n_knots
 
          all_x = np.zeros(num_samples)
          _, all_x, _ = jax.lax.while_loop(lambda i: i[2] < num_samples, rejection_sample, (rng_array, all_x, 0))
@@ -260,7 +258,7 @@ def ISpline_fun():
                cached_bases = []
 
                for i in tqdm.tqdm(range(n_bases)):
-                  cached_bases.append(np.array([I_onp(x, k, i, knots, k, n_derivatives=n_derivative) for x in mesh]))
+                  cached_bases.append(np.array([I_onp(x, k, i, knots, k+1, n_derivatives=n_derivative) for x in mesh]))
 
                cached_bases = np.array(cached_bases)
                np.save(cached_bases_path, cached_bases)
@@ -295,23 +293,8 @@ def ISpline_fun():
 
       reverse_fun_vec = jit(partial(vmap(reverse_fun, in_axes=(0, 0))))
 
-      def derivative_fun(params, x):
-         assert zero_border
 
-         if not cardinal_splines:
-            knots_ = params[1]
-            params = params[0]
-         else:
-            knots_ = knots
-         knots_ = knots_[1:-1]
-
-         return mspline(x, knots_, params, k, zero_border=False)
-
-      derivative_fun_vec = jit(partial(vmap(derivative_fun, in_axes=(0, 0))))
-      # derivative_fun_vec = jit(partial(vmap(jax.grad(apply_fun, argnums=(1,)), in_axes=(0, 0))))
-
-
-      return initial_params, apply_fun_vec, reverse_fun_vec, knots, apply_fun_vec_grad, derivative_fun_vec, cached_bases_dict
+      return initial_params, apply_fun_vec, reverse_fun_vec, knots, apply_fun_vec_grad
 
    return init_fun
 
@@ -342,13 +325,13 @@ def test_splines(testcase):
 
 
       rng_array = jax.random.split(rng, n_points)
-      # s = sample_fun_vec_m(rng_array, params_m, 1).T
+      s = sample_fun_vec_m(rng_array, params_m, 20).reshape(-1)[None]
 
 
       fig, ax = plt.subplots()
       ax.plot(xx, apply_fun_vec_m(params_m, xx), label='M Spline')
-      ax.plot(xx, onp.gradient(apply_fun_vec_m(params_m, xx), (xx[-1] - xx[0])/n_points, edge_order=2), label='dM/dx Spline nummerical')
-      # ax.hist(np.array(s), density=True, bins=100)
+      # ax.plot(xx, onp.gradient(apply_fun_vec_m(params_m, xx), (xx[-1] - xx[0])/n_points, edge_order=2), label='dM/dx Spline nummerical')
+      ax.hist(np.array(s), density=True, bins=100)
 
 
       ax.grid(True)
@@ -369,37 +352,22 @@ def test_splines(testcase):
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, reverse_fun_vec_i, knots_i, apply_fun_vec_i_grad, derivative_fun_vec, cached_bases_dict = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.001, use_cached_bases=True)
+      params_i, apply_fun_vec_i, reverse_fun_vec_i, knots_i, apply_fun_vec_grad = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.0001, use_cached_bases=True, n_mesh_points=1000)
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
 
 
       fig, ax = plt.subplots()
-      # for i in range(params_i.shape[-1]):
-      #    I_vec = lambda x: I(x, k, i, knots_i, k+1, len(knots_i))
-      #    ax.plot(xx, [I_vec(xx[i]) for i in range(xx.shape[0])], label='I {}'.format(i))
-      # ax.plot(xx, [apply_fun_vec_i(params_i[i], xx[i]) for i in range(xx.shape[0])], label='I Spline')
-      # ys_reversed = reverse_fun_vec_i(params_i, xx)
+      ys_reversed = reverse_fun_vec_i(params_i, xx)
       # ax.plot(xx, ys_reversed, label='I Spline Reversed')
       ys = apply_fun_vec_i(params_i, xx)
       # ax.plot(xx, ys, label='I Spline')
 
-      for i in range(cached_bases_dict.shape[1]):
-         ax.plot(xx, cached_bases_dict[0][i])
 
-      # ax.plot(xx, onp.gradient(ys, 1/n_points, edge_order=2), linewidth=6, label='dI/dx Spline nummerical')
-      # ax.plot(xx, [ispline(x, knots_i, params_i[0], k, zero_border=False, cached_bases_dict=cached_bases_dict) for x in xx], label='I Spline 2')
-      # ax.plot(xx, [ispline(x, knots_i, params_i[0], k, zero_border=False, cached_bases_dict=cached_bases_dict[1:]) for x in xx], label='dI/ dx Spline 2')
-      # ax.plot(xx, apply_fun_vec_i_grad(params_i, xx), label='dI/dx Spline analytical')
-      # ax.plot(xx, derivative_fun_vec(params_i, xx), label='dI/dx Spline analytical 2')
+      ax.plot(xx, onp.gradient(ys, 1/n_points, edge_order=2), label='dI/dx Spline nummerical')
+      ax.plot(xx, apply_fun_vec_grad(params_i, xx), label='dI/dx Spline analytical')
 
-      # ax.plot(xx, np.gradient(ys, (xx[-1]-xx[0])/n_points), label='dI/dx nummerical', linewidth=6)
-      # ax.grid(True)
-      # ax.legend(loc='best')
-      # plt.show()
-      # fig, ax = plt.subplots()
-      # ax.plot(xx, derivative_fun_vec(params_i, xx)[0], label='dI/dx', linewidth=1.5)
 
       ax.grid(True)
       ax.legend(loc='best')
@@ -418,6 +386,6 @@ def test_splines(testcase):
 
 
 if __name__ == '__main__':
-   test_splines('i')
+   test_splines('m')
 
 

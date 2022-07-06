@@ -15,11 +15,12 @@ from jax.example_libraries import stax, optimizers
 
 # config.update("jax_debug_nans", True)
 
-dataset = ['gm', 'hm', 'c'][2]
+dataset = ['gm', 'hm', 'c'][1]
 n_samples = 3000
-length = 3
-plot_range = [(-length/2, length/2), (-length/2, length/2)]
-margin = 1e-3
+length = 1
+margin = 0.025
+# plot_range = [(-length/2, length/2), (-length/2, length/2)]
+plot_range = [(0, length), (0, length)]
 n_bins = 100
 rng, flow_rng = random.split(random.PRNGKey(0))
 
@@ -45,9 +46,7 @@ if dataset == 'gm':
     X = scaler.fit_transform(X)
 
 
-    #################################################################################
-    ################################# Plot GT #######################################
-    #################################################################################
+
     length = 2
     x = np.linspace(-length / 2, length / 2, 100)
     y = np.linspace(-length / 2, length / 2, 100)
@@ -58,7 +57,7 @@ if dataset == 'gm':
     yv = np.expand_dims(yv, axis=-1)
     grid = np.concatenate([xv, yv], axis=-1) * 2
     gt_grid = np.exp(log_pdf_gt(params_gt, grid).reshape(100, 100))
-    plt.imshow(gt_grid, extent=[-length / 2, length / 2, -length / 2, length / 2], origin='lower')
+    plt.imshow(gt_grid, extent=plot_range, origin='lower')
     plt.show()
 
     plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)  # [-1]
@@ -95,10 +94,13 @@ else:
 
 
 
-
+#################################################################################
+################################# Define Models #################################
+#################################################################################
 
 input_dim = X.shape[1]
 num_epochs, batch_size = 51000, 100
+model_type = ['Flow', 'IFlow', 'MFlow'][0]
 
 def get_masks(input_dim, hidden_dim=64, num_hidden=1):
     masks = []
@@ -128,24 +130,29 @@ def masked_transform(rng, input_dim, output_shape=2):
     _, params = init_fun(rng, (input_dim,))
     return params, apply_fun
 
-# init_fun = flows.Flow(
-#     flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-#     flows.Normal(),
-# )
 
-init_fun = flows.Flow(
-    flows.Serial(*(flows.IMADE(masked_transform), flows.Reverse()) * 5),
-    flows.Normal(),
-)
+if model_type == 'Flow':
+    init_fun = flows.Flow(
+        flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
+        flows.Normal(-0.5),
+    )
 
+elif model_type == 'IFlow':
+    init_fun = flows.Flow(
+        flows.Serial(*(flows.IMADE(masked_transform), flows.Reverse()) * 5),
+        flows.Normal(),
+    )
 
+elif model_type == 'MFlow':
+    init_fun = flows.MFlow(
+        flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
+        masked_sp_transform,
+        spline_degree=3, spline_knots=10
+    )
 
-# init_fun = flows.MFlow(
-#     flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-#     masked_sp_transform,
-#     spline_degree=3, spline_knots=10
-# )
-
+else:
+    print('No supported model type selected. Exiting...')
+    exit()
 
 params, log_pdf, sample = init_fun(flow_rng, input_dim)
 
@@ -182,10 +189,12 @@ def step(i, opt_state, inputs):
 losses = []
 pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
-    if epoch % 500 == 0:
+    if epoch % 5000 == 0:
         params = get_params(opt_state)
-        x = np.linspace(-length / 2, length / 2, 100)
-        y = np.linspace(-length / 2, length / 2, 100)
+        # x = np.linspace(-length / 2, length / 2, 100)
+        # y = np.linspace(-length / 2, length / 2, 100)
+        x = np.linspace(0, length, 100)
+        y = np.linspace(0, length, 100)
 
         xv, yv = np.meshgrid(x, y)
         xv, yv = xv.reshape(-1), yv.reshape(-1)
@@ -193,7 +202,7 @@ for epoch in pbar:
         yv = np.expand_dims(yv, axis=-1)
         grid = np.concatenate([xv, yv], axis=-1)
         pdf_grid = np.exp(log_pdf(params, grid).reshape(100, 100))
-        plt.imshow(pdf_grid, extent=[-length/2, length/2, -length/2, length/2], origin='lower')
+        plt.imshow(pdf_grid, extent=(0, length, 0, length), origin='lower')
         plt.show()
 
         plt.plot(losses)

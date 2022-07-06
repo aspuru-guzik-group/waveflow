@@ -113,7 +113,7 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 # @profile
 def test_splines(test_case):
 
-   degree = 4
+   degree = 5
    internal_knots = np.linspace(0, 1, 10)
 
    mknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree).clip(min=1))
@@ -136,33 +136,38 @@ def test_splines(test_case):
 
 
    if test_case == 'm':
-      for i in range(len(mweights)):
-         fig, ax = plt.subplots()
-         ys = np.array([M(x, degree, i, mknots, degree, n_derivatives=0) for x in xx])
-         dys = np.array([M(x, degree, i, mknots, degree, n_derivatives=1) for x in xx])
-         ddys = np.array([M(x, degree, i, mknots, degree, n_derivatives=2) for x in xx])
-
-         dyn = np.gradient(ys, dx, edge_order=2)
-         ddyn = np.gradient(dys, dx, edge_order=2)
-         ax.plot(xx, ys, label='M {}'.format(i), ls='-')
-         ax.plot(xx, dys, label='dM {}/dx analytical'.format(i), ls='-.')
-         ax.plot(xx, dyn, label='dM {}/dx nummerical'.format(i), ls='--')
-
-         # ax.plot(xx, ddys, label='ddM {}/dx analytical'.format(i), ls='-.')
-         # ax.plot(xx, ddyn, label='ddM {}/dx nummerical'.format(i), ls='--')
-
-         ax.grid(True)
-         ax.legend(loc='best')
-         plt.show()
+      # for i in range(len(mweights)):
+      #    fig, ax = plt.subplots()
+      #    ys = np.array([M(x, degree, i, mknots, degree, n_derivatives=0) for x in xx])
+      #    dys = np.array([M(x, degree, i, mknots, degree, n_derivatives=1) for x in xx])
+      #    ddys = np.array([M(x, degree, i, mknots, degree, n_derivatives=2) for x in xx])
+      #
+      #    dyn = np.gradient(ys, dx, edge_order=2)
+      #    ddyn = np.gradient(dys, dx, edge_order=2)
+      #    ax.plot(xx, ys, label='M {}'.format(i), ls='-')
+      #    ax.plot(xx, dys, label='dM {}/dx analytical'.format(i), ls='-.')
+      #    ax.plot(xx, dyn, label='dM {}/dx nummerical'.format(i), ls='--')
+      #
+      #    # ax.plot(xx, ddys, label='ddM {}/dx analytical'.format(i), ls='-.')
+      #    # ax.plot(xx, ddyn, label='ddM {}/dx nummerical'.format(i), ls='--')
+      #
+      #    ax.grid(True)
+      #    ax.legend(loc='best')
+      #    plt.show()
 
       # ax.plot(xx, np.array([mspline(x, mknots, mweights, degree) for x in xx]), label='M Spline')
 
-      # max_val = np.max(mweights) * len(mknots)
+      fig, ax = plt.subplots()
+      ys = np.array([mspline(x, mknots, mweights, degree) for x in xx])
+      ax.plot(xx, ys, label='M Spline')
+      max_val = np.max(mweights) * len(mknots)
+      print(max_val)
+      print(ys.max())
       # for i in tqdm.tqdm(range(1000)):
       #    s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1, ymax=max_val)
-      # s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1,
-      #                        ymax=max_val)
-      # ax.hist(np.array(s), density=True, bins=100)
+      s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 4000, xmin=0, xmax=1,
+                             ymax=max_val)
+      ax.hist(np.array(s), density=True, bins=100)
 
       ax.grid(True)
       ax.legend(loc='best')
@@ -195,7 +200,7 @@ def test_splines(test_case):
 
 
 if __name__ == '__main__':
-   test_splines('i')
+   test_splines('m')
 
 
 

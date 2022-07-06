@@ -5,7 +5,7 @@ from jax.scipy.special import logsumexp
 from jax.scipy.stats import norm, multivariate_normal, uniform
 from mspline_dist_jax import MSpline_fun, ISpline_fun
 
-def Normal():
+def Normal(offset=0.0):
     """
     Returns:
         A function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
@@ -13,7 +13,7 @@ def Normal():
 
     def init_fun(rng, input_dim):
         def log_pdf(params, inputs):
-            return norm.logpdf(inputs).sum(1)
+            return norm.logpdf(inputs+offset).sum(1)
 
         def sample(rng, params, num_samples=1):
             return random.normal(rng, (num_samples, input_dim))
