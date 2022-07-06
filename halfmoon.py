@@ -24,7 +24,7 @@ plot_range = [(0, length), (0, length)]
 n_bins = 100
 rng, flow_rng = random.split(random.PRNGKey(0))
 
-
+do_plot = False
 if dataset == 'gm':
     #####################################################################
     ##################### Make Mixture of Gaussians #####################
@@ -46,22 +46,22 @@ if dataset == 'gm':
     X = scaler.fit_transform(X)
 
 
+    if do_plot:
+        length = 2
+        x = np.linspace(-length / 2, length / 2, 100)
+        y = np.linspace(-length / 2, length / 2, 100)
 
-    length = 2
-    x = np.linspace(-length / 2, length / 2, 100)
-    y = np.linspace(-length / 2, length / 2, 100)
+        xv, yv = np.meshgrid(x, y)
+        xv, yv = xv.reshape(-1), yv.reshape(-1)
+        xv = np.expand_dims(xv, axis=-1)
+        yv = np.expand_dims(yv, axis=-1)
+        grid = np.concatenate([xv, yv], axis=-1) * 2
+        gt_grid = np.exp(log_pdf_gt(params_gt, grid).reshape(100, 100))
+        plt.imshow(gt_grid, extent=plot_range, origin='lower')
+        plt.show()
 
-    xv, yv = np.meshgrid(x, y)
-    xv, yv = xv.reshape(-1), yv.reshape(-1)
-    xv = np.expand_dims(xv, axis=-1)
-    yv = np.expand_dims(yv, axis=-1)
-    grid = np.concatenate([xv, yv], axis=-1) * 2
-    gt_grid = np.exp(log_pdf_gt(params_gt, grid).reshape(100, 100))
-    plt.imshow(gt_grid, extent=plot_range, origin='lower')
-    plt.show()
-
-    plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)  # [-1]
-    plt.show()
+        plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)  # [-1]
+        plt.show()
 
 elif dataset == 'hm':
     #################################################################################
@@ -73,10 +73,12 @@ elif dataset == 'hm':
 
     scaler = preprocessing.MinMaxScaler(feature_range=(margin, 1-margin))
     X = scaler.fit_transform(X)
-    plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
-    plt.show()
-
     sample_log_pdf_gt = None
+
+    if do_plot:
+        plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
+        plt.show()
+
 
 else:
     #################################################################################
@@ -87,10 +89,12 @@ else:
 
     scaler = preprocessing.MinMaxScaler(feature_range=(margin, 1-margin))
     X = scaler.fit_transform(X)
-    plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
-    plt.show()
-
     sample_log_pdf_gt = None
+
+    if do_plot:
+        plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
+        plt.show()
+
 
 
 
@@ -100,7 +104,7 @@ else:
 
 input_dim = X.shape[1]
 num_epochs, batch_size = 51000, 100
-model_type = ['Flow', 'IFlow', 'MFlow'][0]
+model_type = ['Flow', 'IFlow', 'MFlow'][1]
 
 def get_masks(input_dim, hidden_dim=64, num_hidden=1):
     masks = []
@@ -125,7 +129,7 @@ def masked_transform(rng, input_dim, output_shape=2):
         act,
         flows.MaskedDense(masks[1]),
         act,
-        flows.MaskedDense(masks[2].tile(output_shape)),
+        flows.MaskedDense(np.tile(masks[2], output_shape)),
     )
     _, params = init_fun(rng, (input_dim,))
     return params, apply_fun
@@ -139,8 +143,8 @@ if model_type == 'Flow':
 
 elif model_type == 'IFlow':
     init_fun = flows.Flow(
-        flows.Serial(*(flows.IMADE(masked_transform), flows.Reverse()) * 5),
-        flows.Normal(),
+        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=4, n_internal_knots=15), flows.Reverse()) * 1),
+        flows.Uniform(),
     )
 
 elif model_type == 'MFlow':
@@ -193,17 +197,22 @@ for epoch in pbar:
         params = get_params(opt_state)
         # x = np.linspace(-length / 2, length / 2, 100)
         # y = np.linspace(-length / 2, length / 2, 100)
-        x = np.linspace(0, length, 100)
-        y = np.linspace(0, length, 100)
+        left_grid = 0.0
+        right_grid = 1.0
+        n_grid_points = 300
+        dx = ((right_grid - left_grid) / n_grid_points)**2
+        x = np.linspace(left_grid, right_grid, n_grid_points)
+        y = np.linspace(left_grid, right_grid, n_grid_points)
 
         xv, yv = np.meshgrid(x, y)
         xv, yv = xv.reshape(-1), yv.reshape(-1)
         xv = np.expand_dims(xv, axis=-1)
         yv = np.expand_dims(yv, axis=-1)
         grid = np.concatenate([xv, yv], axis=-1)
-        pdf_grid = np.exp(log_pdf(params, grid).reshape(100, 100))
-        plt.imshow(pdf_grid, extent=(0, length, 0, length), origin='lower')
+        pdf_grid = np.exp(log_pdf(params, grid).reshape(n_grid_points, n_grid_points))
+        plt.imshow(pdf_grid, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
         plt.show()
+        print("Normalization constant: ", pdf_grid.sum() * dx)
 
         plt.plot(losses)
         if sample_log_pdf_gt is not None: plt.axhline(y=sample_log_pdf_gt.mean(), color='r', linestyle='-')

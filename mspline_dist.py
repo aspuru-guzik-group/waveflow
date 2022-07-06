@@ -113,7 +113,7 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 # @profile
 def test_splines(test_case):
 
-   degree = 5
+   degree = 4
    internal_knots = np.linspace(0, 1, 10)
 
    mknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree).clip(min=1))
@@ -128,6 +128,8 @@ def test_splines(test_case):
    iweights = np.random.rand(len(iknots) - degree)
    iweights[0] = 0
    iweights[-1] = 0
+   iweights[1] = 0
+   iweights[-2] = 0
    iweights = iweights / sum(iweights)
 
    n_points = 1000
@@ -161,8 +163,6 @@ def test_splines(test_case):
       ys = np.array([mspline(x, mknots, mweights, degree) for x in xx])
       ax.plot(xx, ys, label='M Spline')
       max_val = np.max(mweights) * len(mknots)
-      print(max_val)
-      print(ys.max())
       # for i in tqdm.tqdm(range(1000)):
       #    s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1, ymax=max_val)
       s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 4000, xmin=0, xmax=1,
@@ -197,10 +197,54 @@ def test_splines(test_case):
       ax.legend(loc='best')
       plt.show()
 
+   elif test_case == 't':
+      def uniform_pdf(x):
+         return 1
+
+      n_dim = 2
+      if n_dim == 1:
+         transformed_pdf = lambda x: uniform_pdf(ispline(x, iknots, iweights, degree, n_derivatives=0)) * ispline(x, iknots, iweights, degree, n_derivatives=1)
+
+         n_points = 2000
+         dx = 1/n_points
+         x_range = np.linspace(0, 1, n_points)
+
+         ys = np.array([transformed_pdf(x) for x in x_range])
+         plt.plot(x_range, ys)
+         plt.show()
+
+         print(ys.sum() * dx)
+      else:
+         transformed_pdf = lambda x, y: uniform_pdf(ispline(x, iknots, iweights, degree, n_derivatives=0)) * ispline(x, iknots, iweights, degree, n_derivatives=1) * \
+                                        uniform_pdf(ispline(y, iknots, iweights, degree, n_derivatives=0)) * ispline(y, iknots, iweights, degree, n_derivatives=1)
+
+         left_grid = 0.0
+         right_grid = 1.0
+         n_grid_points = 100
+         dx = ((right_grid - left_grid) / n_grid_points) ** 2
+         x = np.linspace(left_grid, right_grid, n_grid_points)
+         y = np.linspace(left_grid, right_grid, n_grid_points)
+
+         xv, yv = np.meshgrid(x, y)
+         xv, yv = xv.reshape(-1), yv.reshape(-1)
+         xv = np.expand_dims(xv, axis=-1)
+         yv = np.expand_dims(yv, axis=-1)
+         grid = np.concatenate([xv, yv], axis=-1)
+         pdf_grid = np.array([transformed_pdf(x, y) for x, y in zip(grid[:,0], grid[:,1])]).reshape(n_grid_points, n_grid_points)
+         plt.imshow(pdf_grid, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
+         plt.show()
+
+         print(pdf_grid.sum() * dx)
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
-   test_splines('m')
+   test_splines('t')
 
 
 

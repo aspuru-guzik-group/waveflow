@@ -62,9 +62,9 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12):
 
 
     def init_fun(rng, input_dim, **kwargs):
-        internal_knots = np.linspace(0, 1, n_internal_knots)
         init_fun_i = ISpline_fun()
-        params_i, apply_fun_vec_i, reverse_fun_vec_i, derivative_fun_vec, knots_i = init_fun_i(rng, spline_degree, internal_knots,
+        params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i = init_fun_i(rng, spline_degree, n_internal_knots,
+                                                                                               use_cached_bases=True,
                                                                                                cardinal_splines=True,
                                                                                                zero_border=True,
                                                                                                reverse_fun_tol=0.001)
@@ -77,7 +77,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12):
             bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
             outputs = apply_fun_vec_i(bijection_params, inputs.reshape(-1)).reshape(-1, input_dim)
 
-            bijection_derivative = derivative_fun_vec(bijection_params, inputs.reshape(-1)).reshape(-1, input_dim)
+            bijection_derivative = apply_fun_vec_grad_i(bijection_params, inputs.reshape(-1)).reshape(-1, input_dim)
             log_det_jacobian = np.log(bijection_derivative).sum(-1)
             return outputs, log_det_jacobian
 
@@ -90,7 +90,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12):
                 bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
                 outputs = apply_fun_vec_i(bijection_params, inputs)
 
-                bijection_derivative = derivative_fun_vec(bijection_params, inputs)
+                bijection_derivative = apply_fun_vec_grad_i(bijection_params, inputs)
 
             log_det_jacobian = np.log(bijection_derivative).sum(-1)
             return outputs, log_det_jacobian

@@ -130,7 +130,7 @@ def ispline(x, t, c, k, zero_border=True, cached_bases_dict=None):
 
 def MSpline_fun():
 
-   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, use_cached_bases=False, cached_bases_path_root='./cached_bases/M/', n_mesh_points=1000):
+   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, use_cached_bases=True, cached_bases_path_root='./cached_bases/M/', n_mesh_points=1000):
       internal_knots = onp.linspace(0, 1, n_internal_knots)
       internal_knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[0]) * k).clip(min=1))
       knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * k).clip(min=1))
@@ -189,7 +189,8 @@ def MSpline_fun():
 
       @partial(jit, static_argnums=(2,))
       def sample_fun(rng_array, params, num_samples):
-         assert cardinal_splines
+         assert cardinal_splines, 'Only cardinal splines can be sampled, unless you figure out how to efficiently upper bound non cardinal splines'
+
          def rejection_sample(args):
             rng, all_x, i = args
             rng, split_rng = jax.random.split(rng)
@@ -223,7 +224,7 @@ def MSpline_fun():
 
 def ISpline_fun():
 
-   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=1e-3, use_cached_bases=False, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000):
+   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=1e-3, use_cached_bases=True, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000):
       internal_knots = onp.linspace(0, 1, n_internal_knots)
       internal_knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[0]) * (k+1)).clip(min=1))
       knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * (k+1)).clip(min=1))
@@ -270,10 +271,6 @@ def ISpline_fun():
 
       # Convert to from onp array to jax device array
       knots = np.array(knots)
-      # (0.0, 4, 12, array([0., 0., 0., 0., 0.11111111,
-      #                     0.22222222, 0.33333333, 0.44444444, 0.55555556, 0.66666667,
-      #                     0.77777778, 0.88888889, 1., 1., 1.,
-      #                     1.]), 4)
 
 
       def apply_fun(params, x):
@@ -294,7 +291,9 @@ def ISpline_fun():
       reverse_fun_vec = jit(partial(vmap(reverse_fun, in_axes=(0, 0))))
 
 
-      return initial_params, apply_fun_vec, reverse_fun_vec, knots, apply_fun_vec_grad
+
+
+      return initial_params, apply_fun_vec, apply_fun_vec_grad, reverse_fun_vec, knots
 
    return init_fun
 
@@ -352,7 +351,7 @@ def test_splines(testcase):
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, reverse_fun_vec_i, knots_i, apply_fun_vec_grad = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.0001, use_cached_bases=True, n_mesh_points=1000)
+      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i  = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.0001, use_cached_bases=True, n_mesh_points=1000)
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
@@ -382,10 +381,67 @@ def test_splines(testcase):
       #    reverse_fun_vec_i(params_i, xx)
 
 
+   if testcase == 't':
+      init_fun_i = ISpline_fun()
+      params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i = init_fun_i(rng, k, n_internal_knots,
+                                                                                             cardinal_splines=True,
+                                                                                             zero_border=True,
+                                                                                             reverse_fun_tol=0.0001,
+                                                                                             use_cached_bases=True,
+                                                                                             n_mesh_points=1000)
+      params_i_2 = jax.random.uniform(jax.random.PRNGKey(1233), shape=params_i.shape)
+
+      params_i = params_i.at[0].set(0)
+      params_i = params_i.at[-1].set(0)
+      params_i_2 = params_i_2.at[0].set(0)
+      params_i_2 = params_i_2.at[-1].set(0)
+
+      params_i = params_i / params_i.sum()
+      params_i_2 = params_i_2 / params_i_2.sum()
+      def uniform_pdf(x):
+         return 1
+
+      n_dim = 2
+      if n_dim == 1:
+         transformed_pdf = lambda params_i_, x_: uniform_pdf(apply_fun_vec_i(params_i_, x_)) * apply_fun_vec_grad_i(params_i_, x_)
+         params_i = np.repeat(params_i[:, None], n_points, axis=1).T
+         dx = 1 / n_points
+         x_range = np.linspace(0, 1, n_points)
+
+         ys = transformed_pdf(params_i, x_range)
+         plt.plot(x_range, ys)
+         plt.show()
+
+         print(ys.sum() * dx)
+      else:
+         transformed_pdf = lambda params_i_x_, params_i_y_, x_, y_: uniform_pdf(apply_fun_vec_i(params_i_x_, x_)) * apply_fun_vec_grad_i(params_i_x_, x_) * \
+                                                      uniform_pdf(apply_fun_vec_i(params_i_y_, y_)) * apply_fun_vec_grad_i(params_i_y_, y_)
+
+         left_grid = 0.0
+         right_grid = 1.0
+         n_grid_points = 200
+         dx = ((right_grid - left_grid) / n_grid_points) ** 2
+         x = np.linspace(left_grid, right_grid, n_grid_points)
+         y = np.linspace(left_grid, right_grid, n_grid_points)
+         params_i = np.repeat(params_i[:, None], n_grid_points**2, axis=1).T
+         params_i_2 = np.repeat(params_i_2[:, None], n_grid_points ** 2, axis=1).T
+
+         xv, yv = np.meshgrid(x, y)
+         xv, yv = xv.reshape(-1), yv.reshape(-1)
+         xv = np.expand_dims(xv, axis=-1)
+         yv = np.expand_dims(yv, axis=-1)
+         grid = np.concatenate([xv, yv], axis=-1)
+         pdf_grid = np.array(transformed_pdf(params_i, params_i_2, grid[:, 0], grid[:, 1])).reshape(n_grid_points, n_grid_points)
+         plt.imshow(pdf_grid, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
+         plt.show()
+
+         print(pdf_grid.sum() * dx)
+
+
 
 
 
 if __name__ == '__main__':
-   test_splines('m')
+   test_splines('t')
 
 
