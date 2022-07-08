@@ -293,7 +293,7 @@ def ISpline_fun():
 
 
 
-      return initial_params, apply_fun_vec, apply_fun_vec_grad, reverse_fun_vec, knots
+      return initial_params, apply_fun, apply_fun_vec, apply_fun_vec_grad, reverse_fun_vec, knots
 
    return init_fun
 

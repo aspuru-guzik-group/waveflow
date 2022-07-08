@@ -244,7 +244,7 @@ def test_splines(test_case):
 
 
 if __name__ == '__main__':
-   test_splines('t')
+   test_splines('i')
 
 
 
