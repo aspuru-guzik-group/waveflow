@@ -105,7 +105,7 @@ else:
 input_dim = X.shape[1]
 
 num_epochs, batch_size = 51000, 100
-model_type = ['Flow', 'IFlow', 'MFlow'][1]
+model_type = ['Flow', 'IFlow', 'MFlow'][0]
 
 def get_masks(input_dim, hidden_dim=64, num_hidden=1):
     masks = []
@@ -138,13 +138,13 @@ def masked_transform(rng, input_dim, output_shape=2):
 
 if model_type == 'Flow':
     init_fun = flows.Flow(
-        flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 1),
+        flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
         flows.Normal(-0.5),
     )
 
 elif model_type == 'IFlow':
     init_fun = flows.Flow(
-        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10), flows.Reverse()) * 3),
+        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10), flows.Reverse()) * 5),
         flows.Uniform(),
     )
 
@@ -194,7 +194,7 @@ def step(i, opt_state, inputs):
 losses = []
 pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
-    if epoch % 5000 == 0:
+    if epoch % 1000 == 0 and epoch > 0:
         params = get_params(opt_state)
         # x = np.linspace(-length / 2, length / 2, 100)
         # y = np.linspace(-length / 2, length / 2, 100)
