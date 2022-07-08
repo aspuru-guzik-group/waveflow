@@ -105,7 +105,7 @@ else:
 input_dim = X.shape[1]
 
 num_epochs, batch_size = 51000, 100
-model_type = ['Flow', 'IFlow', 'MFlow'][0]
+model_type = ['Flow', 'IFlow', 'MFlow'][1]
 
 def get_masks(input_dim, hidden_dim=64, num_hidden=1):
     masks = []
@@ -144,7 +144,7 @@ if model_type == 'Flow':
 
 elif model_type == 'IFlow':
     init_fun = flows.Flow(
-        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10), flows.Reverse()) * 5),
+        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10, spline_regularization=0.1), flows.Reverse()) * 5),
         flows.Uniform(),
     )
 
@@ -194,7 +194,9 @@ def step(i, opt_state, inputs):
 losses = []
 pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
-    if epoch % 1000 == 0 and epoch > 0:
+    split_rng, rng = random.split(rng)
+
+    if epoch % 2000 == 0 and epoch > 0:
         params = get_params(opt_state)
         # x = np.linspace(-length / 2, length / 2, 100)
         # y = np.linspace(-length / 2, length / 2, 100)
@@ -219,11 +221,13 @@ for epoch in pbar:
         if sample_log_pdf_gt is not None: plt.axhline(y=sample_log_pdf_gt.mean(), color='r', linestyle='-')
         plt.show()
 
+        model_samples = sample(split_rng ,params, num_samples=3000)
+        plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_bins, range=plot_range)  # [-1]
+        plt.show()
 
 
 
 
-    split_rng, rng = random.split(rng)
     X = random.permutation(split_rng, X)
     # X = sample(split_rng, params, n_samples)
     # X = sample_gt(split_rng, params_gt, n_samples)
