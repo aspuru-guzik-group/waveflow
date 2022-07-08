@@ -130,7 +130,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
 
         def inverse_fun(params, inputs, **kwargs):
             outputs = np.zeros_like(inputs)
-            for i_col in range(inputs.shape[1]):
+            for i_col in range(inputs.shape[-1]):
                 bijection_params = apply_fun(params, inputs)
                 bijection_params = bijection_params.split(params_i.shape[-1], axis=-1)
                 bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
@@ -139,13 +139,16 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
                 bijection_params = bijection_params.at[:, 0].set(bijection_params[:, 0] + ((spline_regularization / bijection_params.shape[-1]) / spline_degree))
                 bijection_params = bijection_params.at[:, -1].set(bijection_params[:, -1] + ((spline_regularization / bijection_params.shape[-1]) / spline_degree))
                 bijection_params = bijection_params.at[:, 1:-1].set(bijection_params[:, 1:-1] + (spline_regularization / bijection_params.shape[-1]))
-
                 bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
-                bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
 
-                outputs = apply_fun_vec_i(bijection_params, inputs)
+                # bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
+                bijection_params_partial = bijection_params[:, i_col, :]
 
-                bijection_derivative = apply_fun_vec_grad_i(bijection_params, inputs)
+
+                outputs = outputs.at[:, i_col].set(reverse_fun_vec_i(bijection_params_partial, inputs[:, i_col]))
+
+            bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
+            bijection_derivative = apply_fun_vec_grad_i(bijection_params, inputs.reshape(-1))
 
             log_det_jacobian = np.log(bijection_derivative).sum(-1)
             return outputs, log_det_jacobian
