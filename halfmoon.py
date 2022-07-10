@@ -13,10 +13,10 @@ import flows
 from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
 
-# config.update("jax_debug_nans", True)
+config.update("jax_debug_nans", True)
 
 dataset = ['gm', 'hm', 'c'][1]
-n_samples = 3000
+n_samples = 6000
 length = 1
 margin = 0.025
 # plot_range = [(-length/2, length/2), (-length/2, length/2)]
@@ -105,7 +105,7 @@ else:
 input_dim = X.shape[1]
 
 num_epochs, batch_size = 51000, 100
-model_type = ['Flow', 'IFlow', 'MFlow'][1]
+model_type = ['Flow', 'IFlow', 'MFlow'][2]
 
 def get_masks(input_dim, hidden_dim=64, num_hidden=1):
     masks = []
@@ -144,15 +144,15 @@ if model_type == 'Flow':
 
 elif model_type == 'IFlow':
     init_fun = flows.Flow(
-        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10, spline_regularization=0.1), flows.Reverse()) * 5),
-        flows.Uniform(),
+        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10, spline_regularization=0.0), flows.Reverse()) * 2),
+        flows.Uniform(), prior_support=(0.0, 1.0)
     )
 
 elif model_type == 'MFlow':
     init_fun = flows.MFlow(
         flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
         masked_sp_transform,
-        spline_degree=3, spline_knots=10
+        spline_degree=3, spline_knots=10, prior_support=(0.0, 1.0)
     )
 
 else:
@@ -160,6 +160,8 @@ else:
     exit()
 
 params, log_pdf, sample = init_fun(flow_rng, input_dim)
+
+log_pdf = jit(log_pdf)
 
 opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
 opt_state = opt_init(params)
@@ -192,17 +194,20 @@ def step(i, opt_state, inputs):
 
 
 losses = []
+empirical_kl_divergences = []
+empirical_hellinger_distances = []
 pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
     split_rng, rng = random.split(rng)
 
-    if epoch % 2000 == 0 and epoch > 0:
+    if epoch % 2500 == 0 and epoch > 0:
         params = get_params(opt_state)
         # x = np.linspace(-length / 2, length / 2, 100)
         # y = np.linspace(-length / 2, length / 2, 100)
-        left_grid = 0.0
-        right_grid = 1.0
-        n_grid_points = 300
+
+        left_grid = -0.5
+        right_grid = 1.5
+        n_grid_points = 200
         dx = ((right_grid - left_grid) / n_grid_points)**2
         x = np.linspace(left_grid, right_grid, n_grid_points)
         y = np.linspace(left_grid, right_grid, n_grid_points)
@@ -221,9 +226,30 @@ for epoch in pbar:
         if sample_log_pdf_gt is not None: plt.axhline(y=sample_log_pdf_gt.mean(), color='r', linestyle='-')
         plt.show()
 
-        model_samples = sample(split_rng ,params, num_samples=3000)
-        plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_bins, range=plot_range)  # [-1]
+        model_samples = sample(split_rng, params, num_samples=10000)
+        plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points, range=[(left_grid, right_grid), (left_grid, right_grid)])  # [-1]
         plt.show()
+
+        H, xedges, yedges = np.histogram2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points, range=[(left_grid, right_grid), (left_grid, right_grid)], density=True)
+        H = H.T
+
+        log_pdf_grid = log_pdf(params, grid).reshape(n_grid_points, n_grid_points)
+        log_pdf_grid_filtered = log_pdf_grid[H != 0]
+        pdf_grid_filtered = pdf_grid[H != 0]
+        H_filtered = H[H != 0]
+
+        empirical_kl_divergence = (H_filtered * np.log(H_filtered) - log_pdf_grid_filtered).mean()
+        empirical_kl_divergences.append(empirical_kl_divergence)
+        plt.plot(empirical_kl_divergences)
+        plt.show()
+
+        empirical_hellinger_distances.append(((np.sqrt(H_filtered) - np.sqrt(pdf_grid_filtered))**2).mean())
+        plt.plot(empirical_hellinger_distances)
+        plt.show()
+        print(empirical_kl_divergences)
+
+
+
 
 
 

@@ -64,7 +64,7 @@ def GMM(means, covariances, weights):
     return init_fun
 
 
-def Flow(transformation, prior=Normal()):
+def Flow(transformation, prior=Normal(), prior_support=None):
     """
     Args:
         transformation: a function mapping ``(rng, input_dim)`` to a
@@ -94,6 +94,8 @@ def Flow(transformation, prior=Normal()):
 
         def log_pdf(params, inputs):
             u, log_det = direct_fun(params, inputs)
+            if prior_support is not None:
+                u = np.clip(u, *prior_support)
             log_probs = prior_log_pdf(prior_params, u)
             return log_probs + log_det
 
@@ -108,7 +110,7 @@ def Flow(transformation, prior=Normal()):
 
 
 
-def MFlow(transformation, sp_transformation, spline_degree, spline_knots):
+def MFlow(transformation, sp_transformation, spline_degree, spline_knots, prior_support=None):
 
     def init_fun(rng, input_dim):
         rng, transformation_rng = random.split(rng)
@@ -130,6 +132,10 @@ def MFlow(transformation, sp_transformation, spline_degree, spline_knots):
             prior_params = softmax(np.concatenate(prior_params[:, None].split(inputs.shape[-1], axis=-1), axis=1))
             prior_params = prior_params.reshape(-1, prior_params.shape[-1])
             log_probs = mspline_apply_fun_vec(prior_params, np.clip(u.reshape(-1) + 2, a_min=0, a_max=1 ))
+
+            if prior_support is not None:
+                u = np.clip(u, *prior_support)
+
             log_probs = log_probs.reshape(u.shape[0], -1)
             log_probs = np.log(np.prod(log_probs, axis=-1))
             return log_probs + log_det

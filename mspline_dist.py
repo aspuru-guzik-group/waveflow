@@ -128,8 +128,8 @@ def test_splines(test_case):
    iweights = np.random.rand(len(iknots) - degree)
    iweights[0] = 0
    iweights[-1] = 0
-   iweights[1] = 0
-   iweights[-2] = 0
+   # iweights[1] = 0
+   # iweights[-2] = 0
    iweights = iweights / sum(iweights)
 
    n_points = 1000
@@ -215,6 +215,35 @@ def test_splines(test_case):
 
          print(ys.sum() * dx)
       else:
+
+         iweights = np.array([0., 0.05066524, 0.05066524, 0.02953962, 0.18144176,
+                0.08383919, 0.17455034, 0.15516713, 0.0853966, 0.11751313,
+                0.07292235, 0.04896464, 0.05066524, 0.])
+         # iweights[1] = (iweights[1] + 5) / degree
+         # iweights[-2] = (iweights[-2] + 5) / degree
+         # iweights[2:-2] = iweights[2:-2] + 5
+
+         # iweights[1] = (iweights[1] ) / degree
+         # iweights[-2] = (iweights[-2] ) / degree
+         iweights[3:-3] = iweights[3:-3]
+         iweights = iweights / iweights.sum(keepdims=True)
+         print(iweights)
+
+         fig, ax = plt.subplots()
+         ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=1) for x in xx]), label='I Spline')
+         ax.grid(True)
+         ax.legend(loc='best')
+         plt.show()
+
+         fig, ax = plt.subplots()
+         ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=0) for x in xx]), label='I Spline')
+         ax.grid(True)
+         ax.legend(loc='best')
+         plt.show()
+
+
+
+
          transformed_pdf = lambda x, y: uniform_pdf(ispline(x, iknots, iweights, degree, n_derivatives=0)) * ispline(x, iknots, iweights, degree, n_derivatives=1) * \
                                         uniform_pdf(ispline(y, iknots, iweights, degree, n_derivatives=0)) * ispline(y, iknots, iweights, degree, n_derivatives=1)
 
@@ -244,7 +273,7 @@ def test_splines(test_case):
 
 
 if __name__ == '__main__':
-   test_splines('i')
+   test_splines('t')
 
 
 

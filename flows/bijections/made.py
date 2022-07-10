@@ -4,7 +4,7 @@ from jax import random
 from mspline_dist_jax import MSpline_fun, ISpline_fun
 from jax.nn import softmax
 import matplotlib.pyplot as plt
-
+import numpy as onp
 
 def MaskedDense(mask):
     def init_fun(rng, input_shape):
@@ -69,7 +69,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
                                                                                                               use_cached_bases=True,
                                                                                                               cardinal_splines=True,
                                                                                                               zero_border=True,
-                                                                                                              reverse_fun_tol=0.001)
+                                                                                                              reverse_fun_tol=0.0001)
         params, apply_fun = transform(rng, input_dim, params_i.shape[0])
 
         # def apply_fun_i_2(params, x):
@@ -88,44 +88,36 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
             bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
             bijection_params = softmax(bijection_params, axis=-1)
 
-            bijection_params = bijection_params.at[:, 0].set(bijection_params[:, 0] + ((spline_regularization / bijection_params.shape[-1]) / spline_degree))
-            bijection_params = bijection_params.at[:, -1].set(bijection_params[:, -1] + ((spline_regularization / bijection_params.shape[-1]) / spline_degree))
-            bijection_params = bijection_params.at[:, 1:-1].set(bijection_params[:, 1:-1] + (spline_regularization / bijection_params.shape[-1]))
-
+            bijection_params = bijection_params.at[:, :, 0].set( (bijection_params[:, :, 0] + (spline_regularization / bijection_params.shape[-1])) /spline_degree )
+            bijection_params = bijection_params.at[:, :, -1].set( (bijection_params[:, :, -1] + (spline_regularization / bijection_params.shape[-1])) /spline_degree )
+            bijection_params = bijection_params.at[:, :, 1:-1].set(bijection_params[:, :, 1:-1] + (spline_regularization / bijection_params.shape[-1]))
             bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
+
             bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
             outputs = apply_fun_vec_i(bijection_params, inputs.reshape(-1)).reshape(-1, input_dim)
 
 
-            # if outputs.shape[0] == 90000:
-            #     apply_fun_i(bijection_params[0], inputs[0, 0])
-            #     apply_fun_i_2(params,  inputs[0])
-            #     apply_fun_i_jac(params, inputs[0])
-            #     inputs_ = inputs.reshape(300, 300, 2)
-            #
-            #     outputs_ = outputs.reshape(300, 300, 2)
-            #     plt.plot(outputs_[:, 150, 0]) # Flat
-            #     plt.show()
-            #     plt.plot(outputs_[:, 150, 1]) # Correct bijection
-            #     plt.show()
-            #
-            #     plt.plot(outputs_[150, :, 0]) # Wiggely but (0 to 1)
-            #     plt.show()
-            #     plt.plot(outputs_[150, :, 1]) # Wiggely
-            #     plt.show()
-            #     print(inputs_.shape)
-
-                # bijection_derivative_ = apply_fun_vec_grad_i(bijection_params, inputs.reshape(-1)).reshape(-1, input_dim)
-                # bijection_derivative_ = bijection_derivative_.reshape(300, 300, 2)
-                # plt.plot(bijection_derivative_[:, 150, 0])
-                # plt.show()
-                # print(bijection_derivative_[:, 150, 0].sum() * 1/300)
-                # plt.plot(bijection_derivative_[:, 150, 1])
-                # plt.show()
-                # print(bijection_derivative_[:, 150, 1].sum() * 1 / 300)
-
             bijection_derivative = apply_fun_vec_grad_i(bijection_params, inputs.reshape(-1)).reshape(-1, input_dim)
             log_det_jacobian = np.log(bijection_derivative).sum(-1)
+
+            if outputs.shape[0] == 40000:
+                n_points = 100
+                xx = np.linspace(0, 1, n_points)
+
+                # i = onp.random.randint(10000)
+                # print(bijection_params[i])
+                # bijection_params_ = np.repeat(bijection_params[i][:, None], n_points, axis=1).T
+                # ys = apply_fun_vec_i(bijection_params_, xx)
+                # plt.plot(xx, ys, label='Fun')
+                #
+                # ys_inv = reverse_fun_vec_i(bijection_params_, xx)
+                # plt.plot(xx, ys_inv, label='Inv')
+                # plt.legend()
+                # plt.show()
+                #
+                # plt.plot(xx, apply_fun_vec_grad_i(bijection_params_, xx))
+                # plt.show()
+
             return outputs, log_det_jacobian
 
         def inverse_fun(params, inputs, **kwargs):
@@ -136,9 +128,9 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
                 bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
                 bijection_params = softmax(bijection_params, axis=-1)
 
-                bijection_params = bijection_params.at[:, 0].set(bijection_params[:, 0] + ((spline_regularization / bijection_params.shape[-1]) / spline_degree))
-                bijection_params = bijection_params.at[:, -1].set(bijection_params[:, -1] + ((spline_regularization / bijection_params.shape[-1]) / spline_degree))
-                bijection_params = bijection_params.at[:, 1:-1].set(bijection_params[:, 1:-1] + (spline_regularization / bijection_params.shape[-1]))
+                bijection_params = bijection_params.at[:, :, 0].set(bijection_params[:, :, 0] + ((spline_regularization / bijection_params.shape[-1])) /spline_degree)
+                bijection_params = bijection_params.at[:, :, -1].set(bijection_params[:, :, -1] + ((spline_regularization / bijection_params.shape[-1])) /spline_degree)
+                bijection_params = bijection_params.at[:, :, 1:-1].set(bijection_params[:, :, 1:-1] + (spline_regularization / bijection_params.shape[-1]))
                 bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
 
                 # bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
