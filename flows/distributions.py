@@ -128,10 +128,7 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, pr
 
         def log_pdf(params, inputs):
             transform_params, sp_transform_params = params
-            # prior_params = softmax(prior_params)
-            # prior_params = np.repeat(prior_params[None], inputs.reshape(-1).shape[0], axis=0)
             u, log_det = direct_fun(transform_params, inputs)
-            # u = inputs
 
             prior_params = sp_transform_apply_fun(sp_transform_params, u)
             prior_params = prior_params.split(prior_params_init.shape[-1], axis=-1)
@@ -140,7 +137,6 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, pr
 
             u = np.clip(u, a_min=0.0, a_max=1.0)
             probs = mspline_apply_fun_vec(prior_params.reshape(-1, prior_params_init.shape[-1]), u.reshape(-1))
-
 
             probs = probs.reshape(u.shape[0], -1)
             log_probs = np.log(probs + 1e-7).sum(-1)
