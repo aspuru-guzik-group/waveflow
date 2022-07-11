@@ -110,18 +110,18 @@ def Flow(transformation, prior=Normal(), prior_support=None):
 
 
 
-def MFlow(transformation, sp_transformation, spline_degree, spline_knots, prior_support=None):
+def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, prior_support=None):
 
     def init_fun(rng, input_dim):
         rng, transformation_rng = random.split(rng)
         rng, sp_transformation_rng = random.split(rng)
 
         transform_params, direct_fun, inverse_fun = transformation(transformation_rng, input_dim)
-        # prior_params, prior_log_pdf, prior_sample = prior(prior_rng, input_dim)
-        internal_knots = np.linspace(0, 1, spline_knots)
         mspline_init_fun = MSpline_fun()
 
-        prior_params_init, mspline_apply_fun_vec, mspline_sample_fun_vec, knots = mspline_init_fun(rng, spline_degree, internal_knots, cardinal_splines=True)
+        prior_params_init, mspline_apply_fun_vec, mspline_sample_fun_vec, knots = mspline_init_fun(rng, spline_degree, n_internal_knots,
+                                                                                                   cardinal_splines=True,
+                                                                                                   use_cached_bases=True,)
         sp_transform_params, sp_transform_apply_fun = sp_transformation(transformation_rng, input_dim, prior_params_init.shape)
 
         def log_pdf(params, inputs):

@@ -60,27 +60,19 @@ def MADE(transform):
     return init_fun
 
 
-def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization=0.1):
+def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization=0.1, reverse_fun_tol=0.0001):
 
 
     def init_fun(rng, input_dim, **kwargs):
         init_fun_i = ISpline_fun()
-        params_i, apply_fun_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i = init_fun_i(rng, spline_degree, n_internal_knots,
+        params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i = init_fun_i(rng, spline_degree, n_internal_knots,
                                                                                                               use_cached_bases=True,
                                                                                                               cardinal_splines=True,
                                                                                                               zero_border=True,
-                                                                                                              reverse_fun_tol=0.0001)
+                                                                                                              reverse_fun_tol=reverse_fun_tol)
         params, apply_fun = transform(rng, input_dim, params_i.shape[0])
 
-        # def apply_fun_i_2(params, x):
-        #     bp = apply_fun(params, x)[:, None].split(2)
-        #     bp1 = bp[0]
-        #     bp2 = bp[1]
-        #     output1 = apply_fun_i(bp1, x[0])
-        #     output2 = apply_fun_i(bp2, x[1])
-        #     return np.concatenate([output1, output2])
-        #
-        # apply_fun_i_jac = jax.jacrev(apply_fun_i_2, argnums=1)
+
 
         def direct_fun(params, inputs, **kwargs):
             bijection_params = apply_fun(params, inputs)

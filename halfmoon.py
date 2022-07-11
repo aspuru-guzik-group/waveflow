@@ -9,14 +9,16 @@ from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, Wav
 from scipy.stats.sampling import NumericalInverseHermite, SimpleRatioUniforms
 import jax
 import flows
+from sklearn.neighbors import KernelDensity
+from helper import check_sample_quality
 
 from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
 
-config.update("jax_debug_nans", True)
+# config.update("jax_debug_nans", True)
 
 dataset = ['gm', 'hm', 'c'][1]
-n_samples = 6000
+n_samples = 9000
 length = 1
 margin = 0.025
 # plot_range = [(-length/2, length/2), (-length/2, length/2)]
@@ -105,7 +107,7 @@ else:
 input_dim = X.shape[1]
 
 num_epochs, batch_size = 51000, 100
-model_type = ['Flow', 'IFlow', 'MFlow'][2]
+model_type = ['Flow', 'IFlow', 'MFlow'][0]
 
 def get_masks(input_dim, hidden_dim=64, num_hidden=1):
     masks = []
@@ -151,8 +153,8 @@ elif model_type == 'IFlow':
 elif model_type == 'MFlow':
     init_fun = flows.MFlow(
         flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-        masked_sp_transform,
-        spline_degree=3, spline_knots=10, prior_support=(0.0, 1.0)
+        masked_transform,
+        spline_degree=3, n_internal_knots=10, prior_support=(0.0, 1.0)
     )
 
 else:
@@ -196,57 +198,22 @@ def step(i, opt_state, inputs):
 losses = []
 empirical_kl_divergences = []
 empirical_hellinger_distances = []
+kde_kl_divergences = []
+kde_hellinger_distances = []
 pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
     split_rng, rng = random.split(rng)
 
     if epoch % 2500 == 0 and epoch > 0:
-        params = get_params(opt_state)
-        # x = np.linspace(-length / 2, length / 2, 100)
-        # y = np.linspace(-length / 2, length / 2, 100)
-
-        left_grid = -0.5
-        right_grid = 1.5
-        n_grid_points = 200
-        dx = ((right_grid - left_grid) / n_grid_points)**2
-        x = np.linspace(left_grid, right_grid, n_grid_points)
-        y = np.linspace(left_grid, right_grid, n_grid_points)
-
-        xv, yv = np.meshgrid(x, y)
-        xv, yv = xv.reshape(-1), yv.reshape(-1)
-        xv = np.expand_dims(xv, axis=-1)
-        yv = np.expand_dims(yv, axis=-1)
-        grid = np.concatenate([xv, yv], axis=-1)
-        pdf_grid = np.exp(log_pdf(params, grid).reshape(n_grid_points, n_grid_points))
-        plt.imshow(pdf_grid, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
-        plt.show()
-        print("Normalization constant: ", pdf_grid.sum() * dx)
 
         plt.plot(losses)
         if sample_log_pdf_gt is not None: plt.axhline(y=sample_log_pdf_gt.mean(), color='r', linestyle='-')
         plt.show()
+        params = get_params(opt_state)
+        check_sample_quality(split_rng, params, log_pdf, sample, empirical_kl_divergences,
+                             empirical_hellinger_distances, kde_kl_divergences, kde_hellinger_distances)
 
-        model_samples = sample(split_rng, params, num_samples=10000)
-        plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points, range=[(left_grid, right_grid), (left_grid, right_grid)])  # [-1]
-        plt.show()
 
-        H, xedges, yedges = np.histogram2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points, range=[(left_grid, right_grid), (left_grid, right_grid)], density=True)
-        H = H.T
-
-        log_pdf_grid = log_pdf(params, grid).reshape(n_grid_points, n_grid_points)
-        log_pdf_grid_filtered = log_pdf_grid[H != 0]
-        pdf_grid_filtered = pdf_grid[H != 0]
-        H_filtered = H[H != 0]
-
-        empirical_kl_divergence = (H_filtered * np.log(H_filtered) - log_pdf_grid_filtered).mean()
-        empirical_kl_divergences.append(empirical_kl_divergence)
-        plt.plot(empirical_kl_divergences)
-        plt.show()
-
-        empirical_hellinger_distances.append(((np.sqrt(H_filtered) - np.sqrt(pdf_grid_filtered))**2).mean())
-        plt.plot(empirical_hellinger_distances)
-        plt.show()
-        print(empirical_kl_divergences)
 
 
 
