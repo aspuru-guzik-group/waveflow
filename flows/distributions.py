@@ -120,24 +120,30 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, pr
         mspline_init_fun = MSpline_fun()
 
         prior_params_init, mspline_apply_fun_vec, mspline_sample_fun_vec, knots = mspline_init_fun(rng, spline_degree, n_internal_knots,
+                                                                                                   zero_border=True,
                                                                                                    cardinal_splines=True,
-                                                                                                   use_cached_bases=True,)
-        sp_transform_params, sp_transform_apply_fun = sp_transformation(transformation_rng, input_dim, prior_params_init.shape)
+                                                                                                   use_cached_bases=True,
+                                                                                                   n_mesh_points=2000)
+        sp_transform_params_init, sp_transform_apply_fun = sp_transformation(transformation_rng, input_dim, prior_params_init.shape)
 
         def log_pdf(params, inputs):
             transform_params, sp_transform_params = params
+            # prior_params = softmax(prior_params)
+            # prior_params = np.repeat(prior_params[None], inputs.reshape(-1).shape[0], axis=0)
             u, log_det = direct_fun(transform_params, inputs)
+            # u = inputs
 
-            prior_params = sp_transform_apply_fun(sp_transform_params, inputs)
-            prior_params = softmax(np.concatenate(prior_params[:, None].split(inputs.shape[-1], axis=-1), axis=1))
-            prior_params = prior_params.reshape(-1, prior_params.shape[-1])
-            log_probs = mspline_apply_fun_vec(prior_params, np.clip(u.reshape(-1) + 2, a_min=0, a_max=1 ))
+            prior_params = sp_transform_apply_fun(sp_transform_params, u)
+            prior_params = prior_params.split(prior_params_init.shape[-1], axis=-1)
+            prior_params = np.concatenate([np.expand_dims(sp, axis=-1) for sp in prior_params], axis=-1)
+            prior_params = softmax(prior_params, axis=-1)
 
-            if prior_support is not None:
-                u = np.clip(u, *prior_support)
+            u = np.clip(u, a_min=0.0, a_max=1.0)
+            probs = mspline_apply_fun_vec(prior_params.reshape(-1, prior_params_init.shape[-1]), u.reshape(-1))
 
-            log_probs = log_probs.reshape(u.shape[0], -1)
-            log_probs = np.log(np.prod(log_probs, axis=-1))
+
+            probs = probs.reshape(u.shape[0], -1)
+            log_probs = np.log(probs + 1e-7).sum(-1)
             return log_probs + log_det
 
         def sample(rng, params, num_samples=1):
@@ -146,6 +152,6 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, pr
 
             return inverse_fun(transform_params, prior_samples)[0]
 
-        return (transform_params, sp_transform_params), log_pdf, sample
+        return (transform_params, sp_transform_params_init), log_pdf, sample
 
     return init_fun

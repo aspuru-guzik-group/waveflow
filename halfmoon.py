@@ -107,7 +107,7 @@ else:
 input_dim = X.shape[1]
 
 num_epochs, batch_size = 51000, 100
-model_type = ['Flow', 'IFlow', 'MFlow'][0]
+model_type = ['Flow', 'IFlow', 'MFlow'][2]
 
 def get_masks(input_dim, hidden_dim=64, num_hidden=1):
     masks = []
@@ -152,9 +152,9 @@ elif model_type == 'IFlow':
 
 elif model_type == 'MFlow':
     init_fun = flows.MFlow(
-        flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
+        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10, spline_regularization=0.0), flows.Reverse()) * 1),
         masked_transform,
-        spline_degree=3, n_internal_knots=10, prior_support=(0.0, 1.0)
+        spline_degree=3, n_internal_knots=15, prior_support=(0.0, 1.0)
     )
 
 else:
@@ -162,8 +162,6 @@ else:
     exit()
 
 params, log_pdf, sample = init_fun(flow_rng, input_dim)
-
-log_pdf = jit(log_pdf)
 
 opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
 opt_state = opt_init(params)
@@ -204,7 +202,7 @@ pbar = tqdm.tqdm(range(num_epochs))
 for epoch in pbar:
     split_rng, rng = random.split(rng)
 
-    if epoch % 2500 == 0 and epoch > 0:
+    if epoch % 5000 == 0:# and epoch > 0:
 
         plt.plot(losses)
         if sample_log_pdf_gt is not None: plt.axhline(y=sample_log_pdf_gt.mean(), color='r', linestyle='-')

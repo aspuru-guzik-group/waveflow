@@ -232,8 +232,8 @@ def binary_search(func, low=0.0, high=1.0, tol=1e-3):
 
 
 def check_sample_quality(split_rng, params, log_pdf, sample, empirical_kl_divergences, empirical_hellinger_distances, kde_kl_divergences, kde_hellinger_distances, n_model_sample=1000):
-    left_grid = -0.5
-    right_grid = 1.5
+    left_grid = 0.0
+    right_grid = 1.0
     n_grid_points = 200
     dx = ((right_grid - left_grid) / n_grid_points) ** 2
     x = np.linspace(left_grid, right_grid, n_grid_points)
@@ -250,36 +250,36 @@ def check_sample_quality(split_rng, params, log_pdf, sample, empirical_kl_diverg
     print("Normalization constant: ", pdf_grid.sum() * dx)
 
 
+    if False:
+        model_samples = sample(split_rng, params, num_samples=n_model_sample)
+        kde = KernelDensity(kernel='gaussian', bandwidth=0.015, rtol=0.1).fit(model_samples)
+        plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
+                   range=[(left_grid, right_grid), (left_grid, right_grid)])  # [-1]
+        plt.show()
 
-    model_samples = sample(split_rng, params, num_samples=n_model_sample)
-    kde = KernelDensity(kernel='gaussian', bandwidth=0.015, rtol=0.1).fit(model_samples)
-    plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
-               range=[(left_grid, right_grid), (left_grid, right_grid)])  # [-1]
-    plt.show()
+        log_pdf_grid_kde = kde.score_samples(grid).reshape(n_grid_points, n_grid_points)
+        pdf_grid_kde = np.exp(log_pdf_grid_kde)
+        plt.imshow(pdf_grid_kde, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
+        plt.show()
 
-    log_pdf_grid_kde = kde.score_samples(grid).reshape(n_grid_points, n_grid_points)
-    pdf_grid_kde = np.exp(log_pdf_grid_kde)
-    plt.imshow(pdf_grid_kde, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
-    plt.show()
+        # H, xedges, yedges = np.histogram2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
+        #                                    range=[(left_grid, right_grid), (left_grid, right_grid)], density=True)
+        # H = H.T
 
-    # H, xedges, yedges = np.histogram2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
-    #                                    range=[(left_grid, right_grid), (left_grid, right_grid)], density=True)
-    # H = H.T
+        log_pdf_grid = log_pdf(params, grid).reshape(n_grid_points, n_grid_points)
+        # log_pdf_grid_filtered = log_pdf_grid[H != 0]
+        # pdf_grid_filtered = pdf_grid[H != 0]
+        # H_filtered = H[H != 0]
 
-    log_pdf_grid = log_pdf(params, grid).reshape(n_grid_points, n_grid_points)
-    # log_pdf_grid_filtered = log_pdf_grid[H != 0]
-    # pdf_grid_filtered = pdf_grid[H != 0]
-    # H_filtered = H[H != 0]
+        # empirical_kl_divergence = (H_filtered * (np.log(H_filtered) - log_pdf_grid_filtered)).mean()
+        # empirical_kl_divergences.append(empirical_kl_divergence)
+        kde_kl_divergences.append((pdf_grid * (log_pdf_grid - log_pdf_grid_kde)).mean())
+        plt.plot(empirical_kl_divergences)
+        plt.plot(kde_kl_divergences)
+        plt.show()
 
-    # empirical_kl_divergence = (H_filtered * (np.log(H_filtered) - log_pdf_grid_filtered)).mean()
-    # empirical_kl_divergences.append(empirical_kl_divergence)
-    kde_kl_divergences.append((pdf_grid * (log_pdf_grid - log_pdf_grid_kde)).mean())
-    plt.plot(empirical_kl_divergences)
-    plt.plot(kde_kl_divergences)
-    plt.show()
-
-    # empirical_hellinger_distances.append(((np.sqrt(H) - np.sqrt(pdf_grid)) ** 2).mean())
-    kde_hellinger_distances.append(((np.sqrt(pdf_grid) - np.sqrt(pdf_grid_kde)) ** 2).mean())
-    plt.plot(empirical_hellinger_distances)
-    plt.plot(kde_hellinger_distances)
-    plt.show()
+        # empirical_hellinger_distances.append(((np.sqrt(H) - np.sqrt(pdf_grid)) ** 2).mean())
+        kde_hellinger_distances.append(((np.sqrt(pdf_grid) - np.sqrt(pdf_grid_kde)) ** 2).mean())
+        plt.plot(empirical_hellinger_distances)
+        plt.plot(kde_hellinger_distances)
+        plt.show()
