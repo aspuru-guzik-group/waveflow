@@ -442,6 +442,6 @@ def test_splines(testcase):
 
 
 if __name__ == '__main__':
-   test_splines('t')
+   test_splines('m')
 
 

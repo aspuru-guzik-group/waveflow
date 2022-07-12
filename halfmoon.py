@@ -127,13 +127,17 @@ def get_masks(input_dim, hidden_dim=64, num_hidden=1):
 def masked_transform(rng, input_dim, output_shape=2):
     masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
     act = stax.Tanh
+    hidden = []
+    for i in range(len(masks) - 1):
+        hidden.append(flows.MaskedDense(masks[i]))
+        hidden.append(act)
+
     init_fun, apply_fun = stax.serial(
-        flows.MaskedDense(masks[0]),
-        act,
-        flows.MaskedDense(masks[1]),
-        act,
-        flows.MaskedDense(np.tile(masks[2], output_shape)),
+        flows.ShiftLayer(0.0),
+        *hidden,
+        flows.MaskedDense(np.tile(masks[-1], output_shape)),
     )
+
     _, params = init_fun(rng, (input_dim,))
     return params, apply_fun
 
@@ -152,9 +156,9 @@ elif model_type == 'IFlow':
 
 elif model_type == 'MFlow':
     init_fun = flows.MFlow(
-        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10, spline_regularization=0.0), flows.Reverse()) * 1),
+        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10, spline_regularization=0.0), flows.Reverse()) * 1, return_partial_inverse_fun=True),
         masked_transform,
-        spline_degree=3, n_internal_knots=15, prior_support=(0.0, 1.0)
+        spline_degree=3, n_internal_knots=15
     )
 
 else:
@@ -210,12 +214,6 @@ for epoch in pbar:
         params = get_params(opt_state)
         check_sample_quality(split_rng, params, log_pdf, sample, empirical_kl_divergences,
                              empirical_hellinger_distances, kde_kl_divergences, kde_hellinger_distances)
-
-
-
-
-
-
 
 
 

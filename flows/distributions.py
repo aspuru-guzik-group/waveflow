@@ -110,13 +110,13 @@ def Flow(transformation, prior=Normal(), prior_support=None):
 
 
 
-def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, prior_support=None):
+def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots):
 
     def init_fun(rng, input_dim):
         rng, transformation_rng = random.split(rng)
         rng, sp_transformation_rng = random.split(rng)
 
-        transform_params, direct_fun, inverse_fun = transformation(transformation_rng, input_dim)
+        transform_params, direct_fun, partial_inverse_fun = transformation(transformation_rng, input_dim)
         mspline_init_fun = MSpline_fun()
 
         prior_params_init, mspline_apply_fun_vec, mspline_sample_fun_vec, knots = mspline_init_fun(rng, spline_degree, n_internal_knots,
@@ -129,6 +129,7 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, pr
         def log_pdf(params, inputs):
             transform_params, sp_transform_params = params
             u, log_det = direct_fun(transform_params, inputs)
+            # u = inputs
 
             prior_params = sp_transform_apply_fun(sp_transform_params, u)
             prior_params = prior_params.split(prior_params_init.shape[-1], axis=-1)
@@ -139,14 +140,28 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, pr
             probs = mspline_apply_fun_vec(prior_params.reshape(-1, prior_params_init.shape[-1]), u.reshape(-1))
 
             probs = probs.reshape(u.shape[0], -1)
-            log_probs = np.log(probs + 1e-7).sum(-1)
+            log_probs = np.log(probs + 1e-9).sum(-1)
             return log_probs + log_det
 
         def sample(rng, params, num_samples=1):
             transform_params, sp_transform_params = params
-            prior_samples = prior_sample(rng, prior_params, num_samples)
 
-            return inverse_fun(transform_params, prior_samples)[0]
+            outputs = np.zeros((num_samples, input_dim))
+            inputs = np.zeros((num_samples, input_dim))
+
+            for i_col in range(input_dim):
+                prior_params = sp_transform_apply_fun(sp_transform_params, outputs)
+                prior_params = prior_params.split(prior_params_init.shape[-1], axis=-1)
+                prior_params = np.concatenate([np.expand_dims(sp, axis=-1) for sp in prior_params], axis=-1)
+                prior_params = softmax(prior_params, axis=-1)
+                prior_params_partial = prior_params[:, i_col, :]
+                rng_array = random.split(rng, num_samples)
+                prior_samples = mspline_sample_fun_vec(rng_array, prior_params_partial, 1)
+                inputs = inputs.at[:, i_col].set(prior_samples[:, 0])
+
+                outputs = partial_inverse_fun(transform_params, inputs, i_col, outputs)
+
+            return outputs
 
         return (transform_params, sp_transform_params_init), log_pdf, sample
 

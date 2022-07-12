@@ -250,7 +250,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, empirical_kl_diverg
     print("Normalization constant: ", pdf_grid.sum() * dx)
 
 
-    if False:
+    if True:
         model_samples = sample(split_rng, params, num_samples=n_model_sample)
         kde = KernelDensity(kernel='gaussian', bandwidth=0.015, rtol=0.1).fit(model_samples)
         plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
