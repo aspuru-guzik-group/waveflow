@@ -32,8 +32,19 @@ def M(x, k, i, t, max_k):
 
 @custom_jvp
 def M_cached(x, i, cached_bases_dict, n_derivative=0):
-      x = (x * cached_bases_dict[0].shape[-1]).astype(np.int32)
-      return cached_bases_dict[n_derivative][i][x]
+      # x = (x * cached_bases_dict[0].shape[-1]).astype(np.int32)
+      # return cached_bases_dict[n_derivative][i][x]
+
+      n_points = cached_bases_dict[0].shape[-1] - 1
+      x_l = np.floor(x * n_points).astype(np.int32)
+      x_r = np.ceil(x * n_points).astype(np.int32)
+
+      y_l = cached_bases_dict[n_derivative][i][x_l]
+      y_r = cached_bases_dict[n_derivative][i][x_r]
+
+      dx = x - x_l / n_points
+      slope = (y_r - y_l) * n_points
+      return y_l + slope * dx
 
 @M_cached.defjvp
 def f_fwd(primals, tangents):
@@ -96,8 +107,21 @@ def I(x, k, i, t, max_k, max_j):
 
 @custom_jvp
 def I_cached(x, i, cached_bases_dict, n_derivative=0):
-      x = (x * cached_bases_dict[0].shape[-1]).astype(np.int32)
-      return cached_bases_dict[n_derivative][i][x]
+      # x = (x * cached_bases_dict[0].shape[-1]).astype(np.int32)
+      # return cached_bases_dict[n_derivative][i][x]
+
+      n_points = cached_bases_dict[0].shape[-1] - 1
+      x_l = np.floor(x * n_points).astype(np.int32)
+      x_r = np.ceil(x * n_points).astype(np.int32)
+
+      y_l = cached_bases_dict[n_derivative][i][x_l]
+      y_r = cached_bases_dict[n_derivative][i][x_r]
+
+      dx = x - x_l/n_points
+      slope = (y_r - y_l) * n_points
+      return y_l + slope * dx
+
+
 
 @I_cached.defjvp
 def f_fwd(primals, tangents):
@@ -307,7 +331,7 @@ def test_splines(testcase):
    #############
    rng = jax.random.PRNGKey(4)
    k = 4
-   n_points = 1000
+   n_points = 5000
    n_internal_knots = 30
    xx = np.linspace(0, 1, n_points)
 
@@ -353,11 +377,13 @@ def test_splines(testcase):
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i  = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.000001, use_cached_bases=True, n_mesh_points=1000)
+      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i  = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.00001, use_cached_bases=True, n_mesh_points=1000)
+
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
 
+      apply_fun_vec_i(params_i[1][None], xx[1][None])
 
       fig, ax = plt.subplots()
       ys_reversed = reverse_fun_vec_i(params_i, xx)
@@ -366,6 +392,9 @@ def test_splines(testcase):
       ax.plot(xx, ys, label='I Spline')
       x_reconstructed = apply_fun_vec_i(params_i, ys_reversed)
       ax.plot(xx, x_reconstructed, label='x reconstructed')
+
+      print(np.abs(xx - x_reconstructed).mean())
+      # 5.544081e-06
 
 
       # ax.plot(xx, onp.gradient(ys, 1/n_points, edge_order=2), label='dI/dx Spline nummerical')
@@ -446,6 +475,6 @@ def test_splines(testcase):
 
 
 if __name__ == '__main__':
-   test_splines('i')
+   test_splines('m')
 
 
