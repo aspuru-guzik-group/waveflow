@@ -70,10 +70,10 @@ def MADE(transform):
     return init_fun
 
 
-def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization=0.1, reverse_fun_tol=0.0001):
+def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization=0.0, reverse_fun_tol=0.0001):
 
 
-    def init_fun(rng, input_dim, return_partial_inverse_fun, **kwargs):
+    def init_fun(rng, input_dim, **kwargs):
         init_fun_i = ISpline_fun()
         params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i = init_fun_i(rng, spline_degree, n_internal_knots,
                                                                                                               use_cached_bases=True,
@@ -90,8 +90,8 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
             bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
             bijection_params = softmax(bijection_params, axis=-1)
 
-            bijection_params = bijection_params.at[:, :, 0].set( (bijection_params[:, :, 0] + (spline_regularization / bijection_params.shape[-1])) /spline_degree )
-            bijection_params = bijection_params.at[:, :, -1].set( (bijection_params[:, :, -1] + (spline_regularization / bijection_params.shape[-1])) /spline_degree )
+            bijection_params = bijection_params.at[:, :, 0].set( (bijection_params[:, :, 0] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
+            bijection_params = bijection_params.at[:, :, -1].set( (bijection_params[:, :, -1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
             bijection_params = bijection_params.at[:, :, 1:-1].set(bijection_params[:, :, 1:-1] + (spline_regularization / bijection_params.shape[-1]))
             bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
 
@@ -104,57 +104,30 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
 
             return outputs, log_det_jacobian
 
-        def partial_inverse_fun(params, inputs, i_col, outputs, **kwargs):
-            bijection_params = apply_fun(params, inputs)
-            bijection_params = bijection_params.split(params_i.shape[-1], axis=-1)
-            bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
-            bijection_params = softmax(bijection_params, axis=-1)
-
-            bijection_params = bijection_params.at[:, :, 0].set(bijection_params[:, :, 0] + ((spline_regularization / bijection_params.shape[-1])) /spline_degree)
-            bijection_params = bijection_params.at[:, :, -1].set(bijection_params[:, :, -1] + ((spline_regularization / bijection_params.shape[-1])) /spline_degree)
-            bijection_params = bijection_params.at[:, :, 1:-1].set(bijection_params[:, :, 1:-1] + (spline_regularization / bijection_params.shape[-1]))
-            bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
-
-            # bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
-            bijection_params_partial = bijection_params[:, i_col, :]
-
-
-            outputs = outputs.at[:, i_col].set(reverse_fun_vec_i(bijection_params_partial, inputs[:, i_col]))
-
-
-            return outputs, 0
 
 
         def inverse_fun(params, inputs, **kwargs):
             outputs = np.zeros_like(inputs)
             for i_col in range(inputs.shape[-1]):
-                outputs = partial_inverse_fun(params, inputs, i_col, outputs)
-                # bijection_params = apply_fun(params, inputs)
-                # bijection_params = bijection_params.split(params_i.shape[-1], axis=-1)
-                # bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
-                # bijection_params = softmax(bijection_params, axis=-1)
-                #
-                # bijection_params = bijection_params.at[:, :, 0].set(bijection_params[:, :, 0] + ((spline_regularization / bijection_params.shape[-1])) /spline_degree)
-                # bijection_params = bijection_params.at[:, :, -1].set(bijection_params[:, :, -1] + ((spline_regularization / bijection_params.shape[-1])) /spline_degree)
-                # bijection_params = bijection_params.at[:, :, 1:-1].set(bijection_params[:, :, 1:-1] + (spline_regularization / bijection_params.shape[-1]))
-                # bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
-                #
-                # # bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
-                # bijection_params_partial = bijection_params[:, i_col, :]
-                #
-                # outputs = outputs.at[:, i_col].set(reverse_fun_vec_i(bijection_params_partial, inputs[:, i_col]))
+                bijection_params = apply_fun(params, inputs)
+                bijection_params = bijection_params.split(params_i.shape[-1], axis=-1)
+                bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
+                bijection_params = softmax(bijection_params, axis=-1)
 
-            # bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
-            # bijection_derivative = apply_fun_vec_grad_i(bijection_params, inputs.reshape(-1))
-            #
-            # log_det_jacobian = np.log(bijection_derivative).sum(-1)
+                bijection_params = bijection_params.at[:, :, 0].set((bijection_params[:, :, 0] + (spline_regularization / bijection_params.shape[-1])) / spline_degree)
+                bijection_params = bijection_params.at[:, :, -1].set((bijection_params[:, :, -1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree)
+                bijection_params = bijection_params.at[:, :, 1:-1].set(bijection_params[:, :, 1:-1] + (spline_regularization / bijection_params.shape[-1]))
+                bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
 
-            return outputs, 0#log_det_jacobian
+                bijection_params_partial = bijection_params[:, i_col, :]
 
-        if return_partial_inverse_fun:
-            return params, direct_fun, partial_inverse_fun
-        else:
-            return params, direct_fun, inverse_fun
+                outputs = outputs.at[:, i_col].set(reverse_fun_vec_i(bijection_params_partial, inputs[:, i_col]))
+
+
+            return outputs, 0
+
+
+        return params, direct_fun, inverse_fun
 
     return init_fun
 

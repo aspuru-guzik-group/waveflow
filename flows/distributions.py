@@ -126,7 +126,7 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots):
                                                                                                    n_mesh_points=2000)
         sp_transform_params_init, sp_transform_apply_fun = sp_transformation(transformation_rng, input_dim, prior_params_init.shape)
 
-        def log_pdf(params, inputs):
+        def log_pdf(params, inputs, log_tol=1e-20):
             transform_params, sp_transform_params = params
             u, log_det = direct_fun(transform_params, inputs)
             # u = inputs
@@ -140,7 +140,7 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots):
             probs = mspline_apply_fun_vec(prior_params.reshape(-1, prior_params_init.shape[-1]), u.reshape(-1))
 
             probs = probs.reshape(u.shape[0], -1)
-            log_probs = np.log(probs + 1e-9).sum(-1)
+            log_probs = np.log(probs + log_tol).sum(-1)
             return log_probs + log_det
 
         def sample(rng, params, num_samples=1):
@@ -155,12 +155,16 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots):
                 prior_params = np.concatenate([np.expand_dims(sp, axis=-1) for sp in prior_params], axis=-1)
                 prior_params = softmax(prior_params, axis=-1)
                 prior_params_partial = prior_params[:, i_col, :]
-                rng_array = random.split(rng, num_samples)
+
+                rng, split_rng = random.split(rng)
+                rng_array = random.split(split_rng, num_samples)
                 prior_samples = mspline_sample_fun_vec(rng_array, prior_params_partial, 1)
                 inputs = inputs.at[:, i_col].set(prior_samples[:, 0])
 
-                outputs = partial_inverse_fun(transform_params, inputs, i_col, outputs)
+                outputs = inputs
+                # outputs = partial_inverse_fun(transform_params, inputs, i_col, outputs)[0]
 
+            outputs = partial_inverse_fun(transform_params, outputs)[0]
             return outputs
 
         return (transform_params, sp_transform_params_init), log_pdf, sample

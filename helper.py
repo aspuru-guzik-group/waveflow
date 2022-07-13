@@ -231,7 +231,7 @@ def binary_search(func, low=0.0, high=1.0, tol=1e-3):
 
 
 
-def check_sample_quality(split_rng, params, log_pdf, sample, empirical_kl_divergences, empirical_hellinger_distances, kde_kl_divergences, kde_hellinger_distances, n_model_sample=1000):
+def check_sample_quality(split_rng, params, log_pdf, sample, empirical_kl_divergences, empirical_hellinger_distances, kde_kl_divergences, kde_hellinger_distances, n_model_sample=5000):
     left_grid = 0.0
     right_grid = 1.0
     n_grid_points = 200

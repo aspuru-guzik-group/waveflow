@@ -175,18 +175,29 @@ def test_splines(test_case):
 
    elif test_case == 'i':
       # I(xx[-1], degree, len(iweights)-2, iknots, degree + 1, n_derivatives=1)
-      fig, ax = plt.subplots()
-      for i in range(len(iweights)):
-         ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]))
+      iweights = np.array([0., 0.07851201, 0.15099817, 0.12207119, 0.02501863,
+       0.09804973, 0.06001397, 0.12670789, 0.16325871, 0.09478801,
+       0.03023695, 0.01092747, 0.03941728, 0.])
+      iweights = np.ones_like(iweights)
+      iweights[0] = 0
+      iweights[1] = 1/degree
+      iweights[-1] = 0
+      iweights[-2] = 1/degree
+      iweights = iweights / iweights.sum()
+
+
+      # fig, ax = plt.subplots()
+      # for i in range(len(iweights)):
+      #    ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]))
 
          # ax.plot(xx, np.gradient(np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=0) for x in xx]), dx, edge_order=2),
          #         linewidth=6, label='dI/dx nummerical {}'.format(i))
          # ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=1) for x in xx]),
          #         label='dI/dx analytical {}'.format(i))
 
-      ax.grid(True)
-      ax.legend(loc='best')
-      plt.show()
+      # ax.grid(True)
+      # ax.legend(loc='best')
+      # plt.show()
 
       fig, ax = plt.subplots()
       ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=0) for x in xx]), label='I Spline')
@@ -273,7 +284,7 @@ def test_splines(test_case):
 
 
 if __name__ == '__main__':
-   test_splines('t')
+   test_splines('i')
 
 
 

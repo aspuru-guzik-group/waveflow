@@ -333,7 +333,7 @@ def Reverse():
         True
     """
 
-    def init_fun(rng, input_dim, return_partial_inverse_fun=False, **kwargs):
+    def init_fun(rng, input_dim, **kwargs):
         perm = np.arange(input_dim)[::-1]
 
         def direct_fun(params, inputs, **kwargs):
@@ -342,13 +342,7 @@ def Reverse():
         def inverse_fun(params, inputs, **kwargs):
             return inputs[:, perm], np.zeros(inputs.shape[:1])
 
-        def partial_inverse_fun(params, inputs, i_col, outputs, **kwargs):
-            return inputs[:, perm], np.zeros(inputs.shape[:1])
-
-        if return_partial_inverse_fun:
-            return (), direct_fun, partial_inverse_fun
-        else:
-            return (), direct_fun, inverse_fun
+        return (), direct_fun, inverse_fun
 
     return init_fun
 
@@ -420,7 +414,7 @@ def Sigmoid(clip_before_logit=True):
     return init_fun
 
 
-def Serial(*init_funs, return_partial_inverse_fun=False):
+def Serial(*init_funs):
     """
     Args:
         *init_funs: Multiple bijections in sequence
@@ -446,7 +440,7 @@ def Serial(*init_funs, return_partial_inverse_fun=False):
         all_params, direct_funs, inverse_funs = [], [], []
         for init_fun in init_funs:
             rng, layer_rng = random.split(rng)
-            param, direct_fun, inverse_fun = init_fun(layer_rng, input_dim, init_inputs=init_inputs, return_partial_inverse_fun=return_partial_inverse_fun)
+            param, direct_fun, inverse_fun = init_fun(layer_rng, input_dim, init_inputs=init_inputs)
 
             all_params.append(param)
             direct_funs.append(direct_fun)
@@ -455,13 +449,10 @@ def Serial(*init_funs, return_partial_inverse_fun=False):
             if not (init_inputs is None):
                 init_inputs = direct_fun(param, init_inputs)[0]
 
-        def feed_forward(params, apply_funs, inputs, i_col=None, outputs=None, partial_inverse_funs=False):
+        def feed_forward(params, apply_funs, inputs):
             log_det_jacobians = np.zeros(inputs.shape[:1])
             for apply_fun, param in zip(apply_funs, params):
-                if partial_inverse_funs:
-                    inputs, log_det_jacobian = apply_fun(param, inputs, i_col, outputs, **kwargs)
-                else:
-                    inputs, log_det_jacobian = apply_fun(param, inputs, **kwargs)
+                inputs, log_det_jacobian = apply_fun(param, inputs, **kwargs)
                 log_det_jacobians += log_det_jacobian
             return inputs, log_det_jacobians
 
@@ -471,13 +462,6 @@ def Serial(*init_funs, return_partial_inverse_fun=False):
         def inverse_fun(params, inputs, **kwargs):
             return feed_forward(reversed(params), reversed(inverse_funs), inputs)
 
-        def partial_inverse_fun(params, inputs, i_col, outputs, **kwargs):
-            return feed_forward(reversed(params), reversed(inverse_funs), inputs, i_col, outputs, partial_inverse_funs=True)
-
-
-        if return_partial_inverse_fun:
-            return all_params, direct_fun, partial_inverse_fun
-        else:
-            return all_params, direct_fun, inverse_fun
+        return all_params, direct_fun, inverse_fun
 
     return init_fun

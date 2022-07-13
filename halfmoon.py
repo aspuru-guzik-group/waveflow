@@ -17,7 +17,7 @@ from jax.example_libraries import stax, optimizers
 
 # config.update("jax_debug_nans", True)
 
-dataset = ['gm', 'hm', 'c'][1]
+dataset = ['gm', 'hm', 'c'][2]
 n_samples = 9000
 length = 1
 margin = 0.025
@@ -150,13 +150,13 @@ if model_type == 'Flow':
 
 elif model_type == 'IFlow':
     init_fun = flows.Flow(
-        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10, spline_regularization=0.0), flows.Reverse()) * 2),
+        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15, spline_regularization=0.0, reverse_fun_tol=0.000001), flows.Reverse()) * 2),
         flows.Uniform(), prior_support=(0.0, 1.0)
     )
 
 elif model_type == 'MFlow':
     init_fun = flows.MFlow(
-        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=10, spline_regularization=0.0), flows.Reverse()) * 1, return_partial_inverse_fun=True),
+        flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15, spline_regularization=1, reverse_fun_tol=0.000001), flows.Reverse()) * 1),
         masked_transform,
         spline_degree=3, n_internal_knots=15
     )
@@ -213,7 +213,7 @@ for epoch in pbar:
         plt.show()
         params = get_params(opt_state)
         check_sample_quality(split_rng, params, log_pdf, sample, empirical_kl_divergences,
-                             empirical_hellinger_distances, kde_kl_divergences, kde_hellinger_distances)
+                             empirical_hellinger_distances, kde_kl_divergences, kde_hellinger_distances, n_model_sample=10000)
 
 
 
