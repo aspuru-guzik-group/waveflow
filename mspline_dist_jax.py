@@ -224,7 +224,9 @@ def MSpline_fun():
 
 def ISpline_fun():
 
-   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=1e-3, use_cached_bases=True, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000):
+   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=None, use_cached_bases=True, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000):
+      if reverse_fun_tol is None:
+         reverse_fun_tol = 1/n_mesh_points
       internal_knots = onp.linspace(0, 1, n_internal_knots)
       internal_knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[0]) * (k+1)).clip(min=1))
       knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * (k+1)).clip(min=1))
@@ -306,7 +308,7 @@ def test_splines(testcase):
    rng = jax.random.PRNGKey(4)
    k = 4
    n_points = 1000
-   n_internal_knots = 10
+   n_internal_knots = 30
    xx = np.linspace(0, 1, n_points)
 
    #############
@@ -351,7 +353,7 @@ def test_splines(testcase):
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i  = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.0001, use_cached_bases=True, n_mesh_points=1000)
+      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i  = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.000001, use_cached_bases=True, n_mesh_points=1000)
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
@@ -359,13 +361,15 @@ def test_splines(testcase):
 
       fig, ax = plt.subplots()
       ys_reversed = reverse_fun_vec_i(params_i, xx)
-      # ax.plot(xx, ys_reversed, label='I Spline Reversed')
+      ax.plot(xx, ys_reversed, label='I Spline Reversed')
       ys = apply_fun_vec_i(params_i, xx)
-      # ax.plot(xx, ys, label='I Spline')
+      ax.plot(xx, ys, label='I Spline')
+      x_reconstructed = apply_fun_vec_i(params_i, ys_reversed)
+      ax.plot(xx, x_reconstructed, label='x reconstructed')
 
 
-      ax.plot(xx, onp.gradient(ys, 1/n_points, edge_order=2), label='dI/dx Spline nummerical')
-      ax.plot(xx, apply_fun_vec_grad(params_i, xx), label='dI/dx Spline analytical')
+      # ax.plot(xx, onp.gradient(ys, 1/n_points, edge_order=2), label='dI/dx Spline nummerical')
+      # ax.plot(xx, apply_fun_vec_grad(params_i, xx), label='dI/dx Spline analytical')
 
 
       ax.grid(True)
@@ -386,7 +390,7 @@ def test_splines(testcase):
       params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i = init_fun_i(rng, k, n_internal_knots,
                                                                                              cardinal_splines=True,
                                                                                              zero_border=True,
-                                                                                             reverse_fun_tol=0.0001,
+                                                                                             reverse_fun_tol=0.1,
                                                                                              use_cached_bases=True,
                                                                                              n_mesh_points=1000)
       params_i_2 = jax.random.uniform(jax.random.PRNGKey(1233), shape=params_i.shape)
@@ -442,6 +446,6 @@ def test_splines(testcase):
 
 
 if __name__ == '__main__':
-   test_splines('m')
+   test_splines('i')
 
 
