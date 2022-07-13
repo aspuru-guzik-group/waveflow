@@ -100,7 +100,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
 
 
             bijection_derivative = apply_fun_vec_grad_i(bijection_params, inputs.reshape(-1)).reshape(-1, input_dim)
-            log_det_jacobian = np.log(bijection_derivative).sum(-1)
+            log_det_jacobian = np.log(bijection_derivative + 1e-12).sum(-1)
 
             return outputs, log_det_jacobian
 

@@ -196,3 +196,5 @@ results
 results/
 ./results/*
 results/*
+./cached_bases/*
+./cached_bases/

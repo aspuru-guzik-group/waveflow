@@ -231,7 +231,21 @@ def binary_search(func, low=0.0, high=1.0, tol=1e-3):
 
 
 
-def check_sample_quality(split_rng, params, log_pdf, sample, empirical_kl_divergences, empirical_hellinger_distances, kde_kl_divergences, kde_hellinger_distances, n_model_sample=5000, save_path='./experiments'):
+def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
+                         n_model_sample=5000, root_save_path='./results/pdf/',
+                         system=None, model_type=None, epoch=0, save_figs=False):
+    root_save_path = '{}/{}/{}'.format(root_save_path, system, model_type)
+    root_save_path_per_epoch = '{}/epoch_{}'.format(root_save_path, epoch)
+    Path(root_save_path_per_epoch).mkdir(exist_ok=True, parents=True)
+
+    plt.plot(losses)
+    if system is None or model_type is None:
+        plt.show()
+    else:
+        plt.savefig('{}/losses.png'.format(root_save_path))
+        plt.clf()
+
+
     left_grid = 0.0
     right_grid = 1.0
     n_grid_points = 300
@@ -246,40 +260,50 @@ def check_sample_quality(split_rng, params, log_pdf, sample, empirical_kl_diverg
     grid = np.concatenate([xv, yv], axis=-1)
     pdf_grid = np.exp(log_pdf(params, grid).reshape(n_grid_points, n_grid_points))
     plt.imshow(pdf_grid, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
-    plt.show()
-    print("Normalization constant: ", pdf_grid.sum() * dx)
-
-
-    if True:
-        model_samples = sample(split_rng, params, num_samples=n_model_sample)
-        kde = KernelDensity(kernel='gaussian', bandwidth=0.015, rtol=0.1).fit(model_samples)
-        plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
-                   range=[(left_grid, right_grid), (left_grid, right_grid)])  # [-1]
+    if save_figs and (system is None or model_type is None):
         plt.show()
+    else:
+        plt.savefig('{}/pdf_grid.png'.format(root_save_path_per_epoch))
+        plt.clf()
 
-        log_pdf_grid_kde = kde.score_samples(grid).reshape(n_grid_points, n_grid_points)
-        pdf_grid_kde = np.exp(log_pdf_grid_kde)
-        plt.imshow(pdf_grid_kde, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
+
+    model_samples = sample(split_rng, params, num_samples=n_model_sample)
+    kde = KernelDensity(kernel='gaussian', bandwidth=0.01, rtol=0.1).fit(model_samples)
+    plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
+               range=[(left_grid, right_grid), (left_grid, right_grid)])  # [-1]
+    if save_figs and (system is None or model_type is None):
         plt.show()
+    else:
+        plt.savefig('{}/sample.png'.format(root_save_path_per_epoch))
+        plt.clf()
 
-        # H, xedges, yedges = np.histogram2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
-        #                                    range=[(left_grid, right_grid), (left_grid, right_grid)], density=True)
-        # H = H.T
-
-        log_pdf_grid = log_pdf(params, grid).reshape(n_grid_points, n_grid_points)
-        # log_pdf_grid_filtered = log_pdf_grid[H != 0]
-        # pdf_grid_filtered = pdf_grid[H != 0]
-        # H_filtered = H[H != 0]
-
-        # empirical_kl_divergence = (H_filtered * (np.log(H_filtered) - log_pdf_grid_filtered)).mean()
-        # empirical_kl_divergences.append(empirical_kl_divergence)
-        kde_kl_divergences.append((pdf_grid * (log_pdf_grid - log_pdf_grid_kde)).mean())
-        plt.plot(empirical_kl_divergences)
-        plt.plot(kde_kl_divergences)
+    log_pdf_grid_kde = kde.score_samples(grid).reshape(n_grid_points, n_grid_points)
+    pdf_grid_kde = np.exp(log_pdf_grid_kde)
+    plt.imshow(pdf_grid_kde, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
+    if save_figs and (system is None or model_type is None):
         plt.show()
+    else:
+        plt.savefig('{}/kde_pdf_grid.png'.format(root_save_path_per_epoch))
+        plt.clf()
 
-        # empirical_hellinger_distances.append(((np.sqrt(H) - np.sqrt(pdf_grid)) ** 2).mean())
-        kde_hellinger_distances.append(((np.sqrt(pdf_grid) - np.sqrt(pdf_grid_kde)) ** 2).mean())
-        plt.plot(empirical_hellinger_distances)
-        plt.plot(kde_hellinger_distances)
+    log_pdf_grid = log_pdf(params, grid).reshape(n_grid_points, n_grid_points)
+
+    kde_kl_divergences.append((pdf_grid * (log_pdf_grid - log_pdf_grid_kde)).mean())
+    plt.plot(kde_kl_divergences)
+    if save_figs and (system is None or model_type is None):
         plt.show()
+    else:
+        plt.savefig('{}/kl_divergence.png'.format(root_save_path))
+        plt.clf()
+
+    kde_hellinger_distances.append(((np.sqrt(pdf_grid) - np.sqrt(pdf_grid_kde)) ** 2).mean())
+    plt.plot(kde_hellinger_distances)
+    if save_figs and (system is None or model_type is None):
+        plt.show()
+    else:
+        plt.savefig('{}/hellinger_divergence.png'.format(root_save_path))
+        plt.clf()
+
+    np.savetxt('{}/losss.txt'.format(root_save_path), losses)
+    np.savetxt('{}/kl_divergences.txt'.format(root_save_path), kde_kl_divergences)
+    np.savetxt('{}/hellinger_divergences.txt'.format(root_save_path), kde_hellinger_distances)
