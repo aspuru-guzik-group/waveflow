@@ -304,6 +304,6 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
         plt.savefig('{}/hellinger_divergence.png'.format(root_save_path))
         plt.clf()
 
-    np.savetxt('{}/losss.txt'.format(root_save_path), losses)
+    np.savetxt('{}/losses.txt'.format(root_save_path), losses)
     np.savetxt('{}/kl_divergences.txt'.format(root_save_path), kde_kl_divergences)
     np.savetxt('{}/hellinger_divergences.txt'.format(root_save_path), kde_hellinger_distances)

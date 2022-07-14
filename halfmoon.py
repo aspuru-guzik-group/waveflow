@@ -8,7 +8,7 @@ from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
 
 from jax.config import config
-config.update("jax_debug_nans", True)
+# config.update("jax_debug_nans", True)
 
 def get_dataset(dataset, n_samples, length, margin, do_plot=False):
     if dataset == 'gaussian_mixtures':
@@ -219,13 +219,15 @@ if __name__ == '__main__':
     plot_range = [(0, length), (0, length)]
     n_bins = 100
     input_dim = 2
-    num_epochs, batch_size = 50001, 100
+    # num_epochs, batch_size = 50001, 100
+    num_epochs, batch_size = 5001, 100
     n_model_sample = 20000
 
     dataset_list = ['gaussian_mixtures', 'halfmoon', 'circles']
-    model_type_list = ['Flow', 'IFlow_0', 'IFlow_1', 'MFlow_0', 'MFlow_1']
+    # model_type_list = ['Flow', 'IFlow_0', 'IFlow_1', 'MFlow_0', 'MFlow_1']
+    model_type_list = ['IFlow_0', 'IFlow_1']
 
-    run_all = False
+    run_all = True
     if run_all:
         for dataset in dataset_list:
             X = get_dataset(dataset, n_samples, length, margin, do_plot=False)
