@@ -17,7 +17,7 @@ for experiment in experiments:
         model_path = '{}/{}'.format(experiment_path, model)
         if os.path.isfile(model_path):
             continue
-        losses = np.loadtxt('{}/losss.txt'.format(model_path))
+        losses = np.loadtxt('{}/losses.txt'.format(model_path))
         kl_divergences = np.loadtxt('{}/kl_divergences.txt'.format(model_path))
         hellinger_divergences = np.loadtxt('{}/hellinger_divergences.txt'.format(model_path))
 
@@ -27,7 +27,7 @@ for experiment in experiments:
 
     fig, ax = plt.subplots()
     for key, val in losses_dict.items():
-        ax.plot(np.clip(val[burn_in:], a_min=None, a_max=val[burn_in:]), label=key)
+        ax.plot(np.clip(val[burn_in:], a_min=None, a_max=val[burn_in]), label=key)
 
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Loss')

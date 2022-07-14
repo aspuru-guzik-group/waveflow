@@ -42,6 +42,9 @@ def M(x, k, i, t, max_k, n_derivatives = 1):
       else:
          return k / ((k - 1) * (t[i + k] - t[i])) * ((x - t[i]) * M(x, k - 1, i, t, max_k, n_derivatives=n_derivatives) + (t[i + k] - x) * M(x, k - 1, i + 1, t, max_k, n_derivatives=n_derivatives) + n_derivatives * (M(x, k - 1, i, t, max_k, n_derivatives=n_derivatives-1) - M(x, k - 1, i + 1, t, max_k, n_derivatives=n_derivatives-1)))
 
+def dM(x, k, i, t, max_k):
+   return k * ( (B(x, k-1, i, t) / (t[i+k] - t[i]) - B(x, k-1, i+1, t) / (t[i+k+1] - t[i+1]) ) )
+
 def mspline(x, t, c, k, n_derivatives=0):
    return sum(c[i] * M(x, k, i, t, k, n_derivatives=n_derivatives) for i in range(len(c)))
 
@@ -284,7 +287,7 @@ def test_splines(test_case):
 
 
 if __name__ == '__main__':
-   test_splines('i')
+   test_splines('m')
 
 
 
