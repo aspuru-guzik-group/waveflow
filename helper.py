@@ -239,7 +239,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
     Path(root_save_path_per_epoch).mkdir(exist_ok=True, parents=True)
 
     plt.plot(losses)
-    if system is None or model_type is None:
+    if not save_figs or (system is None or model_type is None):
         plt.show()
     else:
         plt.savefig('{}/losses.png'.format(root_save_path))
@@ -260,7 +260,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
     grid = np.concatenate([xv, yv], axis=-1)
     pdf_grid = np.exp(log_pdf(params, grid).reshape(n_grid_points, n_grid_points))
     plt.imshow(pdf_grid, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
-    if save_figs and (system is None or model_type is None):
+    if not save_figs or (system is None or model_type is None):
         plt.show()
     else:
         plt.savefig('{}/pdf_grid.png'.format(root_save_path_per_epoch))
@@ -271,7 +271,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
     kde = KernelDensity(kernel='gaussian', bandwidth=0.01, rtol=0.1).fit(model_samples)
     plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
                range=[(left_grid, right_grid), (left_grid, right_grid)])  # [-1]
-    if save_figs and (system is None or model_type is None):
+    if not save_figs or (system is None or model_type is None):
         plt.show()
     else:
         plt.savefig('{}/sample.png'.format(root_save_path_per_epoch))
@@ -280,7 +280,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
     log_pdf_grid_kde = kde.score_samples(grid).reshape(n_grid_points, n_grid_points)
     pdf_grid_kde = np.exp(log_pdf_grid_kde)
     plt.imshow(pdf_grid_kde, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
-    if save_figs and (system is None or model_type is None):
+    if not save_figs or (system is None or model_type is None):
         plt.show()
     else:
         plt.savefig('{}/kde_pdf_grid.png'.format(root_save_path_per_epoch))
@@ -290,7 +290,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
 
     kde_kl_divergences.append((pdf_grid * (log_pdf_grid - log_pdf_grid_kde)).mean())
     plt.plot(kde_kl_divergences)
-    if save_figs and (system is None or model_type is None):
+    if not save_figs or (system is None or model_type is None):
         plt.show()
     else:
         plt.savefig('{}/kl_divergence.png'.format(root_save_path))
@@ -298,7 +298,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
 
     kde_hellinger_distances.append(((np.sqrt(pdf_grid) - np.sqrt(pdf_grid_kde)) ** 2).mean())
     plt.plot(kde_hellinger_distances)
-    if save_figs and (system is None or model_type is None):
+    if not save_figs or (system is None or model_type is None):
         plt.show()
     else:
         plt.savefig('{}/hellinger_divergence.png'.format(root_save_path))

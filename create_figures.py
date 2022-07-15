@@ -4,6 +4,9 @@ import os
 
 root_path = './results/pdf'
 
+color_dict = {'Flow': 'r', 'IFlow': 'b', 'MFlow': 'g'}
+style_dict = {'0': '-', '01': '--', '1': '-.'}
+
 experiments = os.listdir(root_path)
 burn_in = 10000
 for experiment in experiments:
@@ -27,7 +30,10 @@ for experiment in experiments:
 
     fig, ax = plt.subplots()
     for key, val in losses_dict.items():
-        ax.plot(np.clip(val[burn_in:], a_min=None, a_max=val[burn_in]), label=key)
+        keys = key.split('_')
+        linestyle = style_dict[keys[1]] if len(keys) == 2 else '-'
+        label = '{} {}'.format(keys[0], keys[1]) if len(keys) == 2 else 'Flow'
+        ax.plot(np.clip(val[burn_in:], a_min=None, a_max=val[burn_in]), color=color_dict[keys[0]], linestyle=linestyle, label=label)
 
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Loss')
@@ -39,7 +45,10 @@ for experiment in experiments:
 
     fig, ax = plt.subplots()
     for key, val in kl_dict.items():
-        ax.plot(val, label=key)
+        keys = key.split('_')
+        linestyle = style_dict[keys[1]] if len(keys) == 2 else '-'
+        label = '{} {}'.format(keys[0], keys[1]) if len(keys) == 2 else 'Flow'
+        ax.plot(val, color=color_dict[keys[0]], linestyle=linestyle, label=label)
 
     ax.set_xlabel('Epoch')
     ax.set_ylabel('KL Divergence')
@@ -50,7 +59,10 @@ for experiment in experiments:
 
     fig, ax = plt.subplots()
     for key, val in hellinger_dict.items():
-        ax.plot(val, label=key)
+        keys = key.split('_')
+        linestyle = style_dict[keys[1]] if len(keys) == 2 else '-'
+        label = '{} {}'.format(keys[0], keys[1]) if len(keys) == 2 else 'Flow'
+        ax.plot(val, color=color_dict[keys[0]], linestyle=linestyle, label=label)
 
     ax.set_xlabel('Epoch')
     ax.set_ylabel('Squared Hellinger Divergence')

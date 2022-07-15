@@ -240,10 +240,9 @@ if __name__ == '__main__':
     n_model_sample = 20000
 
     dataset_list = ['gaussian_mixtures', 'halfmoon', 'circles']
-    # model_type_list = ['Flow', 'IFlow_0', 'IFlow_1', 'MFlow_0', 'MFlow_1']
-    model_type_list = ['IFlow_01', 'MFlow_01']
+    model_type_list = ['Flow', 'IFlow_0', 'IFlow_01', 'IFlow_1', 'MFlow_0', 'MFlow_01', 'MFlow_1']
 
-    run_all = True
+    run_all = False
     if run_all:
         for dataset in dataset_list:
             X = get_dataset(dataset, n_samples, length, margin, do_plot=False)
@@ -257,7 +256,7 @@ if __name__ == '__main__':
                 opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
                 opt_state = opt_init(params)
 
-                train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=False)
+                train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=True)
     else:
         dataset = dataset_list[1]
         model_type = model_type_list[1]

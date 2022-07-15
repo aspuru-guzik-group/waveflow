@@ -16,6 +16,7 @@ from mspline_dist import I as I_onp
 from scipy.misc import derivative
 # config.update('jax_disable_jit', True)
 
+
 #@partial(jit, static_argnums=(1,2,4))
 def M(x, k, i, t, max_k):
 
@@ -238,6 +239,21 @@ def MSpline_fun():
 
       sample_fun_vec = vmap(sample_fun, in_axes=(0, 0, None))
 
+
+      def enforce_boundary_conditions(weights, constraints_dict_left={}, constraints_dict_right={}):
+         # Currently can only enforce two boundary conditions
+         for n_derivative, constrain_value in constraints_dict_left.items():
+
+            previous_value_list = [M_cached(0.0, j, cached_bases, n_derivatives=n_derivative) for j in range(n_derivative)]
+            value = M_cached(0.0, n_derivative, cached_bases, n_derivatives=n_derivative)
+
+            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
+            summed_previous_values = constrain_value - summed_previous_values
+
+            weights[n_derivative] = summed_previous_values / value
+
+
+         return weights / weights.sum()
 
       return initial_params, apply_fun_vec, sample_fun_vec, knots
 

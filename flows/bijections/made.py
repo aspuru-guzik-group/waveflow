@@ -93,6 +93,8 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
             bijection_params = bijection_params.at[:, :, 0].set( (bijection_params[:, :, 0] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
             bijection_params = bijection_params.at[:, :, -1].set( (bijection_params[:, :, -1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
             bijection_params = bijection_params.at[:, :, 1:-1].set(bijection_params[:, :, 1:-1] + (spline_regularization / bijection_params.shape[-1]))
+
+            # bijection_params = bijection_params.at[:, :, 2].set( bijection_params[:, :, 1] )
             bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
 
             bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
