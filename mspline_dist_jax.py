@@ -137,12 +137,7 @@ def apply_I_and_multiply(i, x, t, c_i, k):
 apply_I_and_multiply_vec = vmap(apply_I_and_multiply, in_axes=(0, None, None, 0, None))
 @partial(jit, static_argnums=(4))
 def ispline(x, t, c, k, zero_border=True, cached_bases_dict=None):
-   # idx_array = np.arange(0, len(c))
-   # if zero_border:
-   #    idx_array = idx_array + 1
-   #
-   # weighted_bases = apply_I_and_multiply_vec(idx_array, x, t, c, k)
-   # return weighted_bases.sum()
+
    if zero_border:
       if cached_bases_dict is not None:
          return sum(c[i] * I_cached(x, i + 1, cached_bases_dict) for i in range(len(c)))
@@ -239,22 +234,6 @@ def MSpline_fun():
 
       sample_fun_vec = vmap(sample_fun, in_axes=(0, 0, None))
 
-
-      def enforce_boundary_conditions(weights, constraints_dict_left={}, constraints_dict_right={}):
-         # Currently can only enforce two boundary conditions
-         for n_derivative, constrain_value in constraints_dict_left.items():
-
-            previous_value_list = [M_cached(0.0, j, cached_bases, n_derivatives=n_derivative) for j in range(n_derivative)]
-            value = M_cached(0.0, n_derivative, cached_bases, n_derivatives=n_derivative)
-
-            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
-            summed_previous_values = constrain_value - summed_previous_values
-
-            weights[n_derivative] = summed_previous_values / value
-
-
-         return weights / weights.sum()
-
       return initial_params, apply_fun_vec, sample_fun_vec, knots
 
    return init_fun
@@ -264,7 +243,9 @@ def MSpline_fun():
 
 def ISpline_fun():
 
-   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=None, use_cached_bases=True, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000):
+   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=None,
+                use_cached_bases=True, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000,
+                second_derivative_zero_left=False):
       if reverse_fun_tol is None:
          reverse_fun_tol = 1/n_mesh_points
       internal_knots = onp.linspace(0, 1, n_internal_knots)
@@ -314,6 +295,19 @@ def ISpline_fun():
       # Convert to from onp array to jax device array
       knots = np.array(knots)
 
+      if not cardinal_splines and second_derivative_zero_left:
+         print('Cant precompile constraint, use enforce_boundary_conditions funciton to dynamically enforce boundary conditions')
+      elif second_derivative_zero_left and zero_border:
+         ddI1 = I_cached(0.0, 0, cached_bases_dict, n_derivative=2)
+         ddI2 = I_cached(0.0, 1, cached_bases_dict, n_derivative=2)
+         multiplier_left = ddI1 / ddI2
+      elif second_derivative_zero_left and not zero_border:
+         ddI1 = I_cached(0.0, 1, cached_bases_dict, n_derivative=2)
+         ddI2 = I_cached(0.0, 2, cached_bases_dict, n_derivative=2)
+         multiplier_left = ddI1 / ddI2
+
+
+
 
       def apply_fun(params, x):
          if not cardinal_splines:
@@ -322,7 +316,7 @@ def ISpline_fun():
          else:
             knots_ = knots
 
-         return ispline(x, knots_, params, k, zero_border=zero_border, cached_bases_dict=cached_bases_dict)
+         return ispline(x, knots_, params, k, cached_bases_dict=cached_bases_dict, zero_border=zero_border)
 
       apply_fun_vec = jit(partial(vmap(apply_fun, in_axes=(0, 0))))
       apply_fun_vec_grad = jit(partial(vmap(grad(apply_fun, argnums=1), in_axes=(0, 0))))
@@ -333,12 +327,40 @@ def ISpline_fun():
       reverse_fun_vec = jit(partial(vmap(reverse_fun, in_axes=(0, 0))))
 
 
-
-
-      return initial_params, apply_fun_vec, apply_fun_vec_grad, reverse_fun_vec, knots
+      return initial_params, apply_fun_vec, apply_fun_vec_grad, reverse_fun_vec, knots, cached_bases_dict
 
    return init_fun
 
+
+def enforce_boundary_conditions(weights, cached_bases_dict, constraints_dict_left, constraints_dict_right):
+   # Currently can only enforce two boundary conditions
+   for p in constraints_dict_left.items():
+      n_derivative, constrain_value = p
+      previous_value_list = [I_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
+                             range(n_derivative)]
+      value = I_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
+
+      summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
+      summed_previous_values = constrain_value - summed_previous_values
+
+      weights = weights.at[n_derivative].set(summed_previous_values / value)
+
+   weights = np.flip(weights)
+   for p in constraints_dict_right.items():
+      n_derivative, constrain_value = p
+      previous_value_list = [I_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
+                             range(n_derivative)]
+      value = I_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
+
+      summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
+      summed_previous_values = constrain_value - summed_previous_values
+
+      weights = weights.at[n_derivative].set(summed_previous_values / value)
+
+   weights = np.flip(weights)
+
+   return weights / weights.sum()
+enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None, None, None)))
 
 # @profile
 def test_splines(testcase):
@@ -393,9 +415,10 @@ def test_splines(testcase):
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i  = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.00001, use_cached_bases=True, n_mesh_points=1000)
+      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i, cached_bases_dict = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.00001, use_cached_bases=True, n_mesh_points=1000)
 
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
+      params_i = enforce_boundary_conditions(params_i, cached_bases_dict, {0: 0, 2: 0}, {0: 0, 2: 0})
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
 
@@ -491,6 +514,6 @@ def test_splines(testcase):
 
 
 if __name__ == '__main__':
-   test_splines('m')
+   test_splines('i')
 
 

@@ -170,7 +170,7 @@ def test_splines(test_case):
 
 
 
-      Setting 2nd derivative 0 but 1st derivative flexible
+      #Setting 2nd derivative 0 but 1st derivative flexible
       dM1 = np.abs(M(0.0, degree, 1, mknots, degree, n_derivatives=2))
       dM2 = np.abs(M(0.0, degree, 2, mknots, degree, n_derivatives=2))
       mweights[2] = mweights[1] / dM2 * dM1
@@ -198,18 +198,18 @@ def test_splines(test_case):
    elif test_case == 'i':
       # I(xx[-1], degree, len(iweights)-2, iknots, degree + 1, n_derivatives=1)
 
-      # for i in range(len(iweights)):
-      #    fig, ax = plt.subplots()
-      #    # ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]))
-      #
-      #    # ax.plot(xx, np.gradient(np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=0) for x in xx]), dx, edge_order=2),
-      #    #         linewidth=6, label='dI/dx nummerical {}'.format(i))
-      #    ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=2) for x in xx]),
-      #            label='dI/dx analytical {}'.format(i))
-      #
-      #    ax.grid(True)
-      #    ax.legend(loc='best')
-      #    plt.show()
+      for i in range(len(iweights)):
+         fig, ax = plt.subplots()
+         # ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]))
+
+         # ax.plot(xx, np.gradient(np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=0) for x in xx]), dx, edge_order=2),
+         #         linewidth=6, label='dI/dx nummerical {}'.format(i))
+         ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=3) for x in xx]),
+                 label='dI/dx analytical {}'.format(i))
+
+         ax.grid(True)
+         ax.legend(loc='best')
+         plt.show()
 
       # Setting second derivative to 0
       dI1 = np.abs(I(0.0, degree, 1, iknots, degree + 1, n_derivatives=2))
@@ -220,7 +220,7 @@ def test_splines(test_case):
       print(iweights)
 
       fig, ax = plt.subplots()
-      ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=2) for x in xx]), label='I Spline')
+      ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=3) for x in xx]), label='I Spline')
 
       print(np.array([ispline(x, iknots, iweights, degree, n_derivatives=1) for x in xx]).sum() * dx)
 
@@ -304,7 +304,7 @@ def test_splines(test_case):
 
 
 if __name__ == '__main__':
-   test_splines('m')
+   test_splines('i')
 
 
 

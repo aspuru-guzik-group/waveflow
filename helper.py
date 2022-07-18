@@ -236,12 +236,12 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
                          system=None, model_type=None, epoch=0, save_figs=False):
     root_save_path = '{}/{}/{}'.format(root_save_path, system, model_type)
     root_save_path_per_epoch = '{}/epoch_{}'.format(root_save_path, epoch)
-    Path(root_save_path_per_epoch).mkdir(exist_ok=True, parents=True)
 
     plt.plot(losses)
     if not save_figs or (system is None or model_type is None):
         plt.show()
     else:
+        Path(root_save_path_per_epoch).mkdir(exist_ok=True, parents=True)
         plt.savefig('{}/losses.png'.format(root_save_path))
         plt.clf()
 
@@ -304,6 +304,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
         plt.savefig('{}/hellinger_divergence.png'.format(root_save_path))
         plt.clf()
 
-    np.savetxt('{}/losses.txt'.format(root_save_path), losses)
-    np.savetxt('{}/kl_divergences.txt'.format(root_save_path), kde_kl_divergences)
-    np.savetxt('{}/hellinger_divergences.txt'.format(root_save_path), kde_hellinger_distances)
+    if save_figs:
+        np.savetxt('{}/losses.txt'.format(root_save_path), losses)
+        np.savetxt('{}/kl_divergences.txt'.format(root_save_path), kde_kl_divergences)
+        np.savetxt('{}/hellinger_divergences.txt'.format(root_save_path), kde_hellinger_distances)
