@@ -125,7 +125,11 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 def test_splines(test_case):
 
    degree = 5
-   internal_knots = np.linspace(0, 1, 10)
+   # internal_knots = np.linspace(0, 1, 15)
+   internal_knots = np.random.uniform(0,1, 15)
+   internal_knots[0] = 0
+   internal_knots = np.cumsum(internal_knots)
+   internal_knots = internal_knots / internal_knots[-1]
 
    mknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree).clip(min=1))
    mknots = np.repeat(mknots, ((mknots == mknots[-1]) * degree).clip(min=1))
@@ -174,6 +178,7 @@ def test_splines(test_case):
       dM1 = np.abs(M(0.0, degree, 1, mknots, degree, n_derivatives=2))
       dM2 = np.abs(M(0.0, degree, 2, mknots, degree, n_derivatives=2))
       mweights[2] = mweights[1] / dM2 * dM1
+      mweights[4:4+degree-1] = 0
       mweights = mweights / mweights.sum()
       fig, ax = plt.subplots()
       ax.plot(xx, np.array([mspline(x, mknots, mweights, degree, n_derivatives=0) for x in xx]), label='M Spline')
@@ -196,33 +201,41 @@ def test_splines(test_case):
       # plt.show()
 
    elif test_case == 'i':
+      print('ddI_1 ', I(0, degree, 1, iknots, degree + 1, n_derivatives=2))
+      print('ddI_2 ', I(0, degree, 2, iknots, degree + 1, n_derivatives=2))
+      print('dddI_1 ', I(0, degree, 1, iknots, degree + 1, n_derivatives=3))
+      print('dddI_2 ', I(0, degree, 2, iknots, degree + 1, n_derivatives=3))
+      print('dddI_3 ', I(0, degree, 3, iknots, degree + 1, n_derivatives=3))
+      second_derivative_constraint = - I(0, degree, 1, iknots, degree + 1, n_derivatives=2)/I(0, degree, 2, iknots, degree + 1, n_derivatives=2)
+      third_derivative_constraint = -(I(0, degree, 1, iknots, degree + 1, n_derivatives=3) - I(0, degree, 2, iknots, degree + 1, n_derivatives=3)*I(0, degree, 1, iknots, degree + 1, n_derivatives=2)/I(0, degree, 2, iknots, degree + 1, n_derivatives=2))/I(0, degree, 3, iknots, degree + 1, n_derivatives=3)
+      print(second_derivative_constraint)
+      print(third_derivative_constraint)
+
       # I(xx[-1], degree, len(iweights)-2, iknots, degree + 1, n_derivatives=1)
 
-      for i in range(len(iweights)):
-         fig, ax = plt.subplots()
-         # ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]))
-
-         # ax.plot(xx, np.gradient(np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=0) for x in xx]), dx, edge_order=2),
-         #         linewidth=6, label='dI/dx nummerical {}'.format(i))
-         ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=3) for x in xx]),
-                 label='dI/dx analytical {}'.format(i))
-
-         ax.grid(True)
-         ax.legend(loc='best')
-         plt.show()
+      # for i in range(len(iweights)):
+      #
+      #    fig, ax = plt.subplots()
+      #    # ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]))
+      #
+      #    # ax.plot(xx, np.gradient(np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=0) for x in xx]), dx, edge_order=2),
+      #    #         linewidth=6, label='dI/dx nummerical {}'.format(i))
+      #    ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=3) for x in xx]),
+      #            label='dI/dx analytical {}'.format(i))
+      #
+      #    ax.grid(True)
+      #    ax.legend(loc='best')
+      #    plt.show()
 
       # Setting second derivative to 0
-      dI1 = np.abs(I(0.0, degree, 1, iknots, degree + 1, n_derivatives=2))
-      dI2 = np.abs(I(0.0, degree, 2, iknots, degree + 1, n_derivatives=2))
-      print(dI1, dI2)
-      iweights[2] = iweights[1] / dI2 * dI1
+      iweights[2] = iweights[1] * second_derivative_constraint
+      iweights[3] = iweights[1] * third_derivative_constraint
+      iweights[4] = iweights[1] * 4
       iweights = iweights / iweights.sum()
-      print(iweights)
 
       fig, ax = plt.subplots()
-      ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=3) for x in xx]), label='I Spline')
+      ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=4) for x in xx]), label='I Spline')
 
-      print(np.array([ispline(x, iknots, iweights, degree, n_derivatives=1) for x in xx]).sum() * dx)
 
       ax.grid(True)
       ax.legend(loc='best')

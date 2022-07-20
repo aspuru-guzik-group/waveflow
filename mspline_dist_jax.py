@@ -205,7 +205,7 @@ def MSpline_fun():
          return mspline(x, knots_, params, k, zero_border, cached_bases_dict)
 
       apply_fun_vec = jit(vmap(apply_fun, in_axes=(0, 0)))
-      # apply_fun_vec_grad = jit(vmap(grad(apply_fun, argnums=1), in_axes=(0, 0)))
+      apply_fun_vec_grad = jit(vmap(grad(apply_fun, argnums=1), in_axes=(0, 0)))
 
       @partial(jit, static_argnums=(2,))
       def sample_fun(rng_array, params, num_samples):
@@ -234,7 +234,36 @@ def MSpline_fun():
 
       sample_fun_vec = vmap(sample_fun, in_axes=(0, 0, None))
 
-      return initial_params, apply_fun_vec, sample_fun_vec, knots
+      def enforce_boundary_conditions(weights, constraints_dict_left, constraints_dict_right):
+         for p in constraints_dict_left.items():
+            n_derivative, constrain_value = p
+            previous_value_list = [M_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
+                                   range(n_derivative)]
+            value = M_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
+
+            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
+            summed_previous_values = constrain_value - summed_previous_values
+
+            weights = weights.at[n_derivative].set(summed_previous_values / value)
+
+         weights = np.flip(weights)
+         for p in constraints_dict_right.items():
+            n_derivative, constrain_value = p
+            previous_value_list = [M_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
+                                   range(n_derivative)]
+            value = M_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
+
+            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
+            summed_previous_values = constrain_value - summed_previous_values
+
+            weights = weights.at[n_derivative].set(summed_previous_values / value)
+
+         weights = np.flip(weights)
+
+         return weights / weights.sum()
+      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None, None)))
+
+      return initial_params, apply_fun_vec, apply_fun_vec_grad, sample_fun_vec, knots, enforce_boundary_conditions
 
    return init_fun
 
@@ -244,8 +273,7 @@ def MSpline_fun():
 def ISpline_fun():
 
    def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=None,
-                use_cached_bases=True, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000,
-                second_derivative_zero_left=False):
+                use_cached_bases=True, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000):
       if reverse_fun_tol is None:
          reverse_fun_tol = 1/n_mesh_points
       internal_knots = onp.linspace(0, 1, n_internal_knots)
@@ -295,17 +323,6 @@ def ISpline_fun():
       # Convert to from onp array to jax device array
       knots = np.array(knots)
 
-      if not cardinal_splines and second_derivative_zero_left:
-         print('Cant precompile constraint, use enforce_boundary_conditions funciton to dynamically enforce boundary conditions')
-      elif second_derivative_zero_left and zero_border:
-         ddI1 = I_cached(0.0, 0, cached_bases_dict, n_derivative=2)
-         ddI2 = I_cached(0.0, 1, cached_bases_dict, n_derivative=2)
-         multiplier_left = ddI1 / ddI2
-      elif second_derivative_zero_left and not zero_border:
-         ddI1 = I_cached(0.0, 1, cached_bases_dict, n_derivative=2)
-         ddI2 = I_cached(0.0, 2, cached_bases_dict, n_derivative=2)
-         multiplier_left = ddI1 / ddI2
-
 
 
 
@@ -320,6 +337,8 @@ def ISpline_fun():
 
       apply_fun_vec = jit(partial(vmap(apply_fun, in_axes=(0, 0))))
       apply_fun_vec_grad = jit(partial(vmap(grad(apply_fun, argnums=1), in_axes=(0, 0))))
+      # apply_fun_vec_grad = jit(partial(vmap(grad(grad(apply_fun, argnums=1), argnums=1), in_axes=(0, 0))))
+      # apply_fun_vec_grad = jit(partial(vmap(grad(grad(grad(apply_fun, argnums=1), argnums=1), argnums=1), in_axes=(0, 0))))
 
       def reverse_fun(params, y):
          return binary_search(lambda x: apply_fun(params, x) - y, 0.0, 1.0, tol=reverse_fun_tol)
@@ -368,7 +387,7 @@ def test_splines(testcase):
    ### SETUP ###
    #############
    rng = jax.random.PRNGKey(4)
-   k = 4
+   k = 6
    n_points = 5000
    n_internal_knots = 30
    xx = np.linspace(0, 1, n_points)
@@ -378,9 +397,10 @@ def test_splines(testcase):
    #############
    if testcase == 'm':
       init_fun_m = MSpline_fun()
-      params_m, apply_fun_vec_m, sample_fun_vec_m, knots_m = init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, use_cached_bases=True)
+      params_m, apply_fun_vec_m, apply_fun_vec_grad_m, sample_fun_vec_m, knots_m, enforce_boundary_conditions = init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True)
 
       params_m = np.repeat(params_m[:, None], n_points, axis=1).T
+      params_m = enforce_boundary_conditions(params_m, {0: 0, 2: 0, 3: 0}, {0: 0, 2: 0, 3: 0})
       # knots_m = np.repeat(knots_m[:,None], n_points, axis=1).T
       # params_m = (params_m, knots_m)
 
@@ -388,13 +408,13 @@ def test_splines(testcase):
 
 
       rng_array = jax.random.split(rng, n_points)
-      s = sample_fun_vec_m(rng_array, params_m, 20).reshape(-1)[None]
+      # s = sample_fun_vec_m(rng_array, params_m, 20).reshape(-1)[None]
 
 
       fig, ax = plt.subplots()
-      ax.plot(xx, apply_fun_vec_m(params_m, xx), label='M Spline')
+      ax.plot(xx, apply_fun_vec_grad_m(params_m, xx), label='M Spline')
       # ax.plot(xx, onp.gradient(apply_fun_vec_m(params_m, xx), (xx[-1] - xx[0])/n_points, edge_order=2), label='dM/dx Spline nummerical')
-      ax.hist(np.array(s), density=True, bins=100)
+      # ax.hist(np.array(s), density=True, bins=100)
 
 
       ax.grid(True)
@@ -402,37 +422,48 @@ def test_splines(testcase):
       plt.show()
 
 
-      n_knots = len(knots_m)
-      for _ in tqdm.tqdm(range(10000)):
-         params_m = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k - 2,))
-         params_m = np.repeat(params_m[:, None], n_points, axis=1).T
-         rng, split_rng = jax.random.split(rng)
-         xx = jax.random.uniform(rng, shape=(n_points,))
-         apply_fun_vec_m(params_m, xx)
+      # n_knots = len(knots_m)
+      # for _ in tqdm.tqdm(range(10000)):
+      #    params_m = jax.random.uniform(rng, minval=0, maxval=1, shape=(n_knots - k - 2,))
+      #    params_m = np.repeat(params_m[:, None], n_points, axis=1).T
+      #    rng, split_rng = jax.random.split(rng)
+      #    xx = jax.random.uniform(rng, shape=(n_points,))
+      #    apply_fun_vec_m(params_m, xx)
 
    #############
    # I Splines #
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i, cached_bases_dict = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=0.00001, use_cached_bases=True, n_mesh_points=1000)
+      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i, cached_bases_dict = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, reverse_fun_tol=0.00001, use_cached_bases=True, n_mesh_points=1000)
 
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
-      params_i = enforce_boundary_conditions(params_i, cached_bases_dict, {0: 0, 2: 0}, {0: 0, 2: 0})
+      params_i = enforce_boundary_conditions(params_i, cached_bases_dict, {0: 0, 2: 5, 3:0}, {0: 0, 2: 0, 3:0})
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
 
-      apply_fun_vec_i(params_i[1][None], xx[1][None])
+      fig, ax = plt.subplots()
+      ax.plot(xx, apply_fun_vec_grad(params_i, xx), label='I Spline grad')
+      ax.grid(True)
+      ax.legend(loc='best')
+      plt.show()
 
       fig, ax = plt.subplots()
-      ys_reversed = reverse_fun_vec_i(params_i, xx)
-      ax.plot(xx, ys_reversed, label='I Spline Reversed')
-      ys = apply_fun_vec_i(params_i, xx)
-      ax.plot(xx, ys, label='I Spline')
-      x_reconstructed = apply_fun_vec_i(params_i, ys_reversed)
-      ax.plot(xx, x_reconstructed, label='x reconstructed')
+      ax.plot(xx, apply_fun_vec_i(params_i, xx), label='I Spline')
+      ax.grid(True)
+      ax.legend(loc='best')
+      plt.show()
 
-      print(np.abs(xx - x_reconstructed).mean())
+      # fig, ax = plt.subplots()
+      # ys_reversed = reverse_fun_vec_i(params_i, xx)
+      # ax.plot(xx, ys_reversed, label='I Spline Reversed')
+      # ys = apply_fun_vec_i(params_i, xx)
+      # ax.plot(xx, ys, label='I Spline')
+
+      # x_reconstructed = apply_fun_vec_i(params_i, ys_reversed)
+      # ax.plot(xx, x_reconstructed, label='x reconstructed')
+
+      # print(np.abs(xx - x_reconstructed).mean())
       # 5.544081e-06
 
 
@@ -514,6 +545,6 @@ def test_splines(testcase):
 
 
 if __name__ == '__main__':
-   test_splines('i')
+   test_splines('m')
 
 
