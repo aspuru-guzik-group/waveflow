@@ -206,6 +206,7 @@ def MSpline_fun():
 
       apply_fun_vec = jit(vmap(apply_fun, in_axes=(0, 0)))
       apply_fun_vec_grad = jit(vmap(grad(apply_fun, argnums=1), in_axes=(0, 0)))
+      # apply_fun_vec_grad = jit(vmap(grad(grad(grad(apply_fun, argnums=1), argnums=1), argnums=1), in_axes=(0, 0)))
 
       @partial(jit, static_argnums=(2,))
       def sample_fun(rng_array, params, num_samples):
@@ -247,19 +248,19 @@ def MSpline_fun():
 
             weights = weights.at[n_derivative].set(summed_previous_values / value)
 
-         weights = np.flip(weights)
+         # weights = np.flip(weights)
          for p in constraints_dict_right.items():
             n_derivative, constrain_value = p
-            previous_value_list = [M_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
-                                   range(n_derivative)]
-            value = M_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
+            previous_value_list = [M_cached(1.0, len(weights) - j - 1, cached_bases_dict, n_derivative=n_derivative) for
+                                   j in range(n_derivative)]
+            value = M_cached(1.0, len(weights) - n_derivative - 1, cached_bases_dict, n_derivative=n_derivative)
 
-            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
+            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, np.flip(weights))]).sum()
             summed_previous_values = constrain_value - summed_previous_values
 
-            weights = weights.at[n_derivative].set(summed_previous_values / value)
+            weights = weights.at[len(weights) - n_derivative - 1].set(summed_previous_values / value)
 
-         weights = np.flip(weights)
+         # weights = np.flip(weights)
 
          return weights / weights.sum()
       enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None, None)))
@@ -554,6 +555,6 @@ def test_splines(testcase):
 
 
 if __name__ == '__main__':
-   test_splines('i')
+   test_splines('m')
 
 
