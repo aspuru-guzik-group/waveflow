@@ -79,7 +79,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
         params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i, cached_bases_dict = init_fun_i(rng, spline_degree, n_internal_knots,
                                                                                                               use_cached_bases=True,
                                                                                                               cardinal_splines=True,
-                                                                                                              zero_border=True,
+                                                                                                              zero_border=False,
                                                                                                               reverse_fun_tol=reverse_fun_tol)
 
         params, apply_fun = transform(rng, input_dim, params_i.shape[0])
@@ -98,7 +98,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
 
             # bijection_params = bijection_params.at[:, :, 2].set( bijection_params[:, :, 1] )
             bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
-            # bijection_params = enforce_boundary_conditions(bijection_params.reshape(-1, bijection_params.shape[-1]), cached_bases_dict, {0: 0, 2:0}, {0: 0}).reshape(bijection_params.shape[0], bijection_params.shape[1], bijection_params.shape[2])
+            bijection_params = enforce_boundary_conditions(bijection_params.reshape(-1, bijection_params.shape[-1]), cached_bases_dict, {0: 0, 2:0}, {0: 0}).reshape(bijection_params.shape[0], bijection_params.shape[1], bijection_params.shape[2])
 
             bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
             outputs = apply_fun_vec_i(bijection_params, inputs.reshape(-1)).reshape(-1, input_dim)

@@ -14,7 +14,7 @@ import numpy as onp
 from mspline_dist import M as M_onp
 from mspline_dist import I as I_onp
 from scipy.misc import derivative
-# config.update('jax_disable_jit', True)
+config.update('jax_disable_jit', True)
 
 
 #@partial(jit, static_argnums=(1,2,4))
@@ -235,6 +235,7 @@ def MSpline_fun():
       sample_fun_vec = vmap(sample_fun, in_axes=(0, 0, None))
 
       def enforce_boundary_conditions(weights, constraints_dict_left, constraints_dict_right):
+         # Currently can only set things to 0, work on normalization scheme for other values
          for p in constraints_dict_left.items():
             n_derivative, constrain_value = p
             previous_value_list = [M_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
@@ -345,41 +346,49 @@ def ISpline_fun():
 
       reverse_fun_vec = jit(partial(vmap(reverse_fun, in_axes=(0, 0))))
 
+      def enforce_boundary_conditions(weights, constraints_dict_left, constraints_dict_right):
+         # Currently can only set things to 0, work on normalization scheme for other values
+         for p in constraints_dict_left.items():
+            n_derivative, constrain_value = p
+            previous_value_list = [I_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
+                                   range(n_derivative)]
+            value = I_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
 
-      return initial_params, apply_fun_vec, apply_fun_vec_grad, reverse_fun_vec, knots, cached_bases_dict
+            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
+            summed_previous_values = constrain_value - summed_previous_values
+
+            weights = weights.at[n_derivative].set(summed_previous_values / value)
+
+         # weights = np.flip(weights)
+         for p in constraints_dict_right.items():
+            n_derivative, constrain_value = p
+            if n_derivative == 0:
+               if constrain_value == 1:
+                  weights = weights.at[len(weights) - n_derivative - 1].set(0.0)
+               else:
+                  print("Only constraint value of 1.0 is supported. Exiting... ")
+                  exit()
+            else:
+               previous_value_list = [I_cached(1.0, len(weights) -j - 1 , cached_bases_dict, n_derivative=n_derivative) for j in
+                                      range(n_derivative)]
+               value = I_cached(1.0, len(weights) - n_derivative - 1, cached_bases_dict, n_derivative=n_derivative)
+
+               summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, np.flip(weights))]).sum()
+               summed_previous_values = constrain_value - summed_previous_values
+
+               weights = weights.at[len(weights) - n_derivative - 1].set(summed_previous_values / value)
+
+         # weights = np.flip(weights)
+
+         return weights / weights.sum()
+
+      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None, None)))
+
+
+      return initial_params, apply_fun_vec, apply_fun_vec_grad, reverse_fun_vec, knots, enforce_boundary_conditions
 
    return init_fun
 
-
-def enforce_boundary_conditions(weights, cached_bases_dict, constraints_dict_left, constraints_dict_right):
-   # Currently can only enforce two boundary conditions
-   for p in constraints_dict_left.items():
-      n_derivative, constrain_value = p
-      previous_value_list = [I_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
-                             range(n_derivative)]
-      value = I_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
-
-      summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
-      summed_previous_values = constrain_value - summed_previous_values
-
-      weights = weights.at[n_derivative].set(summed_previous_values / value)
-
-   weights = np.flip(weights)
-   for p in constraints_dict_right.items():
-      n_derivative, constrain_value = p
-      previous_value_list = [I_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
-                             range(n_derivative)]
-      value = I_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
-
-      summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
-      summed_previous_values = constrain_value - summed_previous_values
-
-      weights = weights.at[n_derivative].set(summed_previous_values / value)
-
-   weights = np.flip(weights)
-
-   return weights / weights.sum()
-enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None, None, None)))
 
 # @profile
 def test_splines(testcase):
@@ -397,10 +406,10 @@ def test_splines(testcase):
    #############
    if testcase == 'm':
       init_fun_m = MSpline_fun()
-      params_m, apply_fun_vec_m, apply_fun_vec_grad_m, sample_fun_vec_m, knots_m, enforce_boundary_conditions = init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True)
+      params_m, apply_fun_vec_m, apply_fun_vec_grad_m, sample_fun_vec_m, knots_m, enforce_boundary_conditions_m = init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True)
 
       params_m = np.repeat(params_m[:, None], n_points, axis=1).T
-      params_m = enforce_boundary_conditions(params_m, {0: 0, 2: 0, 3: 0}, {0: 0, 2: 0, 3: 0})
+      params_m = enforce_boundary_conditions_m(params_m, {0: 0, 2: 0, 3: 0}, {0: 0, 2: 0, 3: 0})
       # knots_m = np.repeat(knots_m[:,None], n_points, axis=1).T
       # params_m = (params_m, knots_m)
 
@@ -435,10 +444,10 @@ def test_splines(testcase):
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i, cached_bases_dict = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, reverse_fun_tol=0.00001, use_cached_bases=True, n_mesh_points=1000)
+      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i, enforce_boundary_conditions_i = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, reverse_fun_tol=0.00001, use_cached_bases=True, n_mesh_points=1000)
 
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
-      params_i = enforce_boundary_conditions(params_i, cached_bases_dict, {0: 0, 2: 5, 3:0}, {0: 0, 2: 0, 3:0})
+      params_i = enforce_boundary_conditions_i(params_i, {0: 0.0, 2: 0, 3: 0}, {0: 1, 1: 0.0, 3:0})
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
 
@@ -545,6 +554,6 @@ def test_splines(testcase):
 
 
 if __name__ == '__main__':
-   test_splines('m')
+   test_splines('i')
 
 
