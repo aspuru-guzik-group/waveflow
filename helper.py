@@ -265,6 +265,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
     else:
         plt.savefig('{}/pdf_grid.png'.format(root_save_path_per_epoch))
         plt.clf()
+    print(pdf_grid.sum()*dx)
 
 
     model_samples = sample(split_rng, params, num_samples=n_model_sample)

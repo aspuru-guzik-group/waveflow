@@ -14,7 +14,7 @@ import numpy as onp
 from mspline_dist import M as M_onp
 from mspline_dist import I as I_onp
 from scipy.misc import derivative
-config.update('jax_disable_jit', True)
+# config.update('jax_disable_jit', True)
 
 
 #@partial(jit, static_argnums=(1,2,4))
@@ -150,7 +150,9 @@ def ispline(x, t, c, k, zero_border=True, cached_bases_dict=None):
 
 def MSpline_fun():
 
-   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, use_cached_bases=True, cached_bases_path_root='./cached_bases/M/', n_mesh_points=1000):
+   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True,
+                cached_bases_path_root='./cached_bases/M/', n_mesh_points=1000,
+                constraints_dict_left={0: 0}, constraints_dict_right={0:0}):
       internal_knots = onp.linspace(0, 1, n_internal_knots)
       internal_knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[0]) * k).clip(min=1))
       knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[-1]) * k).clip(min=1))
@@ -235,7 +237,7 @@ def MSpline_fun():
 
       sample_fun_vec = vmap(sample_fun, in_axes=(0, 0, None))
 
-      def enforce_boundary_conditions(weights, constraints_dict_left, constraints_dict_right):
+      def enforce_boundary_conditions(weights):
          # Currently can only set things to 0, work on normalization scheme for other values
          for p in constraints_dict_left.items():
             n_derivative, constrain_value = p
@@ -263,7 +265,7 @@ def MSpline_fun():
          # weights = np.flip(weights)
 
          return weights / weights.sum()
-      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None, None)))
+      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0)))
 
       return initial_params, apply_fun_vec, apply_fun_vec_grad, sample_fun_vec, knots, enforce_boundary_conditions
 
@@ -275,7 +277,8 @@ def MSpline_fun():
 def ISpline_fun():
 
    def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=None,
-                use_cached_bases=True, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000):
+                use_cached_bases=True, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000,
+                constraints_dict_left={0: 0}, constraints_dict_right={0: 1}):
       if reverse_fun_tol is None:
          reverse_fun_tol = 1/n_mesh_points
       internal_knots = onp.linspace(0, 1, n_internal_knots)
@@ -326,8 +329,6 @@ def ISpline_fun():
       knots = np.array(knots)
 
 
-
-
       def apply_fun(params, x):
          if not cardinal_splines:
             knots_ = params[1]
@@ -347,7 +348,7 @@ def ISpline_fun():
 
       reverse_fun_vec = jit(partial(vmap(reverse_fun, in_axes=(0, 0))))
 
-      def enforce_boundary_conditions(weights, constraints_dict_left, constraints_dict_right):
+      def enforce_boundary_conditions(weights):
          # Currently can only set things to 0, work on normalization scheme for other values
          for p in constraints_dict_left.items():
             n_derivative, constrain_value = p
@@ -383,7 +384,7 @@ def ISpline_fun():
 
          return weights / weights.sum()
 
-      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None, None)))
+      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0)))
 
 
       return initial_params, apply_fun_vec, apply_fun_vec_grad, reverse_fun_vec, knots, enforce_boundary_conditions

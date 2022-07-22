@@ -259,7 +259,7 @@ if __name__ == '__main__':
                 train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=True)
     else:
         dataset = dataset_list[1]
-        model_type = model_type_list[2]
+        model_type = model_type_list[6]
         X = get_dataset(dataset, n_samples, length, margin, do_plot=False)
         init_fun = get_model(model_type)
         params, log_pdf, sample = init_fun(flow_rng, input_dim)
