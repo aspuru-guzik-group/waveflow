@@ -124,8 +124,8 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 # @profile
 def test_splines(test_case):
 
-   degree = 4
-   internal_knots = np.linspace(0, 1, 15)
+   degree = 5
+   internal_knots = np.linspace(0, 1, 13)
    # internal_knots = np.random.uniform(0,1, 9)
    # internal_knots[0] = 0
    # internal_knots = np.cumsum(internal_knots)
@@ -153,35 +153,49 @@ def test_splines(test_case):
 
 
    if test_case == 'm':
-      # for i in range(len(mweights)):
-      #    fig, ax = plt.subplots()
-      #    ys = np.array([M(x, degree, i, mknots, degree, n_derivatives=0) for x in xx])
-      #    dys = np.array([M(x, degree, i, mknots, degree, n_derivatives=2) for x in xx])
-      #    # ddys = np.array([M(x, degree, i, mknots, degree, n_derivatives=2) for x in xx])
-      #
-      #    dyn = np.gradient(ys, dx, edge_order=2)
-      #    # ddyn = np.gradient(dys, dx, edge_order=2)
-      #    # ax.plot(xx, ys, label='M {}'.format(i), ls='-')
-      #    ax.plot(xx, dys, label='dM {}/dx analytical'.format(i), ls='-')
-      #    # ax.plot(xx, dyn, label='dM {}/dx nummerical'.format(i), ls='--')
-      #
-      #    # ax.plot(xx, ddys, label='ddM {}/dx analytical'.format(i), ls='-.')
-      #    # ax.plot(xx, ddyn, label='ddM {}/dx nummerical'.format(i), ls='--')
-      #
-      #    ax.grid(True)
-      #    ax.legend(loc='best')
-      #    plt.show()
+      max_values = []
+      for i in range(len(mweights)):
+         # fig, ax = plt.subplots()
+         ys = np.array([M(x, degree, i, mknots, degree, n_derivatives=0) for x in xx])
+         max_values.append(np.max(ys))
+         dys = np.array([M(x, degree, i, mknots, degree, n_derivatives=1) for x in xx])
+         # ddys = np.array([M(x, degree, i, mknots, degree, n_derivatives=2) for x in xx])
 
+         dyn = np.gradient(ys, dx, edge_order=2)
+         # ddyn = np.gradient(dys, dx, edge_order=2)
+         # ax.plot(xx, ys, label='M {}'.format(i), ls='-')
+         # ax.plot(xx, dys, label='dM {}/dx analytical'.format(i), ls='-')
+         # ax.plot(xx, dyn, label='dM {}/dx nummerical'.format(i), ls='--')
 
+         # ax.plot(xx, ddys, label='ddM {}/dx analytical'.format(i), ls='-.')
+         # ax.plot(xx, ddyn, label='ddM {}/dx nummerical'.format(i), ls='--')
+
+         # ax.grid(True)
+         # ax.legend(loc='best')
+         # plt.show()
+
+      max_values = np.array(max_values)
+      max_values = max_values / max_values.min()
+      mweights = np.ones_like(mweights) #/ max_values
+      mweights[0] = 1/degree
+      mweights[-1] = 1/degree
+      mweights[1] = 2 / degree
+      mweights[-2] = 2 / degree
+      mweights[2] = 3 / degree
+      mweights[-3] = 3 / degree
+      mweights[3] = 4 / degree
+      mweights[-4] = 4 / degree
+      mweights = mweights / mweights.sum()
 
       #Setting 2nd derivative 0 but 1st derivative flexible
-      dM1 = np.abs(M(0.0, degree, 1, mknots, degree, n_derivatives=2))
-      dM2 = np.abs(M(0.0, degree, 2, mknots, degree, n_derivatives=2))
-      mweights[2] = mweights[1] / dM2 * dM1
-      mweights[4:4+degree-1] = 0
-      mweights = mweights / mweights.sum()
+      # dM1 = np.abs(M(0.0, degree, 1, mknots, degree, n_derivatives=2))
+      # dM2 = np.abs(M(0.0, degree, 2, mknots, degree, n_derivatives=2))
+      # mweights[2] = mweights[1] / dM2 * dM1
+      # mweights[4:4+degree-1] = 0
+      # mweights = mweights / mweights.sum()
       fig, ax = plt.subplots()
-      ax.plot(xx, np.array([mspline(x, mknots, mweights, degree, n_derivatives=0) for x in xx]), label='M Spline')
+      ys = np.array([mspline(x, mknots, mweights, degree, n_derivatives=0) for x in xx])
+      ax.plot(xx, ys, label='M Spline')
       ax.grid(True)
       ax.legend(loc='best')
       plt.show()
@@ -319,7 +333,7 @@ def test_splines(test_case):
 
 
 if __name__ == '__main__':
-   test_splines('i')
+   test_splines('m')
 
 
 

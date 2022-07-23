@@ -6,8 +6,9 @@ import flows
 from helper import check_sample_quality
 from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
-from physics import laplacian
+from physics import laplacian, laplacian_numerical
 import jax
+from functools import partial
 
 from jax.config import config
 # config.update("jax_debug_nans", True)
@@ -49,12 +50,12 @@ def get_model():
 
 
     init_fun = flows.MFlow(
-                flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15,
+                flows.Serial(*(flows.IMADE(masked_transform, spline_degree=4, n_internal_knots=15,
                                            spline_regularization=0.0, reverse_fun_tol=0.000001,
                                            constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0: 1}), flows.Reverse()) * 1),
                 masked_transform,
-                spline_degree=3, n_internal_knots=15,
-                constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={}
+                spline_degree=4, n_internal_knots=15,
+                constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0: 0}
             )
 
     return init_fun
@@ -74,7 +75,7 @@ params, log_pdf, sample = init_fun(flow_rng, input_dim)
 
 left_grid = 0.0
 right_grid = 1.0
-n_grid_points = 300
+n_grid_points = 500
 dx = ((right_grid - left_grid) / n_grid_points) ** 2
 x = np.linspace(left_grid, right_grid, n_grid_points)
 y = np.linspace(left_grid, right_grid, n_grid_points)
@@ -96,7 +97,30 @@ def vh(fn):
 pdf = lambda params, x: np.exp(log_pdf(params, x))
 pdf_l = laplacian(pdf)
 pdf_h = vh(pdf)
-print(pdf_h(params, grid_boundary[:10]).shape)
-print(pdf_l(params, grid_boundary[:10]).shape)
+# print(pdf_h(params, grid_boundary[:10]).shape)
+# print(pdf_l(params, grid_boundary[:10]).shape)
+# print(pdf_ln(params, grid_boundary[:10]).shape)
 
+# print(pdf_h(params, grid_boundary[:3]))
+# print(pdf_l(params, grid_boundary[:3]))
+# print(pdf_ln(params, grid_boundary[:3]))
 
+# pdf_j = jax.vmap(jax.grad(pdf, argnums=1), in_axes=(None, 0))
+pdf_j = lambda x: grad(lambda x: pdf(params, x).sum(-1))(x).sum(-1)
+
+grid_crosssection = grid[:, 150]
+ys = pdf(params, grid_crosssection)
+dys_n = np.gradient(ys, 1 / n_grid_points)
+dys_a = pdf_j(grid_crosssection)
+# plt.plot(ys)
+plt.plot(dys_n, label='Derivative nummerical')
+plt.plot(dys_a, label='Derivative analitically')
+plt.legend()
+plt.show()
+
+ddys_n = np.gradient(np.gradient(ys, 1 / n_grid_points), 1 / n_grid_points)
+ddys_a = pdf_l(params, grid_crosssection)[:, 0]
+plt.plot(ddys_n, label='Second derivative nummerically')
+plt.plot(ddys_a, label='Second derivative analitlically')
+plt.legend()
+plt.show()
