@@ -11,6 +11,7 @@ import jax
 from functools import partial
 
 from jax.config import config
+# config.update('jax_disable_jit', True)
 # config.update("jax_debug_nans", True)
 
 
@@ -50,11 +51,11 @@ def get_model():
 
 
     init_fun = flows.MFlow(
-                flows.Serial(*(flows.IMADE(masked_transform, spline_degree=4, n_internal_knots=15,
+                flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=15,
                                            spline_regularization=0.0, reverse_fun_tol=0.000001,
                                            constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0: 1}), flows.Reverse()) * 1),
                 masked_transform,
-                spline_degree=4, n_internal_knots=15,
+                spline_degree=5, n_internal_knots=15,
                 constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0: 0}
             )
 
@@ -75,7 +76,7 @@ params, log_pdf, sample = init_fun(flow_rng, input_dim)
 
 left_grid = 0.0
 right_grid = 1.0
-n_grid_points = 500
+n_grid_points = 2500
 dx = ((right_grid - left_grid) / n_grid_points) ** 2
 x = np.linspace(left_grid, right_grid, n_grid_points)
 y = np.linspace(left_grid, right_grid, n_grid_points)
@@ -96,31 +97,35 @@ def vh(fn):
 
 pdf = lambda params, x: np.exp(log_pdf(params, x))
 pdf_l = laplacian(pdf)
-pdf_h = vh(pdf)
-# print(pdf_h(params, grid_boundary[:10]).shape)
-# print(pdf_l(params, grid_boundary[:10]).shape)
-# print(pdf_ln(params, grid_boundary[:10]).shape)
-
-# print(pdf_h(params, grid_boundary[:3]))
-# print(pdf_l(params, grid_boundary[:3]))
-# print(pdf_ln(params, grid_boundary[:3]))
-
-# pdf_j = jax.vmap(jax.grad(pdf, argnums=1), in_axes=(None, 0))
 pdf_j = lambda x: grad(lambda x: pdf(params, x).sum(-1))(x).sum(-1)
+pdf_h = vh(pdf)
+
+grid_sample = np.concatenate([grid_boundary[100:100+3], grid_boundary[-(100+3):-100]], axis=0)
+# print(grid_sample)
+# print(pdf(params, grid_sample))
+# print(pdf_j(grid_sample))
+# print(pdf_l(params, grid_sample))
+# exit()
 
 grid_crosssection = grid[:, 150]
 ys = pdf(params, grid_crosssection)
+
+plt.plot(grid_crosssection[:,1], ys, label='Waveflow')
+plt.legend()
+plt.show()
+
 dys_n = np.gradient(ys, 1 / n_grid_points)
 dys_a = pdf_j(grid_crosssection)
 # plt.plot(ys)
-plt.plot(dys_n, label='Derivative nummerical')
-plt.plot(dys_a, label='Derivative analitically')
+plt.plot(grid_crosssection[:,1], dys_n, label='Derivative nummerical')
+plt.plot(grid_crosssection[:,1], dys_a, label='Derivative analitically')
 plt.legend()
 plt.show()
 
 ddys_n = np.gradient(np.gradient(ys, 1 / n_grid_points), 1 / n_grid_points)
 ddys_a = pdf_l(params, grid_crosssection)[:, 0]
-plt.plot(ddys_n, label='Second derivative nummerically')
-plt.plot(ddys_a, label='Second derivative analitlically')
+plt.plot(grid_crosssection[:,1], ddys_n, label='Second derivative nummerically')
+plt.plot(grid_crosssection[:,1], ddys_a, label='Second derivative analitlically')
+plt.xlim([0, 1])
 plt.legend()
 plt.show()

@@ -267,7 +267,15 @@ def MSpline_fun():
          return weights / weights.sum()
       enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0)))
 
-      return initial_params, apply_fun_vec, apply_fun_vec_grad, sample_fun_vec, knots, enforce_boundary_conditions
+      def remove_bias(params):
+         for i in range(k):
+            params = params.at[i].set(params[i] * (i + 1) / k)
+            params = params.at[-(i + 1)].set(params[-(i + 1)] * (i + 1) / k)
+         return params / params.sum()
+
+      remove_bias = jit(vmap(remove_bias, in_axes=(0)))
+
+      return initial_params, apply_fun_vec, apply_fun_vec_grad, sample_fun_vec, knots, enforce_boundary_conditions, remove_bias
 
    return init_fun
 
@@ -386,8 +394,16 @@ def ISpline_fun():
 
       enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0)))
 
+      def remove_bias(params):
+         for i in range(k):
+            params = params.at[i+1].set(params[i+1] * (i + 1) / k)
+            params = params.at[-(i + 2)].set(params[-(i + 2)] * (i + 1) / k )
+         return params / params.sum()
 
-      return initial_params, apply_fun_vec, apply_fun_vec_grad, reverse_fun_vec, knots, enforce_boundary_conditions
+      remove_bias = jit(vmap(remove_bias, in_axes=(0)))
+
+
+      return initial_params, apply_fun_vec, apply_fun_vec_grad, reverse_fun_vec, knots, enforce_boundary_conditions, remove_bias
 
    return init_fun
 
@@ -398,9 +414,9 @@ def test_splines(testcase):
    ### SETUP ###
    #############
    rng = jax.random.PRNGKey(4)
-   k = 6
+   k = 5
    n_points = 5000
-   n_internal_knots = 30
+   n_internal_knots = 13
    xx = np.linspace(0, 1, n_points)
 
    #############
@@ -408,10 +424,15 @@ def test_splines(testcase):
    #############
    if testcase == 'm':
       init_fun_m = MSpline_fun()
-      params_m, apply_fun_vec_m, apply_fun_vec_grad_m, sample_fun_vec_m, knots_m, enforce_boundary_conditions_m = init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True)
+      params_m, apply_fun_vec_m, apply_fun_vec_grad_m, sample_fun_vec_m, knots_m, enforce_boundary_conditions_m, remove_bias = \
+         init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True,
+                    constraints_dict_left={0: 0, 2: 0, 3: 0}, constraints_dict_right={0: 0, 2: 0, 3: 0})
 
+      params_m = np.ones_like(params_m)
       params_m = np.repeat(params_m[:, None], n_points, axis=1).T
-      params_m = enforce_boundary_conditions_m(params_m, {0: 0, 2: 0, 3: 0}, {0: 0, 2: 0, 3: 0})
+
+      params_m = remove_bias(params_m)
+      # params_m = enforce_boundary_conditions_m(params_m)
       # knots_m = np.repeat(knots_m[:,None], n_points, axis=1).T
       # params_m = (params_m, knots_m)
 
@@ -423,7 +444,8 @@ def test_splines(testcase):
 
 
       fig, ax = plt.subplots()
-      ax.plot(xx, apply_fun_vec_grad_m(params_m, xx), label='M Spline')
+      ax.plot(xx, apply_fun_vec_m(params_m, xx), label='M Spline')
+      ax.set_ylim(0, 2)
       # ax.plot(xx, onp.gradient(apply_fun_vec_m(params_m, xx), (xx[-1] - xx[0])/n_points, edge_order=2), label='dM/dx Spline nummerical')
       # ax.hist(np.array(s), density=True, bins=100)
 
@@ -446,10 +468,18 @@ def test_splines(testcase):
    #############
    if testcase == 'i':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i, enforce_boundary_conditions_i = init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, reverse_fun_tol=0.00001, use_cached_bases=True, n_mesh_points=1000)
+      params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i, enforce_boundary_conditions_i, remove_bias = \
+         init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, reverse_fun_tol=0.00001,
+                    use_cached_bases=True, n_mesh_points=1000, constraints_dict_left={0: 0.0, 2: 0, 3: 0}, constraints_dict_right={0: 1, 1: 0.0, 3: 0})
 
+      params_i = np.ones_like(params_i)
+      # params_i = params_i.at[0].set(0)
+      # params_i = params_i.at[-1].set(0)
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
-      params_i = enforce_boundary_conditions_i(params_i, {0: 0.0, 2: 0, 3: 0}, {0: 1, 1: 0.0, 3:0})
+      params_i = remove_bias(params_i)
+
+      # params_i = np.repeat(params_i[:, None], n_points, axis=1).T
+      params_i = enforce_boundary_conditions_i(params_i)
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
 
@@ -497,7 +527,7 @@ def test_splines(testcase):
 
    if testcase == 't':
       init_fun_i = ISpline_fun()
-      params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i = init_fun_i(rng, k, n_internal_knots,
+      params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i, enforce_boundary_conditions, remove_bias = init_fun_i(rng, k, n_internal_knots,
                                                                                              cardinal_splines=True,
                                                                                              zero_border=True,
                                                                                              reverse_fun_tol=0.1,
@@ -556,6 +586,6 @@ def test_splines(testcase):
 
 
 if __name__ == '__main__':
-   test_splines('m')
+   test_splines('i')
 
 

@@ -219,19 +219,19 @@ def test_splines(test_case):
 
       # I(xx[-1], degree, len(iweights)-2, iknots, degree + 1, n_derivatives=1)
 
-      for i in range(len(iweights)):
-
-         fig, ax = plt.subplots()
-         # ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]))
-
-         # ax.plot(xx, np.gradient(np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=0) for x in xx]), dx, edge_order=2),
-         #         linewidth=6, label='dI/dx nummerical {}'.format(i))
-         ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=2) for x in xx]),
-                 label='dI/dx analytical {}'.format(i))
-
-         ax.grid(True)
-         ax.legend(loc='best')
-         plt.show()
+      # for i in range(len(iweights)):
+      #
+      #    fig, ax = plt.subplots()
+      #    # ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]))
+      #
+      #    # ax.plot(xx, np.gradient(np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=0) for x in xx]), dx, edge_order=2),
+      #    #         linewidth=6, label='dI/dx nummerical {}'.format(i))
+      #    ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=2) for x in xx]),
+      #            label='dI/dx analytical {}'.format(i))
+      #
+      #    ax.grid(True)
+      #    ax.legend(loc='best')
+      #    plt.show()
 
       # print('ddI_1 ', I(0, degree, 1, iknots, degree + 1, n_derivatives=2))
       # print('ddI_2 ', I(0, degree, 2, iknots, degree + 1, n_derivatives=2))
@@ -244,18 +244,27 @@ def test_splines(test_case):
       # print(third_derivative_constraint)
 
       # Setting second derivative to 0
-      # iweights[2] = iweights[1] * second_derivative_constraint
-      # iweights[3] = iweights[1] * third_derivative_constraint
-      # iweights[4] = iweights[1] * 4
-      # iweights = iweights / iweights.sum()
-      #
-      # fig, ax = plt.subplots()
-      # ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=4) for x in xx]), label='I Spline')
-      #
-      #
-      # ax.grid(True)
-      # ax.legend(loc='best')
-      # plt.show()
+      iweights = np.ones_like(iweights)
+      iweights[0], iweights[-1] = 0, 0
+      iweights[1] = iweights[1] * 1 / degree
+      iweights[-2] = iweights[-2] * 1 / degree
+      iweights[2] = iweights[2] * 2 / degree
+      iweights[-3] = iweights[-3] * 2 / degree
+      iweights[3] = iweights[3] * 3 / degree
+      iweights[-4] = iweights[-4] * 3 / degree
+      iweights[4] = iweights[4] * 4 / degree
+      iweights[-5] = iweights[-5] * 4 / degree
+      # iweights[1] = iweights[1] * 1 / degree
+      iweights = iweights / iweights.sum()
+      print(iweights)
+      print(len(iweights))
+
+      fig, ax = plt.subplots()
+      ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=0) for x in xx]), label='I Spline')
+
+      ax.grid(True)
+      ax.legend(loc='best')
+      plt.show()
 
    elif test_case == 't':
       def uniform_pdf(x):
@@ -333,7 +342,7 @@ def test_splines(test_case):
 
 
 if __name__ == '__main__':
-   test_splines('m')
+   test_splines('i')
 
 
 

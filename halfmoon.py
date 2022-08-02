@@ -84,7 +84,7 @@ def get_dataset(dataset, n_samples, length, margin, do_plot=False):
 
 
 
-def get_model(model_type):
+def get_model(model_type, spline_reg):
     def get_masks(input_dim, hidden_dim=64, num_hidden=1):
         masks = []
         input_degrees = np.arange(input_dim)
@@ -124,41 +124,15 @@ def get_model(model_type):
             flows.Normal(-0.5),
         )
 
-    elif model_type == 'IFlow_0':
+    elif model_type == 'IFlow':
         init_fun = flows.Flow(
-            flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15, spline_regularization=0.0, reverse_fun_tol=0.000001), flows.Reverse()) * 2),
+            flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15, spline_regularization=spline_reg, reverse_fun_tol=0.000001), flows.Reverse()) * 2),
             flows.Uniform(), prior_support=(0.0, 1.0)
         )
 
-    elif model_type == 'IFlow_01':
-        init_fun = flows.Flow(
-            flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15, spline_regularization=0.1, reverse_fun_tol=0.000001), flows.Reverse()) * 2),
-            flows.Uniform(), prior_support=(0.0, 1.0)
-        )
-
-    elif model_type == 'IFlow_1':
-        init_fun = flows.Flow(
-            flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15, spline_regularization=1.0, reverse_fun_tol=0.000001), flows.Reverse()) * 2),
-            flows.Uniform(), prior_support=(0.0, 1.0)
-        )
-
-    elif model_type == 'MFlow_0':
+    elif model_type == 'MFlow':
         init_fun = flows.MFlow(
-            flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15, spline_regularization=0.0, reverse_fun_tol=0.000001), flows.Reverse()) * 1),
-            masked_transform,
-            spline_degree=3, n_internal_knots=15
-        )
-
-    elif model_type == 'MFlow_01':
-        init_fun = flows.MFlow(
-            flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15, spline_regularization=0.1, reverse_fun_tol=0.000001), flows.Reverse()) * 1),
-            masked_transform,
-            spline_degree=3, n_internal_knots=15
-        )
-
-    elif model_type == 'MFlow_1':
-        init_fun = flows.MFlow(
-            flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15, spline_regularization=1.0, reverse_fun_tol=0.000001), flows.Reverse()) * 1),
+            flows.Serial(*(flows.IMADE(masked_transform, spline_degree=3, n_internal_knots=15, spline_regularization=spline_reg, reverse_fun_tol=0.000001), flows.Reverse()) * 1),
             masked_transform,
             spline_degree=3, n_internal_knots=15
         )
@@ -191,7 +165,7 @@ def loss(params, inputs):
 
 
 
-def train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=False):
+def train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=False, model_type=None):
     def step(i, opt_state, inputs):
         params = get_params(opt_state)
         loss_val = loss(params, inputs)
@@ -240,7 +214,8 @@ if __name__ == '__main__':
     n_model_sample = 20000
 
     dataset_list = ['gaussian_mixtures', 'halfmoon', 'circles']
-    model_type_list = ['Flow', 'IFlow_0', 'IFlow_01', 'IFlow_1', 'MFlow_0', 'MFlow_01', 'MFlow_1']
+    model_type_list = ['Flow', 'IFlow', 'MFlow']
+    spline_reg_list = [0, 0.1, 1]
 
     run_all = False
     if run_all:
@@ -248,24 +223,26 @@ if __name__ == '__main__':
             X = get_dataset(dataset, n_samples, length, margin, do_plot=False)
 
             for model_type in model_type_list:
-                init_fun = get_model(model_type)
-                params, log_pdf, sample = init_fun(flow_rng, input_dim)
-                log_pdf = jit(log_pdf)
-                sample = jit(sample, static_argnums=(2,))
+                for spline_reg in spline_reg_list:
+                    init_fun = get_model(model_type, spline_reg)
+                    params, log_pdf, sample = init_fun(flow_rng, input_dim)
+                    log_pdf = jit(log_pdf)
+                    sample = jit(sample, static_argnums=(2,))
 
-                opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
-                opt_state = opt_init(params)
+                    opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
+                    opt_state = opt_init(params)
 
-                train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=True)
+                    train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=True, model_type='{}_{}'.format(model_type, spline_reg))
     else:
         dataset = dataset_list[1]
-        model_type = model_type_list[6]
+        model_type = model_type_list[5]
+        spline_reg = 0.1
         X = get_dataset(dataset, n_samples, length, margin, do_plot=False)
-        init_fun = get_model(model_type)
+        init_fun = get_model(model_type, spline_reg)
         params, log_pdf, sample = init_fun(flow_rng, input_dim)
 
 
         opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
         opt_state = opt_init(params)
 
-        train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=False)
+        train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=False, model_type='{}_{}'.format(model_type, spline_reg))

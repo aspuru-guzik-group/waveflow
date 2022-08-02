@@ -77,7 +77,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
 
     def init_fun(rng, input_dim, **kwargs):
         init_fun_i = ISpline_fun()
-        params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i, enforce_boundary_conditions = init_fun_i(rng, spline_degree, n_internal_knots,
+        params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i, enforce_boundary_conditions, remove_bias = init_fun_i(rng, spline_degree, n_internal_knots,
                                                                                                               use_cached_bases=True,
                                                                                                               cardinal_splines=True,
                                                                                                               zero_border=False,
@@ -95,11 +95,13 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
             bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
             bijection_params = softmax(bijection_params, axis=-1)
 
-            bijection_params = bijection_params.at[:, :, 1].set( (bijection_params[:, :, 1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
-            bijection_params = bijection_params.at[:, :, -2].set( (bijection_params[:, :, -2] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
-            bijection_params = bijection_params.at[:, :, 2:-2].set(bijection_params[:, :, 2:-2] + (spline_regularization / bijection_params.shape[-1]))
+            # bijection_params = bijection_params.at[:, :, 1].set( (bijection_params[:, :, 1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
+            # bijection_params = bijection_params.at[:, :, -2].set( (bijection_params[:, :, -2] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
+            # bijection_params = bijection_params.at[:, :, 2:-2].set(bijection_params[:, :, 2:-2] + (spline_regularization / bijection_params.shape[-1]))
+            bijection_params = bijection_params + spline_regularization
+            bijection_params = remove_bias(bijection_params.reshape(-1, bijection_params.shape[-1])).reshape(bijection_params.shape[0],
+                                                                                                 bijection_params.shape[1], bijection_params.shape[2])
 
-            # bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
             bijection_params = enforce_boundary_conditions(bijection_params.reshape(-1, bijection_params.shape[-1])).reshape(bijection_params.shape[0], bijection_params.shape[1], bijection_params.shape[2])
 
             bijection_params = bijection_params.reshape(-1, bijection_params.shape[-1])
@@ -107,7 +109,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
 
 
             bijection_derivative = apply_fun_vec_grad_i(bijection_params, inputs.reshape(-1)).reshape(-1, input_dim)
-            log_det_jacobian = np.log(bijection_derivative + 1e-12).sum(-1)
+            log_det_jacobian = np.log(bijection_derivative + 1e-7).sum(-1)
 
             return outputs, log_det_jacobian
 
@@ -121,12 +123,14 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
                 bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
                 bijection_params = softmax(bijection_params, axis=-1)
 
-                bijection_params = bijection_params.at[:, :, 1].set((bijection_params[:, :, 1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree)
-                bijection_params = bijection_params.at[:, :, -2].set((bijection_params[:, :, -2] + (spline_regularization / bijection_params.shape[-1])) / spline_degree)
-                bijection_params = bijection_params.at[:, :, 2:-2].set(bijection_params[:, :, 2:-2] + (spline_regularization / bijection_params.shape[-1]))
-                bijection_params = enforce_boundary_conditions(bijection_params.reshape(-1, bijection_params.shape[-1])).reshape(bijection_params.shape[0], bijection_params.shape[1], bijection_params.shape[2])
+                # bijection_params = bijection_params.at[:, :, 1].set((bijection_params[:, :, 1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree)
+                # bijection_params = bijection_params.at[:, :, -2].set((bijection_params[:, :, -2] + (spline_regularization / bijection_params.shape[-1])) / spline_degree)
+                # bijection_params = bijection_params.at[:, :, 2:-2].set(bijection_params[:, :, 2:-2] + (spline_regularization / bijection_params.shape[-1]))
+                bijection_params = bijection_params + spline_regularization
+                bijection_params = remove_bias(bijection_params.reshape(-1, bijection_params.shape[-1])).reshape(bijection_params.shape[0],
+                                                                                                        bijection_params.shape[1], bijection_params.shape[2])
 
-                # bijection_params = bijection_params / bijection_params.sum(axis=-1, keepdims=True)
+                bijection_params = enforce_boundary_conditions(bijection_params.reshape(-1, bijection_params.shape[-1])).reshape(bijection_params.shape[0], bijection_params.shape[1], bijection_params.shape[2])
 
                 bijection_params_partial = bijection_params[:, i_col, :]
 

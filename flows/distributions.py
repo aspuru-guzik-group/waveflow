@@ -119,7 +119,7 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
         transform_params, direct_fun, partial_inverse_fun = transformation(transformation_rng, input_dim)
         mspline_init_fun = MSpline_fun()
 
-        prior_params_init, mspline_apply_fun_vec, mspline_apply_fun_vec_grad, mspline_sample_fun_vec, knots, enforce_boundary_conditions = mspline_init_fun(rng, spline_degree, n_internal_knots,
+        prior_params_init, mspline_apply_fun_vec, mspline_apply_fun_vec_grad, mspline_sample_fun_vec, knots, enforce_boundary_conditions, remove_bias = mspline_init_fun(rng, spline_degree, n_internal_knots,
                                                                                                    zero_border=False,
                                                                                                    cardinal_splines=True,
                                                                                                    use_cached_bases=True,
@@ -129,7 +129,7 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
                                                                                                    )
         sp_transform_params_init, sp_transform_apply_fun = sp_transformation(transformation_rng, input_dim, prior_params_init.shape)
 
-        def log_pdf(params, inputs, log_tol=1e-20):
+        def log_pdf(params, inputs, log_tol=1e-7):
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
             transform_params, sp_transform_params = params
@@ -141,6 +141,8 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
             prior_params = np.concatenate([np.expand_dims(sp, axis=-1) for sp in prior_params], axis=-1)
             prior_params = softmax(prior_params, axis=-1)
 
+            prior_params = remove_bias(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
+                                                                                                 prior_params.shape[1], prior_params.shape[2])
             prior_params = enforce_boundary_conditions(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
                                                                                                                  prior_params.shape[1], prior_params.shape[2])
 
@@ -163,6 +165,8 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
                 prior_params = np.concatenate([np.expand_dims(sp, axis=-1) for sp in prior_params], axis=-1)
                 prior_params = softmax(prior_params, axis=-1)
 
+                prior_params = remove_bias(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
+                                                                                                 prior_params.shape[1], prior_params.shape[2])
                 prior_params = enforce_boundary_conditions(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
                                                                                                                      prior_params.shape[1], prior_params.shape[2])
 
