@@ -27,9 +27,11 @@ def MaskedDense(mask):
         b = random.uniform(k2, (out_dim,), minval=-bound, maxval=bound)
         return output_shape, (W, b)
 
+
     def apply_fun(params, inputs, **kwargs):
         W, b = params
         return np.dot(inputs, W * mask) + b
+
 
     return init_fun, apply_fun
 

@@ -472,25 +472,30 @@ def test_splines(testcase):
          init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, reverse_fun_tol=0.00001,
                     use_cached_bases=True, n_mesh_points=1000, constraints_dict_left={0: 0.0, 2: 0, 3: 0}, constraints_dict_right={0: 1, 1: 0.0, 3: 0})
 
-      params_i = np.ones_like(params_i)
+      def some_transform(params, x):
+         itrans = apply_fun_vec_i(params, x)
+         return np.log(itrans + 0.1) + x
+
+
+      # params_i = np.ones_like(params_i)
       # params_i = params_i.at[0].set(0)
       # params_i = params_i.at[-1].set(0)
       params_i = np.repeat(params_i[:, None], n_points, axis=1).T
-      params_i = remove_bias(params_i)
+      # params_i = remove_bias(params_i)
 
       # params_i = np.repeat(params_i[:, None], n_points, axis=1).T
-      params_i = enforce_boundary_conditions_i(params_i)
+      # params_i = enforce_boundary_conditions_i(params_i)
       # knots_i = np.repeat(knots_i[:,None], n_points, axis=1).T
       # params_i = (params_i, knots_i)
 
-      fig, ax = plt.subplots()
-      ax.plot(xx, apply_fun_vec_grad(params_i, xx), label='I Spline grad')
-      ax.grid(True)
-      ax.legend(loc='best')
-      plt.show()
+      # fig, ax = plt.subplots()
+      # ax.plot(xx, apply_fun_vec_grad(params_i, xx), label='I Spline grad')
+      # ax.grid(True)
+      # ax.legend(loc='best')
+      # plt.show()
 
       fig, ax = plt.subplots()
-      ax.plot(xx, apply_fun_vec_i(params_i, xx), label='I Spline')
+      ax.plot(xx, some_transform(params_i, xx), label='I Spline')
       ax.grid(True)
       ax.legend(loc='best')
       plt.show()
