@@ -18,6 +18,7 @@ from jax.config import config
 
 
 def get_model():
+
     def get_masks(input_dim, hidden_dim=64, num_hidden=1):
         masks = []
         input_degrees = np.arange(input_dim)
@@ -34,6 +35,17 @@ def get_model():
 
 
     def masked_transform(rng, input_dim, output_shape=2):
+        def calculate_bijection_params(params_nn, zero_params, grid_sample):
+            cubed_input_product = np.roll(np.cumprod(grid_sample ** 3, axis=-1), 1, axis=-1).at[:, 0].set(1)
+            cubed_input_product = np.expand_dims(cubed_input_product, axis=-1)
+            bij_p = nn_apply_fun(params_nn, grid_sample)
+            bij_p = bij_p.split(bij_p.shape[-1], axis=-1)
+            bij_p = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bij_p], axis=-1)
+            bij_p = jax.nn.sigmoid(bij_p)
+            bij_p = cubed_input_product * bij_p + zero_params
+            bij_p = bij_p / bij_p.sum(-1, keepdims=True)
+            return bij_p
+
         masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
         act = stax.Tanh
         hidden = []
@@ -41,29 +53,32 @@ def get_model():
             hidden.append(flows.MaskedDense(masks[i]))
             hidden.append(act)
 
-        init_fun, apply_fun = stax.serial(
+        init_fun, nn_apply_fun = stax.serial(
             flows.ShiftLayer(0.0),
             *hidden,
             flows.MaskedDense(np.tile(masks[-1], output_shape)),
         )
 
+        zero_params = jax.random.uniform(rng, shape=(masks[-1], output_shape))
+
         _, params = init_fun(rng, (input_dim,))
-        return params, apply_fun
+        params = (params, zero_params)
+        return params, calculate_bijection_params
 
 
     init_fun = flows.MFlow(
                 flows.Serial(*(flows.IMADE(masked_transform, spline_degree=5, n_internal_knots=15,
                                            spline_regularization=0.0, reverse_fun_tol=0.000001,
-                                           constraints_dict_left={0: 0, 2: 0, 3: 0}, constraints_dict_right={0: 1}), flows.Reverse()) * 1),
+                                           constraints_dict_left={0: 0, 2: 0, 3: 0}, constraints_dict_right={0: 1}),) * 1),
                 masked_transform,
                 spline_degree=5, n_internal_knots=15,
-                constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0: 0}
+                constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={2:0}
             )
 
 
-    return init_fun, masked_transform
+    return init_fun, masked_transform, calculate_bijection_params
 
-rng, flow_rng = random.split(random.PRNGKey(0))
+rng, flow_rng = random.split(random.PRNGKey(1))
 n_samples = 9000
 length = 1
 margin = 0.025
@@ -72,7 +87,7 @@ input_dim = 2
 num_epochs, batch_size = 50001, 100
 n_model_sample = 20000
 
-init_fun, masked_transform = get_model()
+init_fun, masked_transform, calculate_bijection_params = get_model()
 params, log_pdf, sample = init_fun(flow_rng, input_dim)
 params_nn, nn_fun = masked_transform(flow_rng, 2, 7)
 
@@ -92,26 +107,18 @@ grid = np.concatenate([xv, yv], axis=-1)
 grid = grid.reshape(n_grid_points, n_grid_points, 2)
 grid_boundary = np.concatenate([grid[0, :], grid[:, 0]])
 grid_sample = np.concatenate([grid_boundary[100:100+3], grid_boundary[-(100+3):-100]], axis=0)
-grid_crosssection = grid[:, 150]
+grid_crosssection_horizontal = grid[:, 150]
+grid_crosssection_vertical = grid[150, :]
 
 
-def calculate_bijection_params(params, x):
-    squared_input_product = np.roll(np.cumprod(grid_sample**2, axis=-1), 1, axis=-1).at[:, 0].set(1)
-    squared_input_product = np.expand_dims(squared_input_product, axis=-1)
-    bij_p = nn_fun(params_nn, grid_sample)
-    bij_p = bij_p.split(7, axis=-1)
-    bij_p = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bij_p], axis=-1)
-    bij_p = jax.nn.sigmoid(bij_p)
-    bij_p = squared_input_product * bij_p + np.ones_like(bij_p) * onp.random.uniform(size=bij_p.shape)
-    bij_p = bij_p / bij_p.sum(-1, keepdims=True)
-    return bij_p.reshape(-1, 7)
+
+calculate_bijection_params_s = lambda x:calculate_bijection_params(params_nn, x).sum()
+calculate_bijection_params_j = jax.grad(calculate_bijection_params_s)
 
 bij_p = calculate_bijection_params(params_nn, grid_sample)
-print(bij_p.shape)
+bij_p_j = calculate_bijection_params_j(grid_sample)
 
 
-
-exit()
 
 def vh(fn):
     _laplacian = lambda params, x: jax.hessian(fn, argnums=1)(params, x)
@@ -128,24 +135,38 @@ pdf_h = vh(pdf)
 # print(pdf_l(params, grid_sample))
 # exit()
 
-ys = pdf(params, grid_crosssection)
+ys = pdf(params, grid_crosssection_horizontal)
 
-plt.plot(grid_crosssection[:,1], ys, label='Waveflow')
+plt.plot(grid_crosssection_horizontal[:, 1], ys, label='Waveflow')
 plt.legend()
 plt.show()
-
-dys_n = np.gradient(ys, 1 / n_grid_points)
-dys_a = pdf_j(params, grid_crosssection)
-# plt.plot(ys)
-plt.plot(grid_crosssection[:,1], dys_n, label='Derivative nummerical')
-plt.plot(grid_crosssection[:,1], dys_a[:,0,1], label='Derivative analitically')
-plt.legend()
-plt.show()
+#
+# dys_n = np.gradient(ys, 1 / n_grid_points)
+# dys_a = pdf_j(params, grid_crosssection_horizontal)
+# # plt.plot(ys)
+# plt.plot(grid_crosssection_horizontal[:, 1], dys_n, label='Derivative nummerical')
+# plt.plot(grid_crosssection_horizontal[:, 1], dys_a[:, 0, 1], label='Derivative analitically')
+# plt.legend()
+# plt.show()
 
 ddys_n = np.gradient(np.gradient(ys, 1 / n_grid_points), 1 / n_grid_points)
-# ddys_a = pdf_l(params, grid_crosssection)[:, 0]
-ddys_a = pdf_h(params, grid_crosssection)[:, 0, 1, 1]
-plt.plot(grid_crosssection[:,1], ddys_n, label='Second derivative nummerically')
-plt.plot(grid_crosssection[:,1], ddys_a, label='Second derivative analitlically')
+ddys_a_0 = pdf_h(params, grid_crosssection_horizontal)[:, 0, 0, 0]
+ddys_a_1 = pdf_h(params, grid_crosssection_horizontal)[:, 0, 1, 1]
+print(grid_crosssection_horizontal[:10])
+plt.plot(grid_crosssection_horizontal[:, 1], ddys_n, label='Second derivative nummerically')
+plt.plot(grid_crosssection_horizontal[:, 1], ddys_a_0, label='Second derivative analitlically 0')
+plt.plot(grid_crosssection_horizontal[:, 1], ddys_a_1, label='Second derivative analitlically 1')
+plt.legend()
+plt.show()
+
+
+ys = pdf(params, grid_crosssection_vertical)
+ddys_n = np.gradient(np.gradient(ys, 1 / n_grid_points), 1 / n_grid_points)
+ddys_a_0 = pdf_h(params, grid_crosssection_vertical)[:, 0, 0, 0]
+ddys_a_1 = pdf_h(params, grid_crosssection_vertical)[:, 0, 1, 1]
+print(grid_crosssection_vertical[:10])
+plt.plot(grid_crosssection_vertical[:, 0], ddys_n, label='Second derivative nummerically')
+plt.plot(grid_crosssection_vertical[:, 0], ddys_a_0, label='Second derivative analitlically 0')
+plt.plot(grid_crosssection_vertical[:, 0], ddys_a_1, label='Second derivative analitlically 1')
 plt.legend()
 plt.show()
