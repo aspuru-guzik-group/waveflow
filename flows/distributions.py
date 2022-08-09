@@ -127,14 +127,13 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
                                                                                                    constraints_dict_left=constraints_dict_left,
                                                                                                    constraints_dict_right=constraints_dict_right
                                                                                                    )
-        sp_transform_params_init, sp_transform_apply_fun = sp_transformation(transformation_rng, input_dim, prior_params_init.shape)
+        sp_transform_params_init, sp_transform_apply_fun = sp_transformation(transformation_rng, input_dim, prior_params_init.shape[0])
 
         def log_pdf(params, inputs, log_tol=1e-7):
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
             transform_params, sp_transform_params = params
             u, log_det = direct_fun(transform_params, inputs)
-            # u = inputs
 
             prior_params = sp_transform_apply_fun(sp_transform_params, u)
             prior_params = prior_params.split(prior_params_init.shape[-1], axis=-1)

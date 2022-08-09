@@ -14,6 +14,7 @@ import numpy as onp
 from jax.config import config
 # config.update('jax_disable_jit', True)
 # config.update("jax_debug_nans", True)
+config.update("jax_enable_x64", True)
 
 
 
@@ -35,11 +36,12 @@ def get_model():
 
 
     def masked_transform(rng, input_dim, output_shape=2):
-        def calculate_bijection_params(params_nn, zero_params, grid_sample):
-            cubed_input_product = np.roll(np.cumprod(grid_sample ** 3, axis=-1), 1, axis=-1).at[:, 0].set(1)
+        def calculate_bijection_params(params, x):
+            params_nn, zero_params = params
+            cubed_input_product = np.roll(np.cumprod(x ** 3, axis=-1), 1, axis=-1).at[:, 0].set(1)
             cubed_input_product = np.expand_dims(cubed_input_product, axis=-1)
-            bij_p = nn_apply_fun(params_nn, grid_sample)
-            bij_p = bij_p.split(bij_p.shape[-1], axis=-1)
+            bij_p = nn_apply_fun(params_nn, x)
+            bij_p = bij_p.split(bij_p.shape[-1]//x.shape[-1], axis=-1)
             bij_p = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bij_p], axis=-1)
             bij_p = jax.nn.sigmoid(bij_p)
             bij_p = cubed_input_product * bij_p + zero_params
@@ -59,7 +61,7 @@ def get_model():
             flows.MaskedDense(np.tile(masks[-1], output_shape)),
         )
 
-        zero_params = jax.random.uniform(rng, shape=(masks[-1], output_shape))
+        zero_params = jax.random.uniform(rng, shape=(input_dim, output_shape))
 
         _, params = init_fun(rng, (input_dim,))
         params = (params, zero_params)
@@ -76,9 +78,9 @@ def get_model():
             )
 
 
-    return init_fun, masked_transform, calculate_bijection_params
+    return init_fun
 
-rng, flow_rng = random.split(random.PRNGKey(1))
+rng, flow_rng = random.split(random.PRNGKey(3))
 n_samples = 9000
 length = 1
 margin = 0.025
@@ -87,9 +89,8 @@ input_dim = 2
 num_epochs, batch_size = 50001, 100
 n_model_sample = 20000
 
-init_fun, masked_transform, calculate_bijection_params = get_model()
+init_fun = get_model()
 params, log_pdf, sample = init_fun(flow_rng, input_dim)
-params_nn, nn_fun = masked_transform(flow_rng, 2, 7)
 
 
 left_grid = 0.0
@@ -112,11 +113,11 @@ grid_crosssection_vertical = grid[150, :]
 
 
 
-calculate_bijection_params_s = lambda x:calculate_bijection_params(params_nn, x).sum()
-calculate_bijection_params_j = jax.grad(calculate_bijection_params_s)
-
-bij_p = calculate_bijection_params(params_nn, grid_sample)
-bij_p_j = calculate_bijection_params_j(grid_sample)
+# calculate_bijection_params_s = lambda x:calculate_bijection_params(params_nn, x).sum()
+# calculate_bijection_params_j = jax.grad(calculate_bijection_params_s)
+#
+# bij_p = calculate_bijection_params(params_nn, grid_sample)
+# bij_p_j = calculate_bijection_params_j(grid_sample)
 
 
 
@@ -129,11 +130,13 @@ pdf_l = laplacian(pdf)
 pdf_j = jax.vmap(jax.jacrev(pdf, argnums=-1), in_axes=(None, 0))
 pdf_h = vh(pdf)
 
-# print(grid_sample)
+print(grid_sample)
 # print(pdf(params, grid_sample))
 # print(pdf_j(grid_sample))
-# print(pdf_l(params, grid_sample))
-# exit()
+print(pdf_h(params, grid_sample)[:, 0, 0, 0])
+print(pdf_h(params, grid_sample)[:, 0, 1, 1])
+
+exit()
 
 ys = pdf(params, grid_crosssection_horizontal)
 
