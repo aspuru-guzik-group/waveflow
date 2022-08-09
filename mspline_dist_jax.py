@@ -416,7 +416,7 @@ def test_splines(testcase):
    rng = jax.random.PRNGKey(4)
    k = 5
    n_points = 5000
-   n_internal_knots = 13
+   n_internal_knots = 15
    xx = np.linspace(0, 1, n_points)
 
    #############
@@ -428,11 +428,6 @@ def test_splines(testcase):
          init_fun_m(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True,
                     constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={})
 
-      params_m = np.array([0., 0.02036023, 0.09162105, 0.08637742,
-               0.03408029, 0.04377855, 0.02052169, 0.04918405,
-               0.07647818, 0.13239992, 0.01899634, 0.12756695,
-               0.07849756, 0.10966318, 0.07412524, 0.06355129,
-               0.00643065, 0.01681754])
 
       # params_m = np.ones_like(params_m)
       params_m = np.repeat(params_m[:, None], n_points, axis=1).T
