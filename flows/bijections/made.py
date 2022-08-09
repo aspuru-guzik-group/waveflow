@@ -93,9 +93,9 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
 
         def direct_fun(params, inputs, **kwargs):
             bijection_params = apply_fun(params, inputs)
-            bijection_params = bijection_params.split(params_i.shape[-1], axis=-1)
-            bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
-            bijection_params = softmax(bijection_params, axis=-1)
+            # bijection_params = bijection_params.split(params_i.shape[-1], axis=-1)
+            # bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
+            # bijection_params = softmax(bijection_params, axis=-1)
 
             # bijection_params = bijection_params.at[:, :, 1].set( (bijection_params[:, :, 1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
             # bijection_params = bijection_params.at[:, :, -2].set( (bijection_params[:, :, -2] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )

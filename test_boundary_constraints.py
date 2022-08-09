@@ -12,8 +12,8 @@ from functools import partial
 import numpy as onp
 
 from jax.config import config
-# config.update('jax_disable_jit', True)
-# config.update("jax_debug_nans", True)
+config.update('jax_disable_jit', True)
+config.update("jax_debug_nans", True)
 config.update("jax_enable_x64", True)
 
 
@@ -74,7 +74,7 @@ def get_model():
                                            constraints_dict_left={0: 0, 2: 0, 3: 0}, constraints_dict_right={0: 1}),) * 1),
                 masked_transform,
                 spline_degree=5, n_internal_knots=15,
-                constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={2:0}
+                constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={2: 0}
             )
 
 
@@ -130,6 +130,7 @@ pdf_l = laplacian(pdf)
 pdf_j = jax.vmap(jax.jacrev(pdf, argnums=-1), in_axes=(None, 0))
 pdf_h = vh(pdf)
 
+grid_sample = grid_sample + 1e-2
 print(grid_sample)
 # print(pdf(params, grid_sample))
 # print(pdf_j(grid_sample))

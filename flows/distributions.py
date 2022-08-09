@@ -136,9 +136,9 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
             u, log_det = direct_fun(transform_params, inputs)
 
             prior_params = sp_transform_apply_fun(sp_transform_params, u)
-            prior_params = prior_params.split(prior_params_init.shape[-1], axis=-1)
-            prior_params = np.concatenate([np.expand_dims(sp, axis=-1) for sp in prior_params], axis=-1)
-            prior_params = softmax(prior_params, axis=-1)
+            # prior_params = prior_params.split(prior_params_init.shape[-1], axis=-1)
+            # prior_params = np.concatenate([np.expand_dims(sp, axis=-1) for sp in prior_params], axis=-1)
+            # prior_params = softmax(prior_params, axis=-1)
 
             prior_params = remove_bias(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
                                                                                                  prior_params.shape[1], prior_params.shape[2])
