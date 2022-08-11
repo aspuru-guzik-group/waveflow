@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from line_profiler_pycharm import profile
 import tqdm
+import ortho_splines
 
 # def M(x, k, i, t, max_k):
 #    is_superflious_node = i < (max_k - 1) or i >= len(t) - max_k
@@ -78,25 +79,34 @@ def ispline(x, t, c, k, n_derivatives=0):
    return sum(c[i] * I(x, k, i, t, k+1, n_derivatives=n_derivatives) for i in range(n))
 
 
-def B(x, k, i, t):
-   if k == 0:
-      return 1.0 if t[i] <= x < t[i+1] else 0.0
-   if t[i+k] == t[i]:
-      c1 = 0.0
+def B(x, k, i, t, max_k, n_derivative=0):
+   if n_derivative == 0:
+      if k == 0:
+         if t[i] <= x < t[i+1] or (i >= len(t) - (max_k+1) and x >= t[i] and x <= t[i+1]):
+            return 1.0
+         else:
+            return 0.0
+
+         #return 1.0 if t[i] <= x < t[i+1] else 0.0
+      if t[i+k] == t[i]:
+         c1 = 0.0
+      else:
+         c1 = (x - t[i])/(t[i+k] - t[i]) * B(x, k-1, i, t, max_k)
+      if t[i+k+1] == t[i+1]:
+         c2 = 0.0
+      else:
+         c2 = (t[i+k+1] - x)/(t[i+k+1] - t[i+1]) * B(x, k-1, i+1, t, max_k)
+      return c1 + c2
    else:
-      c1 = (x - t[i])/(t[i+k] - t[i]) * B(x, k-1, i, t)
-   if t[i+k+1] == t[i+1]:
-      c2 = 0.0
-   else:
-      c2 = (t[i+k+1] - x)/(t[i+k+1] - t[i+1]) * B(x, k-1, i+1, t)
-   return c1 + c2
-def bspline(x, t, c, k):
+      return dB(x, k , i , t, max_k, n_derivative=n_derivative)
+
+def bspline(x, t, c, k, n_derivative=0):
    n = len(t) - k - 1
    assert (n >= k+1) and (len(c) >= n)
-   return sum(c[i] * B(x, k, i, t) for i in range(n))
+   return sum(c[i] * B(x, k, i, t, k, n_derivative=n_derivative) for i in range(n))
 
-def dB(x, k, i, t):
-   return k * ( (B(x, k-1, i, t) / (t[i+k] - t[i]) - B(x, k-1, i+1, t) / (t[i+k+1] - t[i+1]) ) )
+def dB(x, k, i, t, max_k, n_derivative=1):
+   return k * ( (B(x, k-1, i, t, max_k, n_derivative=n_derivative-1) / (t[i+k] - t[i]) - B(x, k-1, i+1, t, max_k, n_derivative=n_derivative-1) / (t[i+k+1] - t[i+1]) ) )
 
 def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
    x = np.random.uniform(low=xmin, high=xmax, size=num_samples * 4)
@@ -124,7 +134,7 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 # @profile
 def test_splines(test_case):
 
-   degree = 5
+   degree = 4
    internal_knots = np.linspace(0, 1, 13)
    # internal_knots = np.random.uniform(0,1, 9)
    # internal_knots[0] = 0
@@ -143,9 +153,11 @@ def test_splines(test_case):
    iweights = np.random.rand(len(iknots) - degree)
    iweights[0] = 0
    iweights[-1] = 0
-   # iweights[1] = 0
-   # iweights[-2] = 0
    iweights = iweights / sum(iweights)
+
+   bknots = mknots#internal_knots
+   bweights = np.random.rand(len(mknots) - degree - 1) - 0.5#np.random()
+   bweights = bweights / np.sqrt(sum(np.abs(bweights)))
 
    n_points = 1000
    xx = np.linspace(internal_knots[0], internal_knots[-1], n_points)
@@ -153,111 +165,45 @@ def test_splines(test_case):
 
 
    if test_case == 'm':
-      max_values = []
-      for i in range(len(mweights)):
-         # fig, ax = plt.subplots()
-         ys = np.array([M(x, degree, i, mknots, degree, n_derivatives=0) for x in xx])
-         max_values.append(np.max(ys))
-         dys = np.array([M(x, degree, i, mknots, degree, n_derivatives=1) for x in xx])
-         # ddys = np.array([M(x, degree, i, mknots, degree, n_derivatives=2) for x in xx])
 
-         dyn = np.gradient(ys, dx, edge_order=2)
-         # ddyn = np.gradient(dys, dx, edge_order=2)
-         # ax.plot(xx, ys, label='M {}'.format(i), ls='-')
-         # ax.plot(xx, dys, label='dM {}/dx analytical'.format(i), ls='-')
-         # ax.plot(xx, dyn, label='dM {}/dx nummerical'.format(i), ls='--')
-
-         # ax.plot(xx, ddys, label='ddM {}/dx analytical'.format(i), ls='-.')
-         # ax.plot(xx, ddyn, label='ddM {}/dx nummerical'.format(i), ls='--')
-
-         # ax.grid(True)
-         # ax.legend(loc='best')
-         # plt.show()
-
-      max_values = np.array(max_values)
-      max_values = max_values / max_values.min()
-      mweights = np.ones_like(mweights) #/ max_values
-      mweights[0] = 1/degree
-      mweights[-1] = 1/degree
-      mweights[1] = 2 / degree
-      mweights[-2] = 2 / degree
-      mweights[2] = 3 / degree
-      mweights[-3] = 3 / degree
-      mweights[3] = 4 / degree
-      mweights[-4] = 4 / degree
-      mweights = mweights / mweights.sum()
-
-      #Setting 2nd derivative 0 but 1st derivative flexible
-      # dM1 = np.abs(M(0.0, degree, 1, mknots, degree, n_derivatives=2))
-      # dM2 = np.abs(M(0.0, degree, 2, mknots, degree, n_derivatives=2))
-      # mweights[2] = mweights[1] / dM2 * dM1
-      # mweights[4:4+degree-1] = 0
-      # mweights = mweights / mweights.sum()
       fig, ax = plt.subplots()
-      ys = np.array([mspline(x, mknots, mweights, degree, n_derivatives=0) for x in xx])
+      for i in range(len(mweights)):
+         ys = np.array([M(x, degree, i, mknots, degree, n_derivatives=0) for x in xx])
+         # dys = np.array([M(x, degree, i, mknots, degree, n_derivatives=1) for x in xx])
+
+         ax.plot(xx, ys, label='M {}'.format(i), ls='-')
+         # ax.plot(xx, dys, label='dM {}/dx analytical'.format(i), ls='-')
+
+      ax.grid(True)
+      # ax.legend(loc='best')
+      plt.show()
+
+
+      fig, ax = plt.subplots()
+      ys = np.array([mspline(x, mknots, mweights, degree) for x in xx])
       ax.plot(xx, ys, label='M Spline')
+      max_val = np.max(mweights) * len(mknots)
+      s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 4000, xmin=0, xmax=1,
+                             ymax=max_val)
+      ax.hist(np.array(s), density=True, bins=100)
+
       ax.grid(True)
       ax.legend(loc='best')
       plt.show()
 
-      # fig, ax = plt.subplots()
-      # ys = np.array([mspline(x, mknots, mweights, degree) for x in xx])
-      # ax.plot(xx, ys, label='M Spline')
-      # max_val = np.max(mweights) * len(mknots)
-      # for i in tqdm.tqdm(range(1000)):
-      #    s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 256, xmin=0, xmax=1, ymax=max_val)
-      # s = rejection_sampling(lambda x: np.array([mspline(x_, mknots, mweights, degree) for x_ in x]), 4000, xmin=0, xmax=1,
-      #                        ymax=max_val)
-      # ax.hist(np.array(s), density=True, bins=100)
-
-      # ax.grid(True)
-      # ax.legend(loc='best')
-      # plt.show()
-
    elif test_case == 'i':
 
+      fig, ax = plt.subplots()
+      for i in range(len(iweights)):
 
-      # I(xx[-1], degree, len(iweights)-2, iknots, degree + 1, n_derivatives=1)
+         ax.plot(xx, [I(x, degree, i, iknots, degree + 1, n_derivatives=0) for x in xx], label='I {}'.format(i))
+         ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=1) for x in xx]),
+                 label='dI/dx analytical {}'.format(i))
 
-      # for i in range(len(iweights)):
-      #
-      #    fig, ax = plt.subplots()
-      #    # ax.plot(xx, np.array([I(x, degree, i, iknots, degree+1, n_derivatives=0) for x in xx]))
-      #
-      #    # ax.plot(xx, np.gradient(np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=0) for x in xx]), dx, edge_order=2),
-      #    #         linewidth=6, label='dI/dx nummerical {}'.format(i))
-      #    ax.plot(xx, np.array([I(x, degree, i, iknots, degree + 1, n_derivatives=2) for x in xx]),
-      #            label='dI/dx analytical {}'.format(i))
-      #
-      #    ax.grid(True)
-      #    ax.legend(loc='best')
-      #    plt.show()
+      ax.grid(True)
+      # ax.legend(loc='best')
+      plt.show()
 
-      # print('ddI_1 ', I(0, degree, 1, iknots, degree + 1, n_derivatives=2))
-      # print('ddI_2 ', I(0, degree, 2, iknots, degree + 1, n_derivatives=2))
-      # print('dddI_1 ', I(0, degree, 1, iknots, degree + 1, n_derivatives=3))
-      # print('dddI_2 ', I(0, degree, 2, iknots, degree + 1, n_derivatives=3))
-      # print('dddI_3 ', I(0, degree, 3, iknots, degree + 1, n_derivatives=3))
-      # second_derivative_constraint = - I(0, degree, 1, iknots, degree + 1, n_derivatives=2)/I(0, degree, 2, iknots, degree + 1, n_derivatives=2)
-      # third_derivative_constraint = -(I(0, degree, 1, iknots, degree + 1, n_derivatives=3) - I(0, degree, 2, iknots, degree + 1, n_derivatives=3)*I(0, degree, 1, iknots, degree + 1, n_derivatives=2)/I(0, degree, 2, iknots, degree + 1, n_derivatives=2))/I(0, degree, 3, iknots, degree + 1, n_derivatives=3)
-      # print(second_derivative_constraint)
-      # print(third_derivative_constraint)
-
-      # Setting second derivative to 0
-      iweights = np.ones_like(iweights)
-      iweights[0], iweights[-1] = 0, 0
-      iweights[1] = iweights[1] * 1 / degree
-      iweights[-2] = iweights[-2] * 1 / degree
-      iweights[2] = iweights[2] * 2 / degree
-      iweights[-3] = iweights[-3] * 2 / degree
-      iweights[3] = iweights[3] * 3 / degree
-      iweights[-4] = iweights[-4] * 3 / degree
-      iweights[4] = iweights[4] * 4 / degree
-      iweights[-5] = iweights[-5] * 4 / degree
-      # iweights[1] = iweights[1] * 1 / degree
-      iweights = iweights / iweights.sum()
-      print(iweights)
-      print(len(iweights))
 
       fig, ax = plt.subplots()
       ax.plot(xx, np.array([ispline(x, iknots, iweights, degree, n_derivatives=0) for x in xx]), label='I Spline')
@@ -270,7 +216,7 @@ def test_splines(test_case):
       def uniform_pdf(x):
          return 1
 
-      n_dim = 2
+      n_dim = 1
       if n_dim == 1:
          transformed_pdf = lambda x: uniform_pdf(ispline(x, iknots, iweights, degree, n_derivatives=0)) * ispline(x, iknots, iweights, degree, n_derivatives=1)
 
@@ -284,16 +230,6 @@ def test_splines(test_case):
 
          print(ys.sum() * dx)
       else:
-
-         iweights = np.array([0., 0.05066524, 0.05066524, 0.02953962, 0.18144176,
-                0.08383919, 0.17455034, 0.15516713, 0.0853966, 0.11751313,
-                0.07292235, 0.04896464, 0.05066524, 0.])
-         # iweights[1] = (iweights[1] + 5) / degree
-         # iweights[-2] = (iweights[-2] + 5) / degree
-         # iweights[2:-2] = iweights[2:-2] + 5
-
-         # iweights[1] = (iweights[1] ) / degree
-         # iweights[-2] = (iweights[-2] ) / degree
          iweights[3:-3] = iweights[3:-3]
          iweights = iweights / iweights.sum(keepdims=True)
          print(iweights)
@@ -334,6 +270,48 @@ def test_splines(test_case):
 
          print(pdf_grid.sum() * dx)
 
+   elif test_case == 'b':
+      basis_splines = []
+      fig, ax = plt.subplots()
+      for i in range(len(bweights)):
+         ys = np.array([B(x, degree, i, bknots, degree, n_derivative=0) for x in xx])
+         basis_splines.append(ys)
+         ax.plot(xx, ys, label='M {}'.format(i), ls='-')
+
+      ax.grid(True)
+      plt.show()
+
+
+      basis_splines = np.array(basis_splines)
+      # basis_splines = ortho_splines.gram_schmidt_r2l(basis_splines.T).T
+      basis_splines = ortho_splines.gram_schmidt_symm(basis_splines.T).T
+
+      print(np.linalg.norm(basis_splines, axis=-1))
+      print(basis_splines[0].sum())
+      print((basis_splines[0]**2).sum())
+      print(np.dot(basis_splines[3], basis_splines[4]))
+      print(basis_splines.shape)
+
+      fig, ax = plt.subplots()
+      for i in range(len(bweights)):
+         ys = basis_splines[i]
+         ax.plot(xx, ys, label='M {}'.format(i), ls='-')
+
+      ax.grid(True)
+      plt.show()
+
+
+
+      # fig, ax = plt.subplots()
+      # ys = np.array([bspline(x, bknots, bweights, degree) for x in xx])
+      # ys_squared = np.array([bspline(x, bknots, bweights, degree) for x in xx])**2
+      # ax.plot(xx, ys, label='B Spline')
+      # ax.plot(xx, ys_squared, label='B Spline Squared')
+
+
+      ax.grid(True)
+      ax.legend(loc='best')
+      plt.show()
 
 
 
@@ -342,7 +320,7 @@ def test_splines(test_case):
 
 
 if __name__ == '__main__':
-   test_splines('i')
+   test_splines('b')
 
 
 

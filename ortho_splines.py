@@ -7,7 +7,6 @@ def gram_schmidt_symm(imat, ovlp=None):
     Symmetriezed Gram Schmidt orthogonalization.
     # TODO: only works for M = N... there might be a bug in the osplines paper.
     '''
-    mat = np.copy(imat)
     ## pick the central knot that is closest to the central point
     #c = (knots[-1] - knots[0]) / 2.
     #idc = np.sum([knots < c])
@@ -61,7 +60,7 @@ def gram_schmidt_symm(imat, ovlp=None):
     for i in range(npair):
         v1 = matL[:, 2*i]
         v2 = matR[:, 2*i]
-        h = np.dot(np.dot(v1.T, ovlp), v2)
+        # h = np.dot(np.dot(v1.T, ovlp), v2)
         ov = symm_ortho2v(v1, v2)
         omat[:, i] = ov[0]
         omat[:, M-i-1] = ov[1]
@@ -126,7 +125,7 @@ def gram_schmidt_r2l(imat):
         imat - (N, M) matrix, M: number of vectors to orthogonalize; N:
             the dimension of the Hilbert space.
     '''
-    mat_n = mat[:, ::-1]
+    # mat_n = mat[:, ::-1]
     omat = gram_schmidt_l2r(imat[:, ::-1])
     return omat[:, ::-1]
 
@@ -137,9 +136,10 @@ def qr_decomp(mat):
 
 if __name__ == "__main__":
     
-    mat = np.random.rand(4,4)
+    mat = np.random.rand(10, 4)
     omat = gram_schmidt_l2r(mat)
     print(omat)
+
     print(np.dot(omat.T, omat))
     omat1 = gram_schmidt_r2l(mat)
     print(omat1)
