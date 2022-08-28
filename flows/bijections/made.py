@@ -74,7 +74,8 @@ def MADE(transform):
 
 
 def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization=0.0, reverse_fun_tol=0.0001,
-          constraints_dict_left={0: 0.0}, constraints_dict_right={0: 1.0}):
+          constraints_dict_left={0: 0.0}, constraints_dict_right={0: 1.0}, set_nn_output_grad_to_zero=False,
+          n_spline_base_mesh_points=2000):
 
 
     def init_fun(rng, input_dim, **kwargs):
@@ -84,10 +85,11 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
                                                                                                               cardinal_splines=True,
                                                                                                               zero_border=False,
                                                                                                               reverse_fun_tol=reverse_fun_tol,
-                                                                                                              constraints_dict_left = constraints_dict_left,
-                                                                                                              constraints_dict_right = constraints_dict_right)
+                                                                                                              n_mesh_points=n_spline_base_mesh_points,
+                                                                                                              constraints_dict_left=constraints_dict_left,
+                                                                                                              constraints_dict_right=constraints_dict_right)
 
-        params, apply_fun = transform(rng, input_dim, params_i.shape[0])
+        params, apply_fun = transform(rng, input_dim, params_i.shape[0], set_nn_output_grad_to_zero=set_nn_output_grad_to_zero)
 
 
 
@@ -121,9 +123,9 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
             outputs = np.zeros_like(inputs)
             for i_col in range(inputs.shape[-1]):
                 bijection_params = apply_fun(params, inputs)
-                bijection_params = bijection_params.split(params_i.shape[-1], axis=-1)
-                bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
-                bijection_params = softmax(bijection_params, axis=-1)
+                # bijection_params = bijection_params.split(params_i.shape[-1], axis=-1)
+                # bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
+                # bijection_params = softmax(bijection_params, axis=-1)
 
                 # bijection_params = bijection_params.at[:, :, 1].set((bijection_params[:, :, 1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree)
                 # bijection_params = bijection_params.at[:, :, -2].set((bijection_params[:, :, -2] + (spline_regularization / bijection_params.shape[-1])) / spline_degree)

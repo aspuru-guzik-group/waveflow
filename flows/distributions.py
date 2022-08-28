@@ -110,7 +110,8 @@ def Flow(transformation, prior=Normal(), prior_support=None):
 
 
 
-def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, constraints_dict_left={0: 0}, constraints_dict_right={0: 0}):
+def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, constraints_dict_left={0: 0}, constraints_dict_right={0: 0},
+          set_nn_output_grad_to_zero=False, n_spline_base_mesh_points=2000):
 
     def init_fun(rng, input_dim):
         rng, transformation_rng = random.split(rng)
@@ -123,11 +124,14 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
                                                                                                    zero_border=False,
                                                                                                    cardinal_splines=True,
                                                                                                    use_cached_bases=True,
-                                                                                                   n_mesh_points=2000,
+                                                                                                   n_mesh_points=n_spline_base_mesh_points,
                                                                                                    constraints_dict_left=constraints_dict_left,
                                                                                                    constraints_dict_right=constraints_dict_right
                                                                                                    )
-        sp_transform_params_init, sp_transform_apply_fun = sp_transformation(transformation_rng, input_dim, prior_params_init.shape[0])
+        sp_transform_params_init, sp_transform_apply_fun = sp_transformation(transformation_rng, input_dim,
+                                                                             prior_params_init.shape[0],
+                                                                             set_nn_output_grad_to_zero=set_nn_output_grad_to_zero
+                                                                             )
 
         def log_pdf(params, inputs, log_tol=1e-7):
             if len(inputs.shape) == 1:
@@ -160,9 +164,9 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
 
             for i_col in range(input_dim):
                 prior_params = sp_transform_apply_fun(sp_transform_params, outputs)
-                prior_params = prior_params.split(prior_params_init.shape[-1], axis=-1)
-                prior_params = np.concatenate([np.expand_dims(sp, axis=-1) for sp in prior_params], axis=-1)
-                prior_params = softmax(prior_params, axis=-1)
+                # prior_params = prior_params.split(prior_params_init.shape[-1], axis=-1)
+                # prior_params = np.concatenate([np.expand_dims(sp, axis=-1) for sp in prior_params], axis=-1)
+                # prior_params = softmax(prior_params, axis=-1)
 
                 prior_params = remove_bias(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
                                                                                                  prior_params.shape[1], prior_params.shape[2])

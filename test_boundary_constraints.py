@@ -1,37 +1,27 @@
 import matplotlib.pyplot as plt
-import jax.numpy as np
-from physics import laplacian
-import jax
 
-from model_factory import get_model
+import jax
+import jax.numpy as np
 from jax.config import config
 # config.update('jax_disable_jit', True)
 # config.update("jax_debug_nans", True)
 config.update("jax_enable_x64", True)
 
-
-
+from model_factory import get_model
 
 
 rng, flow_rng = jax.random.split(jax.random.PRNGKey(3))
-n_samples = 9000
-length = 1
-margin = 0.025
-plot_range = [(0, length), (0, length)]
 input_dim = 2
 num_epochs, batch_size = 50001, 100
-n_model_sample = 20000
 
-init_fun = get_model()
+init_fun = get_model(i_constraint_dict_left={0: 0, 2: 0, 3: 0}, i_constraint_dict_right={0: 1},
+                     prior_constraint_dict_left={0: 0, 2: 0}, set_nn_output_grad_to_zero=True)
 params, log_pdf, sample = init_fun(flow_rng, input_dim)
-
 
 left_grid = 0.0
 right_grid = 1.0
 n_grid_points = 1000
-
-dx = ((right_grid - left_grid) / n_grid_points) ** 2
-
+dx = ((right_grid - left_grid) / n_grid_points)
 
 grid = []
 meshgrid_x = []
@@ -59,7 +49,6 @@ def vh(fn):
     return jax.vmap(_laplacian, in_axes=(None, 0))
 
 pdf = lambda params, x: np.exp(log_pdf(params, x))
-pdf_l = laplacian(pdf)
 pdf_j = jax.vmap(jax.jacrev(pdf, argnums=-1), in_axes=(None, 0))
 pdf_h = vh(pdf)
 
@@ -68,6 +57,9 @@ print(grid_sample)
 print(pdf_h(params, grid_sample)[:, 0, 0, 0])
 print(pdf_h(params, grid_sample)[:, 0, 1, 1])
 
+
+
+
 if input_dim == 2:
     ys = pdf(params, grid_crosssection_horizontal)
 
@@ -75,7 +67,7 @@ if input_dim == 2:
     plt.legend()
     plt.show()
 
-    dys_n = np.gradient(ys, 1 / n_grid_points)
+    dys_n = np.gradient(ys, dx)
     dys_a = pdf_j(params, grid_crosssection_horizontal)
     # plt.plot(ys)
     plt.plot(grid_crosssection_horizontal[:, 1], dys_n, label='Derivative nummerical')
@@ -94,7 +86,7 @@ if input_dim == 2:
 
 
     ys = pdf(params, grid_crosssection_vertical)
-    ddys_n = np.gradient(np.gradient(ys, 1 / n_grid_points), 1 / n_grid_points)
+    ddys_n = np.gradient(np.gradient(ys, dx), 1 / n_grid_points)
     ddys_a_0 = pdf_h(params, grid_crosssection_vertical)[:, 0, 0, 0]
     ddys_a_1 = pdf_h(params, grid_crosssection_vertical)[:, 0, 1, 1]
     plt.plot(grid_crosssection_vertical[:, 0], ddys_n, label='Second derivative nummerically')

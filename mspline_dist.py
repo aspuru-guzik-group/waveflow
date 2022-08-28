@@ -281,8 +281,17 @@ def test_splines(test_case):
       ax.grid(True)
       plt.show()
 
-
       basis_splines = np.array(basis_splines)
+      basis_splines = basis_splines / np.linalg.norm(basis_splines, axis=-1, keepdims=True)
+
+      fig, ax = plt.subplots()
+      ys = [np.array([bweights[i] * basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in enumerate(xx)]
+      ax.plot(xx, ys, label='B', ls='-')
+
+      ax.grid(True)
+      plt.show()
+
+
       # basis_splines = ortho_splines.gram_schmidt_r2l(basis_splines.T).T
       basis_splines = ortho_splines.gram_schmidt_symm(basis_splines.T).T
 
@@ -292,6 +301,8 @@ def test_splines(test_case):
       print(np.dot(basis_splines[3], basis_splines[4]))
       print(basis_splines.shape)
 
+
+
       fig, ax = plt.subplots()
       for i in range(len(bweights)):
          ys = basis_splines[i]
@@ -300,6 +311,12 @@ def test_splines(test_case):
       ax.grid(True)
       plt.show()
 
+      fig, ax = plt.subplots()
+      ys = [np.array([bweights[i] * basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in enumerate(xx)]
+      ax.plot(xx, ys, label='B', ls='-')
+
+      ax.grid(True)
+      plt.show()
 
 
       # fig, ax = plt.subplots()

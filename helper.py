@@ -232,8 +232,8 @@ def binary_search(func, low=0.0, high=1.0, tol=1e-3):
 
 
 def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
-                         n_model_sample=5000, root_save_path='./results/pdf/',
-                         system=None, model_type=None, epoch=0, save_figs=False):
+                         sample_scores, n_model_sample=5000, root_save_path='./results/pdf/', system=None,
+                         model_type=None, epoch=0, save_figs=False):
     root_save_path = '{}/{}/{}'.format(root_save_path, system, model_type)
     root_save_path_per_epoch = '{}/epoch_{}'.format(root_save_path, epoch)
 
@@ -303,6 +303,16 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
         plt.show()
     else:
         plt.savefig('{}/hellinger_divergence.png'.format(root_save_path))
+        plt.clf()
+
+
+    sample_score = np.exp(log_pdf(params, model_samples))
+    sample_scores.append(sample_score.mean())
+    plt.plot(sample_scores)
+    if not save_figs or (system is None or model_type is None):
+        plt.show()
+    else:
+        plt.savefig('{}/sample_scores.png'.format(root_save_path))
         plt.clf()
 
     if save_figs:
