@@ -2,10 +2,47 @@
 #
 import numpy as np
 
+# def D_update(H, k):
+#     pass
+#
+# def get_splinet(b_spline_basis, k, n_knots):
+#
+#     N = int(np.ceil(np.log2((n_knots + 1) / k)))
+#     d = int(k * (2 ** N - 1))
+#     m = n_knots + 1 - k
+#     n_U = np.floor((d - m)/2)
+#     n_D = k * 2 ** N - n_knots - 1 - n_U
+#
+#     H = b_spline_basis @ b_spline_basis.T
+#     A = np.eye(d)
+#     I = np.arange(d) #+ 1
+#
+#     for l in range(N):
+#
+#         # A_bar, H_bar = D_update(H[I, I], N - l)
+#         # A[:,I] = A[:, I] @ A_bar
+#         # H[I,I] = H_bar
+#
+#         r_index = []
+#         for j in range(1, k+1):
+#             for i in range(1, 2**(N-l-1) + 1):
+#
+#                 r_index.append( 2**l * (2*i-1)*k-k+j )
+#         r_index = np.array(r_index)
+#
+#         I = np.concatenate(I_list)
+
+
+def get_dyadic_splinet(bases_splines, degree, dyadic_N):
+    intervals = [[(2 * degree * (r - 1) * 2**l, (2 * degree * r - degree) * 2**l, 2 * degree * r * 2**l) for r in range(1, 2**(dyadic_N-1-l) + 1)] for l in range(dyadic_N-1)]
+
+
+
+
+
 def gram_schmidt_symm(imat, ovlp=None):
     '''
     Symmetriezed Gram Schmidt orthogonalization.
-    # TODO: only works for M = N... there might be a bug in the osplines paper.
     '''
     ## pick the central knot that is closest to the central point
     #c = (knots[-1] - knots[0]) / 2.

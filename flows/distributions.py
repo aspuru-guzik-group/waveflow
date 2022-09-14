@@ -92,15 +92,19 @@ def Flow(transformation, prior=Normal(), prior_support=None):
         params, direct_fun, inverse_fun = transformation(transformation_rng, input_dim)
         prior_params, prior_log_pdf, prior_sample = prior(prior_rng, input_dim)
 
-        def log_pdf(params, inputs):
+        def log_pdf(params, inputs, return_sample=False):
             u, log_det = direct_fun(params, inputs)
             if prior_support is not None:
                 u = np.clip(u, *prior_support)
             log_probs = prior_log_pdf(prior_params, u)
+            if return_sample:
+                return log_probs + log_det, u
             return log_probs + log_det
 
-        def sample(rng, params, num_samples=1):
+        def sample(rng, params, num_samples=1, return_original_samples=False):
             prior_samples = prior_sample(rng, prior_params, num_samples)
+            if return_original_samples:
+                return inverse_fun(params, prior_samples)[0], prior_samples
             return inverse_fun(params, prior_samples)[0]
 
         return params, log_pdf, sample
@@ -133,7 +137,7 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
                                                                              set_nn_output_grad_to_zero=set_nn_output_grad_to_zero
                                                                              )
 
-        def log_pdf(params, inputs, log_tol=1e-7):
+        def log_pdf(params, inputs, log_tol=1e-7, return_sample=False):
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
             transform_params, sp_transform_params = params
@@ -154,9 +158,11 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
 
             probs = probs.reshape(u.shape[0], -1)
             log_probs = np.log(probs + log_tol).sum(-1)
+            if return_sample:
+                return log_probs + log_det, u
             return log_probs + log_det
 
-        def sample(rng, params, num_samples=1):
+        def sample(rng, params, num_samples=1, return_original_samples=False):
             transform_params, sp_transform_params = params
 
             outputs = np.zeros((num_samples, input_dim))
@@ -164,10 +170,6 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
 
             for i_col in range(input_dim):
                 prior_params = sp_transform_apply_fun(sp_transform_params, outputs)
-                # prior_params = prior_params.split(prior_params_init.shape[-1], axis=-1)
-                # prior_params = np.concatenate([np.expand_dims(sp, axis=-1) for sp in prior_params], axis=-1)
-                # prior_params = softmax(prior_params, axis=-1)
-
                 prior_params = remove_bias(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
                                                                                                  prior_params.shape[1], prior_params.shape[2])
                 prior_params = enforce_boundary_conditions(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
@@ -181,11 +183,53 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
                 inputs = inputs.at[:, i_col].set(prior_samples[:, 0])
 
                 outputs = inputs
-                # outputs = partial_inverse_fun(transform_params, inputs, i_col, outputs)[0]
 
             outputs = partial_inverse_fun(transform_params, outputs)[0]
+            if return_original_samples:
+                return outputs, inputs
             return outputs
 
         return (transform_params, sp_transform_params_init), log_pdf, sample
+
+    return init_fun
+
+
+
+
+
+def InvFlow(transformation, prior=Normal(), prior_support=None):
+    """
+    Args:
+        transformation: a function mapping ``(rng, input_dim)`` to a
+            ``(params, direct_fun, inverse_fun)`` triplet
+        prior: a function mapping ``(rng, input_dim)`` to a
+            ``(params, log_pdf, sample)`` triplet
+
+    Returns:
+        A function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
+    """
+
+    def init_fun(rng, input_dim):
+        transformation_rng, prior_rng = random.split(rng)
+
+        params, direct_fun, inverse_fun = transformation(transformation_rng, input_dim)
+        prior_params, prior_log_pdf, prior_sample = prior(prior_rng, input_dim)
+
+        def log_pdf(params, inputs, return_sample=False):
+            u, log_det = direct_fun(params, inputs)
+            if prior_support is not None:
+                u = np.clip(u, *prior_support)
+            log_probs = prior_log_pdf(prior_params, u)
+            if return_sample:
+                return log_probs + log_det, u
+            return log_probs + log_det
+
+        def sample(rng, params, num_samples=1, return_original_samples=False):
+            prior_samples = prior_sample(rng, prior_params, num_samples)
+            if return_original_samples:
+                return inverse_fun(params, prior_samples)[0], prior_samples
+            return inverse_fun(params, prior_samples)[0]
+
+        return params, log_pdf, sample
 
     return init_fun

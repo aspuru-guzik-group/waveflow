@@ -7,6 +7,7 @@ from helper import check_sample_quality
 from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
 from model_factory import get_model, get_masked_transform
+from create_figures import create_report
 
 from jax.config import config
 # config.update("jax_debug_nans", True)
@@ -81,28 +82,29 @@ def get_dataset(dataset, n_samples, length, margin, do_plot=False):
             plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
             plt.show()
 
+    elif dataset == 'checkerboard':
+        #################################################################################
+        ################################# Make Halfmoon #################################
+        #################################################################################
+
+        X, _ = datasets.make_swiss_roll(n_samples=n_samples, noise=.05)
+
+        scaler = preprocessing.MinMaxScaler(feature_range=(margin, 1-margin))
+        X = scaler.fit_transform(X)
+        sample_log_pdf_gt = None
+
+        if do_plot:
+            fig = plt.figure(figsize=(8, 6))
+            ax = fig.add_subplot(111, projection="3d")
+            fig.add_axes(ax)
+            ax.scatter(X[:, 0], X[:, 1], X[:, 2], s=5, alpha=0.6)
+            plt.show()
+
     return X
 
 
 
 def get_model(model_type, spline_reg):
-    def get_masks(input_dim, hidden_dim=64, num_hidden=1):
-        masks = []
-        input_degrees = np.arange(input_dim)
-        degrees = [input_degrees]
-
-        for n_h in range(num_hidden + 1):
-            degrees += [np.arange(hidden_dim) % (input_dim - 1)]
-        degrees += [input_degrees % input_dim - 1]
-
-        for (d0, d1) in zip(degrees[:-1], degrees[1:]):
-            masks += [np.transpose(np.expand_dims(d1, -1) >= np.expand_dims(d0, 0)).astype(np.float32)]
-        return masks
-
-
-
-
-
 
     if model_type == 'Flow':
         init_fun = flows.Flow(
@@ -161,7 +163,7 @@ def train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_si
     losses = [-log_pdf(params, X).mean()]
     kde_kl_divergences = []
     kde_hellinger_distances = []
-    sample_scores = []
+    reconstruction_distances = []
     pbar = tqdm.tqdm(range(num_epochs))
     step = jit(step)
     for epoch in pbar:
@@ -171,7 +173,7 @@ def train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_si
 
             params = get_params(opt_state)
             check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
-                                 sample_scores,
+                                 reconstruction_distances,
                                  n_model_sample=n_model_sample, system=dataset, model_type=model_type, epoch=epoch,
                                  save_figs=save_figs)
 
@@ -201,33 +203,42 @@ if __name__ == '__main__':
     num_epochs, batch_size = 50001, 100
     n_model_sample = 20000
 
-    dataset_list = ['gaussian_mixtures', 'halfmoon', 'circles']
+    dataset_list = ['gaussian_mixtures', 'halfmoon', 'circles', 'swiss_roll']
     model_type_list = ['Flow', 'IFlow', 'MFlow']
     spline_reg_list = [0, 0.01, 0.1]
 
     run_all = False
     if run_all:
         for dataset in dataset_list:
-            print('============== {} =============='.format(dataset))
             X = get_dataset(dataset, n_samples, length, margin, do_plot=False)
 
             for model_type in model_type_list:
-                print('============== {} =============='.format(model_type))
                 for spline_reg in spline_reg_list:
+                    if model_type == 'Flow' and spline_reg != 0:
+                        continue
+                    print('=========================================== \n '
+                          'Dataset: {} \n '
+                          'Model: {} \n '
+                          'Regularisation: {} \n '
+                          '=========================================== '.format(dataset, model_type, spline_reg))
                     init_fun = get_model(model_type, spline_reg)
                     params, log_pdf, sample = init_fun(flow_rng, input_dim)
-                    log_pdf = jit(log_pdf)
-                    sample = jit(sample, static_argnums=(2,))
+                    log_pdf = jit(log_pdf, static_argnums=(2, 3))
+                    sample = jit(sample, static_argnums=(2, 3))
 
                     opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
                     opt_state = opt_init(params)
 
                     train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=True, model_type='{}_{}'.format(model_type, spline_reg))
+
+        print('Creating report... ')
+        create_report('./results/pdf/')
+        print('Done!')
     else:
-        dataset = dataset_list[1]
+        dataset = dataset_list[3]
         model_type = model_type_list[2]
         spline_reg = 0.1
-        X = get_dataset(dataset, n_samples, length, margin, do_plot=False)
+        X = get_dataset(dataset, n_samples, length, margin, do_plot=True)
         init_fun = get_model(model_type, spline_reg)
         params, log_pdf, sample = init_fun(flow_rng, input_dim)
 

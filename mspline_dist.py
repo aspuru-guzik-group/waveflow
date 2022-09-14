@@ -134,8 +134,11 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 # @profile
 def test_splines(test_case):
 
+   dyadic_N = 5
+
    degree = 4
-   internal_knots = np.linspace(0, 1, 13)
+   n_internal_knots = degree * 2**dyadic_N - 1
+   internal_knots = np.linspace(0, 1, n_internal_knots)
    # internal_knots = np.random.uniform(0,1, 9)
    # internal_knots[0] = 0
    # internal_knots = np.cumsum(internal_knots)
@@ -272,34 +275,36 @@ def test_splines(test_case):
 
    elif test_case == 'b':
       basis_splines = []
-      fig, ax = plt.subplots()
+      # fig, ax = plt.subplots()
       for i in range(len(bweights)):
          ys = np.array([B(x, degree, i, bknots, degree, n_derivative=0) for x in xx])
          basis_splines.append(ys)
-         ax.plot(xx, ys, label='M {}'.format(i), ls='-')
-
-      ax.grid(True)
-      plt.show()
+      #    ax.plot(xx, ys, label='M {}'.format(i), ls='-')
+      #
+      # ax.grid(True)
+      # plt.show()
 
       basis_splines = np.array(basis_splines)
       basis_splines = basis_splines / np.linalg.norm(basis_splines, axis=-1, keepdims=True)
 
-      fig, ax = plt.subplots()
-      ys = [np.array([bweights[i] * basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in enumerate(xx)]
-      ax.plot(xx, ys, label='B', ls='-')
+      # fig, ax = plt.subplots()
+      # ys = [np.array([bweights[i] * basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in enumerate(xx)]
+      # ax.plot(xx, ys, label='B', ls='-')
+      #
+      # ax.grid(True)
+      # plt.show()
+      #
+      #
+      # # basis_splines = ortho_splines.gram_schmidt_r2l(basis_splines.T).T
+      # basis_splines = ortho_splines.gram_schmidt_symm(basis_splines.T).T
+      #
+      # print(np.linalg.norm(basis_splines, axis=-1))
+      # print(basis_splines[0].sum())
+      # print((basis_splines[0]**2).sum())
+      # print(np.dot(basis_splines[3], basis_splines[4]))
+      # print(basis_splines.shape)
 
-      ax.grid(True)
-      plt.show()
-
-
-      # basis_splines = ortho_splines.gram_schmidt_r2l(basis_splines.T).T
-      basis_splines = ortho_splines.gram_schmidt_symm(basis_splines.T).T
-
-      print(np.linalg.norm(basis_splines, axis=-1))
-      print(basis_splines[0].sum())
-      print((basis_splines[0]**2).sum())
-      print(np.dot(basis_splines[3], basis_splines[4]))
-      print(basis_splines.shape)
+      # ob_splines = ortho_splines.get_splinet(basis_splines, degree, len(bknots))
 
 
 

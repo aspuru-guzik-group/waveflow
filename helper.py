@@ -232,7 +232,7 @@ def binary_search(func, low=0.0, high=1.0, tol=1e-3):
 
 
 def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
-                         sample_scores, n_model_sample=5000, root_save_path='./results/pdf/', system=None,
+                         reconstruction_distances, n_model_sample=5000, root_save_path='./results/pdf/', system=None,
                          model_type=None, epoch=0, save_figs=False):
     root_save_path = '{}/{}/{}'.format(root_save_path, system, model_type)
     root_save_path_per_epoch = '{}/epoch_{}'.format(root_save_path, epoch)
@@ -268,7 +268,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
     print(pdf_grid.sum()*dx)
 
 
-    model_samples = sample(split_rng, params, num_samples=n_model_sample)
+    model_samples, original_samples = sample(split_rng, params, num_samples=n_model_sample, return_original_samples=True)
     kde = KernelDensity(kernel='gaussian', bandwidth=0.01, rtol=0.1).fit(model_samples)
     plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
                range=[(left_grid, right_grid), (left_grid, right_grid)])  # [-1]
@@ -291,6 +291,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
 
     kde_kl_divergences.append((pdf_grid * (log_pdf_grid - log_pdf_grid_kde)).mean())
     plt.plot(kde_kl_divergences)
+    plt.title('KL Divergence')
     if not save_figs or (system is None or model_type is None):
         plt.show()
     else:
@@ -299,6 +300,7 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
 
     kde_hellinger_distances.append(((np.sqrt(pdf_grid) - np.sqrt(pdf_grid_kde)) ** 2).mean())
     plt.plot(kde_hellinger_distances)
+    plt.title('Hellinger distance')
     if not save_figs or (system is None or model_type is None):
         plt.show()
     else:
@@ -306,16 +308,18 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
         plt.clf()
 
 
-    sample_score = np.exp(log_pdf(params, model_samples))
-    sample_scores.append(sample_score.mean())
-    plt.plot(sample_scores)
+    _, reconstructed_samples = log_pdf(params, model_samples, return_sample=True)
+    reconstruction_distances.append(np.linalg.norm(original_samples - reconstructed_samples, axis=-1).mean())
+    plt.plot(reconstruction_distances)
+    plt.title('Reconstruction error')
     if not save_figs or (system is None or model_type is None):
         plt.show()
     else:
-        plt.savefig('{}/sample_scores.png'.format(root_save_path))
+        plt.savefig('{}/reconstruction_distances.png'.format(root_save_path))
         plt.clf()
 
     if save_figs:
         np.savetxt('{}/losses.txt'.format(root_save_path), losses)
         np.savetxt('{}/kl_divergences.txt'.format(root_save_path), kde_kl_divergences)
         np.savetxt('{}/hellinger_divergences.txt'.format(root_save_path), kde_hellinger_distances)
+        np.savetxt('{}/reconstruction_distances.txt'.format(root_save_path), reconstruction_distances)
