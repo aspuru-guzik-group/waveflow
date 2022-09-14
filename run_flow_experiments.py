@@ -82,23 +82,6 @@ def get_dataset(dataset, n_samples, length, margin, do_plot=False):
             plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
             plt.show()
 
-    elif dataset == 'checkerboard':
-        #################################################################################
-        ################################# Make Halfmoon #################################
-        #################################################################################
-
-        X, _ = datasets.make_swiss_roll(n_samples=n_samples, noise=.05)
-
-        scaler = preprocessing.MinMaxScaler(feature_range=(margin, 1-margin))
-        X = scaler.fit_transform(X)
-        sample_log_pdf_gt = None
-
-        if do_plot:
-            fig = plt.figure(figsize=(8, 6))
-            ax = fig.add_subplot(111, projection="3d")
-            fig.add_axes(ax)
-            ax.scatter(X[:, 0], X[:, 1], X[:, 2], s=5, alpha=0.6)
-            plt.show()
 
     return X
 
@@ -203,7 +186,7 @@ if __name__ == '__main__':
     num_epochs, batch_size = 50001, 100
     n_model_sample = 20000
 
-    dataset_list = ['gaussian_mixtures', 'halfmoon', 'circles', 'swiss_roll']
+    dataset_list = ['gaussian_mixtures', 'halfmoon', 'circles']
     model_type_list = ['Flow', 'IFlow', 'MFlow']
     spline_reg_list = [0, 0.01, 0.1]
 
@@ -235,7 +218,7 @@ if __name__ == '__main__':
         create_report('./results/pdf/')
         print('Done!')
     else:
-        dataset = dataset_list[3]
+        dataset = dataset_list[2]
         model_type = model_type_list[2]
         spline_reg = 0.1
         X = get_dataset(dataset, n_samples, length, margin, do_plot=True)

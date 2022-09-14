@@ -11,8 +11,8 @@ import os
 from pathlib import Path
 from jax.config import config
 import numpy as onp
-from mspline_dist import M as M_onp
-from mspline_dist import I as I_onp
+from splines import M as M_onp
+from splines import I as I_onp
 from scipy.misc import derivative
 # config.update('jax_disable_jit', True)
 
