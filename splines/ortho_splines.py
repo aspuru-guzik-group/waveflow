@@ -58,6 +58,9 @@ def gram_schmidt_symm(imat, ovlp=None):
     odd = True
     if M % 2 == 0:
         odd = False
+    else:
+        print('Currently only even number of basises supported for orthogonalization. \n Exiting...')
+        exit()
 
     if ovlp is None:
         ovlp = np.dot(mat.T, mat) # get overlap
@@ -101,7 +104,10 @@ def gram_schmidt_symm(imat, ovlp=None):
         ov = symm_ortho2v(v1, v2)
         omat[:, i] = ov[0]
         omat[:, M-i-1] = ov[1]
-        
+
+    square_normalization_constant = np.sqrt(N)
+    for i in range(M):
+        omat[:,i] = omat[:,i] * square_normalization_constant
 
     return omat
 
@@ -173,7 +179,7 @@ def qr_decomp(mat):
 
 if __name__ == "__main__":
     
-    mat = np.random.rand(10, 4)
+    mat = np.random.rand(1000, 13)
     omat = gram_schmidt_l2r(mat)
     print(omat)
 

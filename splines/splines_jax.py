@@ -275,7 +275,6 @@ def MSpline_fun():
 
 
 
-
 def ISpline_fun():
 
    def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=None,

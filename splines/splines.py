@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from line_profiler_pycharm import profile
 import tqdm
-import splines.ortho_splines as ortho_splines
+import ortho_splines as ortho_splines
 
 # def M(x, k, i, t, max_k):
 #    is_superflious_node = i < (max_k - 1) or i >= len(t) - max_k
@@ -134,15 +134,18 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 # @profile
 def test_splines(test_case):
 
-   dyadic_N = 5
+   dyadic_N = 3
 
    degree = 4
-   n_internal_knots = degree * 2**dyadic_N - 1
-   internal_knots = np.linspace(0, 1, n_internal_knots)
-   # internal_knots = np.random.uniform(0,1, 9)
-   # internal_knots[0] = 0
-   # internal_knots = np.cumsum(internal_knots)
-   # internal_knots = internal_knots / internal_knots[-1]
+   cardinal_basis = True
+   if cardinal_basis:
+      n_internal_knots = 12#degree * 2**dyadic_N - 1
+      internal_knots = np.linspace(0, 1, n_internal_knots)
+   else:
+      internal_knots = np.random.uniform(0,1, 9)
+      internal_knots[0] = 0
+      internal_knots = np.cumsum(internal_knots)
+      internal_knots = internal_knots / internal_knots[-1]
 
    mknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree).clip(min=1))
    mknots = np.repeat(mknots, ((mknots == mknots[-1]) * degree).clip(min=1))
@@ -274,35 +277,39 @@ def test_splines(test_case):
          print(pdf_grid.sum() * dx)
 
    elif test_case == 'b':
+      dyadic_N = 3
+      degree = 4
+      cardinal_basis = True
+      if cardinal_basis:
+         n_internal_knots = 13  # degree * 2**dyadic_N - 1
+         internal_knots = np.linspace(0, 1, n_internal_knots)
+      else:
+         internal_knots = np.random.uniform(0, 1, 9)
+         internal_knots[0] = 0
+         internal_knots = np.cumsum(internal_knots)
+         internal_knots = internal_knots / internal_knots[-1]
+
+      bknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree).clip(min=1))
+      bknots = np.repeat(bknots, ((bknots == bknots[-1]) * degree).clip(min=1))
+      bweights = np.random.rand(len(bknots) - degree - 1) - 0.5  # np.random()
+      bweights = bweights / np.sqrt(sum(bweights**2))
+
       basis_splines = []
-      # fig, ax = plt.subplots()
+      d_basis_splines = []
       for i in range(len(bweights)):
          ys = np.array([B(x, degree, i, bknots, degree, n_derivative=0) for x in xx])
          basis_splines.append(ys)
-      #    ax.plot(xx, ys, label='M {}'.format(i), ls='-')
-      #
-      # ax.grid(True)
-      # plt.show()
+
+         dys = np.array([B(x, degree, i, bknots, degree, n_derivative=1) for x in xx])
+         d_basis_splines.append(dys)
 
       basis_splines = np.array(basis_splines)
-      basis_splines = basis_splines / np.linalg.norm(basis_splines, axis=-1, keepdims=True)
 
-      # fig, ax = plt.subplots()
-      # ys = [np.array([bweights[i] * basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in enumerate(xx)]
-      # ax.plot(xx, ys, label='B', ls='-')
-      #
-      # ax.grid(True)
-      # plt.show()
-      #
-      #
-      # # basis_splines = ortho_splines.gram_schmidt_r2l(basis_splines.T).T
-      # basis_splines = ortho_splines.gram_schmidt_symm(basis_splines.T).T
-      #
-      # print(np.linalg.norm(basis_splines, axis=-1))
-      # print(basis_splines[0].sum())
-      # print((basis_splines[0]**2).sum())
-      # print(np.dot(basis_splines[3], basis_splines[4]))
-      # print(basis_splines.shape)
+      o_basis_splines = ortho_splines.gram_schmidt_symm(basis_splines.T).T
+
+
+      print('Orthogonality ', np.dot(o_basis_splines[3], o_basis_splines[4]))
+      print('Square integral ', ((o_basis_splines[0]**2) * 1/o_basis_splines[0].shape[0]).sum())
 
       # ob_splines = ortho_splines.get_splinet(basis_splines, degree, len(bknots))
 
@@ -310,33 +317,59 @@ def test_splines(test_case):
 
       fig, ax = plt.subplots()
       for i in range(len(bweights)):
-         ys = basis_splines[i]
+         ys = o_basis_splines[i]
          ax.plot(xx, ys, label='M {}'.format(i), ls='-')
 
       ax.grid(True)
       plt.show()
+      #
+      # fig, ax = plt.subplots()
+      ys = np.array([np.array([bweights[i] * o_basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in enumerate(xx)])
+      # ax.plot(xx, ys, label='B', ls='-')
+      # ax.plot(xx, ys**2, label='B_Squared', ls='-')
+      #
+      # ax.grid(True)
+      # plt.show()
+
+
+
+      print((bweights**2).sum())
+      print(np.max(ys**2))
+      print(np.array([np.array([bweights[i]**2 * o_basis_splines[i].max()**2 for i in range(len(bweights))]).sum()]))
+
+      basis_change_matrix_b_to_ob = o_basis_splines @ np.linalg.pinv(basis_splines)
+      basis_change_matrix_ob_to_b = basis_splines @ np.linalg.pinv(o_basis_splines)
+      d_o_basis_splines = basis_change_matrix_b_to_ob @ d_basis_splines
+
+      for i in range(10):
+         fig, ax = plt.subplots()
+         ys = np.array([np.array(o_basis_splines[i, j]) for j, x in enumerate(xx)])
+         dys_n = np.gradient(ys, 1 / n_points, edge_order=2)
+         dys = np.array([np.array(np.array(d_o_basis_splines)[i, j]) for j, x in enumerate(xx)])
+         ax.plot(xx, dys_n, label='del B n', ls='-')
+         ax.plot(xx, dys, label='del B', ls='-')
+         ax.legend()
+         plt.show()
+
+         # ys = np.array([np.array(o_basis_splines[i, j]) for j, x in enumerate(xx)])
+         # ys2 = (basis_change_matrix_b_to_ob @ basis_splines)[i]
+         # ax.plot(xx, ys, label='del B n', ls='-', linewidth=5)
+         # ax.plot(xx, ys2, label='del B', ls='-')
+         # ax.legend()
+         # plt.show()
+
 
       fig, ax = plt.subplots()
-      ys = [np.array([bweights[i] * basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in enumerate(xx)]
-      ax.plot(xx, ys, label='B', ls='-')
+      ys = np.array([np.array([bweights[i] * o_basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in
+                     enumerate(xx)])
+      dys_n = np.gradient(ys, 1/n_points, edge_order=2)
 
-      ax.grid(True)
+      dys = np.array([np.array([bweights[i] * d_o_basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in
+                     enumerate(xx)])
+      ax.plot(xx, dys_n, label='del B n', ls='-')
+      ax.plot(xx, dys, label='del B', ls='-')
+      ax.legend()
       plt.show()
-
-
-      # fig, ax = plt.subplots()
-      # ys = np.array([bspline(x, bknots, bweights, degree) for x in xx])
-      # ys_squared = np.array([bspline(x, bknots, bweights, degree) for x in xx])**2
-      # ax.plot(xx, ys, label='B Spline')
-      # ax.plot(xx, ys_squared, label='B Spline Squared')
-
-
-      ax.grid(True)
-      ax.legend(loc='best')
-      plt.show()
-
-
-
 
 
 
