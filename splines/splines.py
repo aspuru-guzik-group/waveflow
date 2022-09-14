@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from line_profiler_pycharm import profile
 import tqdm
-import ortho_splines
+import splines.ortho_splines as ortho_splines
 
 # def M(x, k, i, t, max_k):
 #    is_superflious_node = i < (max_k - 1) or i >= len(t) - max_k

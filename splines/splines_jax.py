@@ -11,8 +11,8 @@ import os
 from pathlib import Path
 from jax.config import config
 import numpy as onp
-from splines import M as M_onp
-from splines import I as I_onp
+from splines.splines import M as M_onp
+from splines.splines import I as I_onp
 from scipy.misc import derivative
 # config.update('jax_disable_jit', True)
 
@@ -33,9 +33,6 @@ def M(x, k, i, t, max_k):
 
 @custom_jvp
 def M_cached(x, i, cached_bases_dict, n_derivative=0):
-      # x = (x * cached_bases_dict[0].shape[-1]).astype(np.int32)
-      # return cached_bases_dict[n_derivative][i][x]
-
       n_points = cached_bases_dict[0].shape[-1] - 1
       x_l = np.floor(x * n_points).astype(np.int32)
       x_r = np.ceil(x * n_points).astype(np.int32)
@@ -108,9 +105,6 @@ def I(x, k, i, t, max_k, max_j):
 
 @custom_jvp
 def I_cached(x, i, cached_bases_dict, n_derivative=0):
-      # x = (x * cached_bases_dict[0].shape[-1]).astype(np.int32)
-      # return cached_bases_dict[n_derivative][i][x]
-
       n_points = cached_bases_dict[0].shape[-1] - 1
       x_l = np.floor(x * n_points).astype(np.int32)
       x_r = np.ceil(x * n_points).astype(np.int32)
@@ -151,7 +145,7 @@ def ispline(x, t, c, k, zero_border=True, cached_bases_dict=None):
 def MSpline_fun():
 
    def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True,
-                cached_bases_path_root='./cached_bases/M/', n_mesh_points=1000,
+                cached_bases_path_root='./splines/cached_bases/M/', n_mesh_points=1000,
                 constraints_dict_left={0: 0}, constraints_dict_right={0:0}):
       internal_knots = onp.linspace(0, 1, n_internal_knots)
       internal_knots = onp.repeat(internal_knots, ((internal_knots == internal_knots[0]) * k).clip(min=1))
@@ -285,7 +279,7 @@ def MSpline_fun():
 def ISpline_fun():
 
    def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=None,
-                use_cached_bases=True, cached_bases_path_root='./cached_bases/I/', n_mesh_points=1000,
+                use_cached_bases=True, cached_bases_path_root='./splines/cached_bases/I/', n_mesh_points=1000,
                 constraints_dict_left={0: 0}, constraints_dict_right={0: 1}):
       if reverse_fun_tol is None:
          reverse_fun_tol = 1/n_mesh_points

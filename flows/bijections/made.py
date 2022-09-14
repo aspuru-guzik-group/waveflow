@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as np
 from jax import random
-from splines_jax import MSpline_fun, ISpline_fun
+from splines.splines_jax import MSpline_fun, ISpline_fun
 from jax.nn import softmax
 import matplotlib.pyplot as plt
 import numpy as onp
