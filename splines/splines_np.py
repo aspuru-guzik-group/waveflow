@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from line_profiler_pycharm import profile
 import tqdm
-import ortho_splines as ortho_splines
+import splines.ortho_splines as ortho_splines
 
 def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
    x = np.random.uniform(low=xmin, high=xmax, size=num_samples * 4)
@@ -101,8 +101,8 @@ def ispline(x, t, c, k, n_derivatives=0):
    return sum(c[i] * I(x, k, i, t, k+1, n_derivatives=n_derivatives) for i in range(n))
 
 
-def B(x, k, i, t, max_k, n_derivative=0):
-   if n_derivative == 0:
+def B(x, k, i, t, max_k, n_derivatives=0):
+   if n_derivatives == 0:
       if k == 0:
          if t[i] <= x < t[i+1] or (i >= len(t) - (max_k+2) and x >= t[i] and x <= t[i+1]):
             return 1.0
@@ -120,22 +120,22 @@ def B(x, k, i, t, max_k, n_derivative=0):
          c2 = (t[i+k+1] - x)/(t[i+k+1] - t[i+1]) * B(x, k-1, i+1, t, max_k)
       return c1 + c2
    else:
-      return dB(x, k , i , t, max_k, n_derivative=n_derivative)
+      return dB(x, k, i, t, max_k, n_derivative=n_derivatives)
 
 def bspline(x, t, c, k, n_derivative=0):
    n = len(t) - k - 1
    assert (n >= k+1) and (len(c) >= n)
-   return sum(c[i] * B(x, k, i, t, k, n_derivative=n_derivative) for i in range(n))
+   return sum(c[i] * B(x, k, i, t, k, n_derivatives=n_derivative) for i in range(n))
 
 def dB(x, k, i, t, max_k, n_derivative=1):
    if t[i+k] - t[i] == 0:
       c1 = 0
    else:
-      c1 = B(x, k-1, i, t, max_k, n_derivative=n_derivative-1) / (t[i+k] - t[i])
+      c1 = B(x, k - 1, i, t, max_k, n_derivatives=n_derivative - 1) / (t[i + k] - t[i])
    if t[i+k+1] - t[i+1] == 0:
       c2 = 0
    else:
-      c2 = B(x, k-1, i+1, t, max_k, n_derivative=n_derivative-1) / (t[i+k+1] - t[i+1])
+      c2 = B(x, k - 1, i + 1, t, max_k, n_derivatives=n_derivative - 1) / (t[i + k + 1] - t[i + 1])
 
    return k * ( c1 - c2 )
 
@@ -145,10 +145,10 @@ def dB(x, k, i, t, max_k, n_derivative=1):
 
 # @profile
 def test_splines(test_case):
-   degree = 2
+   degree = 5
    cardinal_basis = True
    if cardinal_basis:
-      n_internal_knots = 11  # degree * 2**dyadic_N - 1
+      n_internal_knots = 20  # degree * 2**dyadic_N - 1
       internal_knots = np.linspace(0, 1, n_internal_knots)
    else:
       internal_knots = np.random.uniform(0, 1, 9)
@@ -233,9 +233,9 @@ def test_splines(test_case):
       basis_splines = []
       d_basis_splines = []
       for i in range(len(bweights)):
-         ys = np.array([B(x, degree, i, bknots, degree, n_derivative=0) for x in xx])
+         ys = np.array([B(x, degree, i, bknots, degree, n_derivatives=0) for x in xx])
          basis_splines.append(ys)
-         dys = np.array([B(x, degree, i, bknots, degree, n_derivative=1) for x in xx])
+         dys = np.array([B(x, degree, i, bknots, degree, n_derivatives=1) for x in xx])
          d_basis_splines.append(dys)
 
       basis_splines = np.array(basis_splines)
@@ -254,19 +254,17 @@ def test_splines(test_case):
       # ob_splines = ortho_splines.get_splinet(basis_splines, degree, len(bknots))
 
       # fig, ax = plt.subplots()
-      # ys = np.array([bspline(x, bknots, bweights, degree, n_derivative=0) for x in xx])
+      # ys = np.array([bspline(x, bknots, bweights, degree, n_derivatives=0) for x in xx])
       # ax.plot(xx, ys)
       #
-      # ax.grid(True)
       # plt.show()
 
-      # for i in range(len(bweights)):
-         # fig, ax = plt.subplots()
-         # ys = np.array([B(x, degree, i, bknots, degree, n_derivative=0) for x in xx])
-         # ax.plot(xx, ys, label='OB {}'.format(i), ls='-')
-         #
-         # ax.grid(True)
-         # plt.show()
+      fig, ax = plt.subplots()
+      for i in range(len(bweights)):
+         ys = np.array([B(x, degree, i, bknots, degree, n_derivatives=0) for x in xx])
+         ax.plot(xx, ys, label='OB {}'.format(i), ls='-')
+
+      plt.show()
 
       # fig, ax = plt.subplots()
       # for i in range(len(bweights)):
@@ -280,13 +278,13 @@ def test_splines(test_case):
 
 
       def obspline(x, n_derivative=0):
-         bspline_vec = np.array([np.array([B(x_, degree, i, bknots, degree, n_derivative=n_derivative) for i in range(len(bweights))]) for x_ in x]).T
+         bspline_vec = np.array([np.array([B(x_, degree, i, bknots, degree, n_derivatives=n_derivative) for i in range(len(bweights))]) for x_ in x]).T
          bspline_vec = bspline_vec / np.sqrt((bspline_vec**2).T.sum(-1))
          ob_spline_vec = basis_change_matrix_b_to_ob @ bspline_vec
          return obweights.dot(ob_spline_vec)
 
       def obspline_squared(x):
-         bspline_vec = np.array([np.array([B(x_, degree, i, bknots, degree, n_derivative=0) for i in range(len(bweights))]) for x_ in x]).T
+         bspline_vec = np.array([np.array([B(x_, degree, i, bknots, degree, n_derivatives=0) for i in range(len(bweights))]) for x_ in x]).T
          ob_spline_vec = basis_change_matrix_b_to_ob @ bspline_vec
          return obweights.dot(ob_spline_vec)**2
 
@@ -296,6 +294,7 @@ def test_splines(test_case):
       ax.plot(xx, ys, label='B', ls='-')
       ax.plot(xx, oys, label='OB', ls='-')
       # ax.plot(xx, oys ** 2, label='B_Squared', ls='-')
+
 
       max_val = np.array([np.array([obweights[i] ** 2 * o_basis_splines[i].max() ** 2 for i in range(len(bweights))]).sum()])
       print('Estimated max val upper bound ', max_val)
