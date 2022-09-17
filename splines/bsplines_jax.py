@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import numpy as onp
 from splines.splines_np import B as B_onp
+import splines.ortho_splines as ortho_splines
 # config.update('jax_disable_jit', True)
 
 def B(x, k, i, t, max_k):
@@ -38,16 +39,10 @@ def f_fwd(primals, tangents):
 
 
 
-def bspline(x, t, c, k, zero_border=True, cached_bases=None):
-
-   if zero_border:
-      if cached_bases is not None:
-         return sum(c[i] * B_cached(x, i+1, cached_bases) for i in range(len(c)))
-      return sum(c[i] * B(x, k, i+1, t, k) for i in range(len(c)))
-   else:
-      if cached_bases is not None:
-         return sum(c[i] * B_cached(x, i, cached_bases) for i in range(len(c)))
-      return sum(c[i] * B(x, k, i, t, k) for i in range(len(c)))
+def bspline(x, t, c, k, cached_bases=None):
+    if cached_bases is not None:
+     return sum(c[i] * B_cached(x, i, cached_bases) for i in range(len(c)))
+    return sum(c[i] * B(x, k, i, t, k) for i in range(len(c)))
 
 
 
@@ -56,7 +51,7 @@ def bspline(x, t, c, k, zero_border=True, cached_bases=None):
 
 def BSpline_fun():
 
-   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True,
+   def init_fun(rng, k, n_internal_knots, cardinal_splines=True, use_cached_bases=True,
                 cached_bases_path_root='./splines/cached_bases/B/', n_mesh_points=1000,
                 constraints_dict_left={0: 0}, constraints_dict_right={0:0}):
 
@@ -66,10 +61,8 @@ def BSpline_fun():
       n_knots = len(knots)
 
 
-      if zero_border:
-         initial_params = jax.random.uniform(rng, minval=-1, maxval=1, shape=(n_knots - k - 2,))
-      else:
-         initial_params = jax.random.uniform(rng, minval=-1, maxval=1, shape=(n_knots - k - 1,))
+
+      initial_params = jax.random.uniform(rng, minval=-1, maxval=1, shape=(n_knots - k - 1,))
       initial_params = initial_params / np.sqrt(sum(initial_params ** 2))
 
       if use_cached_bases:
@@ -79,6 +72,7 @@ def BSpline_fun():
             exit()
 
          cached_bases_dict = []
+         cached_bases_change_matrix_path = '{}/degree_{}_niknots_{}_nmp_{}'.format(cached_bases_path_root, k, n_knots - k, n_mesh_points)
          for n_derivative in tqdm.tqdm(range(0, 4)):
 
             cached_bases_path = '{}/degree_{}_niknots_{}_nmp_{}_nd_{}.npy'.format(cached_bases_path_root, k, n_knots - k, n_mesh_points, n_derivative)
@@ -86,16 +80,28 @@ def BSpline_fun():
                print('Bases found, loading...')
                cached_bases_dict.append(np.load(cached_bases_path))
             else:
-               print('No bases found, precomputing...')
-               mesh = onp.linspace(0, 1, n_mesh_points)
-               cached_bases = []
-               for i in tqdm.tqdm(range(n_knots - k - 1)):
-                  cached_bases.append(np.array([B_onp(x, k, i, knots, k, n_derivatives=n_derivative) for x in mesh]))
+                print('No bases found, precomputing...')
+                mesh = onp.linspace(0, 1, n_mesh_points)
+                cached_bases = []
+                for i in tqdm.tqdm(range(n_knots - k - 1)):
+                    cached_bases.append(np.array([B_onp(x, k, i, knots, k, n_derivatives=n_derivative) for x in mesh]))
 
-               cached_bases = np.array(cached_bases)
-               np.save(cached_bases_path, cached_bases)
-               cached_bases_dict.append(cached_bases)
-               print('Done!')
+                cached_bases = np.array(cached_bases)
+
+                if n_derivative == 0:
+                    o_basis_splines = ortho_splines.gram_schmidt_symm(cached_bases.T).T
+                    basis_change_matrix_b_to_ob = o_basis_splines @ onp.linalg.pinv(cached_bases)
+                    basis_change_matrix_ob_to_b = cached_bases @ onp.linalg.pinv(o_basis_splines)
+                    np.save('{}_b_to_ob.npy'.format(cached_bases_change_matrix_path), basis_change_matrix_b_to_ob)
+                    np.save('{}_ob_to_b.npy'.format(cached_bases_change_matrix_path), basis_change_matrix_b_to_ob)
+                    cached_bases = o_basis_splines
+                else:
+                    cached_bases = basis_change_matrix_b_to_ob @ cached_bases
+
+                np.save(cached_bases_path, cached_bases)
+                cached_bases_dict.append(cached_bases)
+
+                print('Done!')
          cached_bases_dict = np.array(cached_bases_dict)
       else:
          print('B spline basis only supports precached bases at the moment. Exiting...')
@@ -113,7 +119,11 @@ def BSpline_fun():
          else:
             knots_ = knots
 
-         return bspline(x, knots_, params, k, zero_border, cached_bases_dict)
+         params = basis_change_matrix_ob_to_b.T @ params
+         #obweights = obweights / np.sqrt(sum(obweights ** 2))
+
+         return bspline(x, knots_, params, k, cached_bases_dict)
+
 
       apply_fun_vec = jit(vmap(apply_fun, in_axes=(0, 0)))
       apply_fun_vec_grad = jit(vmap(grad(apply_fun, argnums=1), in_axes=(0, 0)))
@@ -192,7 +202,6 @@ def BSpline_fun():
 
 
 if __name__ == '__main__':
-
     rng = jax.random.PRNGKey(4)
     k = 5
     n_points = 5000
@@ -202,7 +211,7 @@ if __name__ == '__main__':
 
     init_fun_b = BSpline_fun()
     params_b, apply_fun_vec_b, apply_fun_vec_grad_b, sample_fun_vec_b, knots_b, enforce_boundary_conditions_b, remove_bias_b = \
-        init_fun_b(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, use_cached_bases=True,
+        init_fun_b(rng, k, n_internal_knots, cardinal_splines=True, use_cached_bases=True,
                    constraints_dict_left={0: 0}, constraints_dict_right={})
 
     # params_m = np.ones_like(params_m)
