@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as onp
 from splines.splines_np import B as B_onp
 import splines.ortho_splines as ortho_splines
+from jax import config
 # config.update('jax_disable_jit', True)
 
 def B(x, k, i, t, max_k):
@@ -72,13 +73,20 @@ def BSpline_fun():
             exit()
 
          cached_bases_dict = []
+         cached_o_bases_dict = []
          cached_bases_change_matrix_path = '{}/degree_{}_niknots_{}_nmp_{}'.format(cached_bases_path_root, k, n_knots - k, n_mesh_points)
          for n_derivative in tqdm.tqdm(range(0, 4)):
 
-            cached_bases_path = '{}/degree_{}_niknots_{}_nmp_{}_nd_{}.npy'.format(cached_bases_path_root, k, n_knots - k, n_mesh_points, n_derivative)
+            cached_bases_path = '{}/b_degree_{}_niknots_{}_nmp_{}_nd_{}.npy'.format(cached_bases_path_root, k, n_knots - k, n_mesh_points, n_derivative)
+            cached_obases_path = '{}/ob_degree_{}_niknots_{}_nmp_{}_nd_{}.npy'.format(cached_bases_path_root, k, n_knots - k, n_mesh_points, n_derivative)
             if os.path.exists(cached_bases_path):
                print('Bases found, loading...')
+               cached_o_bases_dict.append(np.load(cached_obases_path))
                cached_bases_dict.append(np.load(cached_bases_path))
+               if n_derivative == 0:
+                   basis_change_matrix_b_to_ob = np.load('{}_b_to_ob.npy'.format(cached_bases_change_matrix_path))
+                   basis_change_matrix_ob_to_b = np.load('{}_ob_to_b.npy'.format(cached_bases_change_matrix_path))
+
             else:
                 print('No bases found, precomputing...')
                 mesh = onp.linspace(0, 1, n_mesh_points)
@@ -89,23 +97,28 @@ def BSpline_fun():
                 cached_bases = np.array(cached_bases)
 
                 if n_derivative == 0:
-                    o_basis_splines = ortho_splines.gram_schmidt_symm(cached_bases.T).T
-                    basis_change_matrix_b_to_ob = o_basis_splines @ onp.linalg.pinv(cached_bases)
-                    basis_change_matrix_ob_to_b = cached_bases @ onp.linalg.pinv(o_basis_splines)
+                    cached_o_bases = ortho_splines.gram_schmidt_symm(cached_bases.T).T
+                    cached_o_bases = cached_o_bases / np.sqrt((cached_o_bases**2).sum(-1)[0] / n_mesh_points)
+                    basis_change_matrix_b_to_ob = cached_o_bases @ onp.linalg.pinv(cached_bases)
+                    basis_change_matrix_ob_to_b = cached_bases @ onp.linalg.pinv(cached_o_bases)
                     np.save('{}_b_to_ob.npy'.format(cached_bases_change_matrix_path), basis_change_matrix_b_to_ob)
-                    np.save('{}_ob_to_b.npy'.format(cached_bases_change_matrix_path), basis_change_matrix_b_to_ob)
-                    cached_bases = o_basis_splines
+                    np.save('{}_ob_to_b.npy'.format(cached_bases_change_matrix_path), basis_change_matrix_ob_to_b)
                 else:
-                    cached_bases = basis_change_matrix_b_to_ob @ cached_bases
+                    cached_o_bases = basis_change_matrix_b_to_ob @ cached_bases
 
+                np.save(cached_obases_path, cached_o_bases)
                 np.save(cached_bases_path, cached_bases)
+                cached_o_bases_dict.append(cached_o_bases)
                 cached_bases_dict.append(cached_bases)
 
                 print('Done!')
+         cached_o_bases_dict = np.array(cached_o_bases_dict)
          cached_bases_dict = np.array(cached_bases_dict)
+         pairwise_max = (np.einsum('in,jn->ijn', cached_o_bases_dict[0], cached_o_bases_dict[0])).max(-1)
       else:
          print('B spline basis only supports precached bases at the moment. Exiting...')
          exit()
+         cached_o_bases_dict = np.array([None])
          cached_bases_dict = np.array([None])
 
       # Convert to from onp array to jax device array
@@ -119,10 +132,10 @@ def BSpline_fun():
          else:
             knots_ = knots
 
-         params = basis_change_matrix_ob_to_b.T @ params
-         #obweights = obweights / np.sqrt(sum(obweights ** 2))
+         params = params @ basis_change_matrix_ob_to_b#basis_change_matrix_ob_to_b.T @ params
+         params = params / np.sqrt(np.sum(params ** 2))
 
-         return bspline(x, knots_, params, k, cached_bases_dict)
+         return bspline(x, knots_, params, k, cached_o_bases_dict)
 
 
       apply_fun_vec = jit(vmap(apply_fun, in_axes=(0, 0)))
@@ -140,15 +153,17 @@ def BSpline_fun():
             rng, split_rng = jax.random.split(rng)
             y = jax.random.uniform(split_rng, minval=0, maxval=ymax, shape=(1,))
 
-            passed = (y < apply_fun(params, x)).astype(bool)
+            passed = (y < apply_fun(params, x)**2).astype(bool)
             all_x = all_x.at[i].add((passed * x)[0])
             i = i + passed[0]
             return rng, all_x, i
 
          if not cardinal_splines:
-            ymax = params[0].max() * n_knots
+            raise NotImplementedError
          else:
-            ymax = params.max() * n_knots
+            obweigts = params @ basis_change_matrix_ob_to_b
+            obweigts = obweigts / np.sqrt(np.sum(obweigts ** 2))
+            ymax = ((obweigts @ basis_change_matrix_b_to_ob) ** 2).max()
 
          all_x = np.zeros(num_samples)
          _, all_x, _ = jax.lax.while_loop(lambda i: i[2] < num_samples, rejection_sample, (rng_array, all_x, 0))
@@ -183,18 +198,10 @@ def BSpline_fun():
 
          # weights = np.flip(weights)
 
-         return weights / weights.sum()
+         return weights / np.sqrt(np.sum(weights ** 2))#weights.sum()
       enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0)))
 
-      def remove_bias(params):
-         for i in range(k):
-            params = params.at[i].set(params[i] * (i + 1) / k)
-            params = params.at[-(i + 1)].set(params[-(i + 1)] * (i + 1) / k)
-         return params / params.sum()
-
-      remove_bias = jit(vmap(remove_bias, in_axes=(0)))
-
-      return initial_params, apply_fun_vec, apply_fun_vec_grad, sample_fun_vec, knots, enforce_boundary_conditions, remove_bias
+      return initial_params, apply_fun_vec, apply_fun_vec_grad, sample_fun_vec, knots, enforce_boundary_conditions
 
    return init_fun
 
@@ -202,7 +209,8 @@ def BSpline_fun():
 
 
 if __name__ == '__main__':
-    rng = jax.random.PRNGKey(4)
+
+    rng = jax.random.PRNGKey(40)
     k = 5
     n_points = 5000
     n_internal_knots = 20
@@ -210,32 +218,42 @@ if __name__ == '__main__':
 
 
     init_fun_b = BSpline_fun()
-    params_b, apply_fun_vec_b, apply_fun_vec_grad_b, sample_fun_vec_b, knots_b, enforce_boundary_conditions_b, remove_bias_b = \
+    params_b, apply_fun_vec_b, apply_fun_vec_grad_b, sample_fun_vec_b, knots_b, enforce_boundary_conditions_b = \
         init_fun_b(rng, k, n_internal_knots, cardinal_splines=True, use_cached_bases=True,
-                   constraints_dict_left={0: 0}, constraints_dict_right={})
+                   cached_bases_path_root='../splines/cached_bases/B/',
+                   constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={})
 
     # params_m = np.ones_like(params_m)
     params_b = np.repeat(params_b[:, None], n_points, axis=1).T
-    params_b = np.ones_like(params_b)
+    # params_b = np.ones_like(params_b)
+
 
     # params_b = remove_bias_b(params_b)
     params_b = enforce_boundary_conditions_b(params_b)
 
 
     rng_array = jax.random.split(rng, n_points)
-    # s = sample_fun_vec_m(rng_array, params_m, 20).reshape(-1)[None]
+    s = sample_fun_vec_b(rng_array, params_b, 1000).reshape(-1)[None]
 
     fig, ax = plt.subplots()
-    ax.plot(xx, apply_fun_vec_b(params_b, xx), label='B Spline')
+    ys = apply_fun_vec_b(params_b, xx)
+    print('Actual max ', (ys**2).max())
+
+    ax.plot(xx, ys, label='B Spline')
+    ax.plot(xx, ys**2, label='B^2 Spline')
+    ax.hist(np.array(s), density=True, bins=100)
     ax.grid(True)
     ax.legend(loc='best')
     plt.show()
+    print('Square integral ', (ys**2).sum() / n_points)
 
     fig, ax = plt.subplots()
     ax.plot(xx, apply_fun_vec_grad_b(params_b, xx), label='B Spline Grad')
+    ax.plot(xx, np.gradient(ys, 1/n_points), label='B Spline Grad nummerically')
     ax.grid(True)
     ax.legend(loc='best')
     plt.show()
+
 
     # n_knots = len(knots_b)
     # for _ in tqdm.tqdm(range(10000)):

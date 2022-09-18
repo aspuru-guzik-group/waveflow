@@ -227,7 +227,7 @@ def test_splines(test_case):
       bknots = np.repeat(internal_knots, ((internal_knots == internal_knots[0]) * degree + 1).clip(min=1))
       bknots = np.repeat(bknots, ((bknots == bknots[-1]) * degree + 1).clip(min=1))
       bweights = np.random.rand(len(bknots) - degree - 1) - 0.5  # np.random()
-      bweights = bweights / np.sqrt(sum(bweights**2))
+      bweights = bweights / np.sqrt(sum(bweights ** 2))
 
 
       basis_splines = []
@@ -239,73 +239,80 @@ def test_splines(test_case):
          d_basis_splines.append(dys)
 
       basis_splines = np.array(basis_splines)
-      basis_splines = basis_splines / np.sqrt((basis_splines**2).T.sum(-1))
+      # basis_splines = basis_splines / np.sqrt((basis_splines**2).T.sum(-1))
 
       o_basis_splines = ortho_splines.gram_schmidt_symm(basis_splines.T).T
+      o_basis_splines = o_basis_splines / np.sqrt((o_basis_splines**2).sum(-1)[:,None] / n_points)
       basis_change_matrix_b_to_ob = o_basis_splines @ np.linalg.pinv(basis_splines)
       basis_change_matrix_ob_to_b = basis_splines @ np.linalg.pinv(o_basis_splines)
-      obweights = basis_change_matrix_ob_to_b.T @ bweights
-      obweights = obweights / np.sqrt(sum(obweights ** 2))
+
+      for _ in range(30):
+         bweights = np.random.rand(len(bknots) - degree - 1) - 0.5  # np.random()
+         # bweights = bweights / np.sqrt(sum(bweights ** 2))
+         obweights = bweights @ basis_change_matrix_ob_to_b
+         obweights = obweights / np.sqrt(sum(obweights ** 2))
 
 
 
-      print('Orthogonality ', np.dot(o_basis_splines[3], o_basis_splines[4]))
-      print('Square integral ', ((o_basis_splines[4]**2) * 1/o_basis_splines[4].shape[0]).sum())
-      # ob_splines = ortho_splines.get_splinet(basis_splines, degree, len(bknots))
+         print('Orthogonality ', np.dot(o_basis_splines[3], o_basis_splines[4]))
+         print('Square integral ', ((o_basis_splines[4]**2) * 1/o_basis_splines[4].shape[0]).sum())
+         # ob_splines = ortho_splines.get_splinet(basis_splines, degree, len(bknots))
 
-      # fig, ax = plt.subplots()
-      # ys = np.array([bspline(x, bknots, bweights, degree, n_derivatives=0) for x in xx])
-      # ax.plot(xx, ys)
-      #
-      # plt.show()
+         # fig, ax = plt.subplots()
+         # ys = np.array([bspline(x, bknots, bweights, degree, n_derivatives=0) for x in xx])
+         # ax.plot(xx, ys)
+         #
+         # plt.show()
 
-      fig, ax = plt.subplots()
-      for i in range(len(bweights)):
-         ys = np.array([B(x, degree, i, bknots, degree, n_derivatives=0) for x in xx])
-         ax.plot(xx, ys, label='OB {}'.format(i), ls='-')
-
-      plt.show()
-
-      # fig, ax = plt.subplots()
-      # for i in range(len(bweights)):
-      #    ys = o_basis_splines[i]
-      #    ax.plot(xx, ys, label='OB {}'.format(i), ls='-')
-      #
-      # ax.grid(True)
-      # plt.show()
+         # for i in range(len(bweights)):
+         #    fig, ax = plt.subplots()
+         #    ys = np.array([B(x, degree, i, bknots, degree, n_derivatives=2) for x in xx])
+         #    ax.plot(xx, ys, label='OB {}'.format(i), ls='-')
+         #    plt.show()
 
 
+         # fig, ax = plt.subplots()
+         # for i in range(len(bweights)):
+         #    ys = o_basis_splines[i]
+         #    ax.plot(xx, ys, label='OB {}'.format(i), ls='-')
+         #
+         # ax.grid(True)
+         # plt.show()
 
 
-      def obspline(x, n_derivative=0):
-         bspline_vec = np.array([np.array([B(x_, degree, i, bknots, degree, n_derivatives=n_derivative) for i in range(len(bweights))]) for x_ in x]).T
-         bspline_vec = bspline_vec / np.sqrt((bspline_vec**2).T.sum(-1))
-         ob_spline_vec = basis_change_matrix_b_to_ob @ bspline_vec
-         return obweights.dot(ob_spline_vec)
-
-      def obspline_squared(x):
-         bspline_vec = np.array([np.array([B(x_, degree, i, bknots, degree, n_derivatives=0) for i in range(len(bweights))]) for x_ in x]).T
-         ob_spline_vec = basis_change_matrix_b_to_ob @ bspline_vec
-         return obweights.dot(ob_spline_vec)**2
-
-      fig, ax = plt.subplots()
-      oys = obspline(xx, n_derivative=0)
-      ys = np.array([bspline(x, bknots, bweights, degree, n_derivative=0) for x in xx])
-      ax.plot(xx, ys, label='B', ls='-')
-      ax.plot(xx, oys, label='OB', ls='-')
-      # ax.plot(xx, oys ** 2, label='B_Squared', ls='-')
 
 
-      max_val = np.array([np.array([obweights[i] ** 2 * o_basis_splines[i].max() ** 2 for i in range(len(bweights))]).sum()])
-      print('Estimated max val upper bound ', max_val)
-      print('Real max val ', np.max(oys ** 2))
-      print('Square integral over entire spline', (oys ** 2 * 1 / n_points).sum())
-      print('Square integral over entire spline', (ys ** 2 * 1 / n_points).sum())
-      # s = rejection_sampling(obspline_squared, 1000, xmin=0, xmax=1, ymax=max_val)
-      # ax.hist(np.array(s), density=True, bins=100)
+         def obspline(x, n_derivative=0):
+            bspline_vec = np.array([np.array([B(x_, degree, i, bknots, degree, n_derivatives=n_derivative) for i in range(len(bweights))]) for x_ in x]).T
+            ob_spline_vec = basis_change_matrix_b_to_ob @ bspline_vec
+            return obweights.dot(ob_spline_vec), np.sqrt((bspline_vec**2).T.sum(-1))
 
-      ax.grid(True)
-      plt.show()
+         def obspline_squared(x):
+            bspline_vec = np.array([np.array([B(x_, degree, i, bknots, degree, n_derivatives=0) for i in range(len(bweights))]) for x_ in x]).T
+            ob_spline_vec = basis_change_matrix_b_to_ob @ bspline_vec
+            return obweights.dot(ob_spline_vec)**2
+
+         oys, N = obspline(xx, n_derivative=0)
+         ys = np.array([bspline(x, bknots, obweights @ basis_change_matrix_b_to_ob, degree, n_derivative=0) for x in xx])
+
+
+         bobweights = obweights @ basis_change_matrix_b_to_ob
+         max_val = (bobweights**2).max()
+         print('Estimated max val upper bound ', max_val)
+         print('Real max val ', np.max(oys ** 2))
+         print('Square integral over entire spline', (oys ** 2 * 1 / n_points).sum())
+         print('Square integral over entire spline', (ys ** 2 * 1 / n_points).sum())
+         print('\n\n')
+
+         fig, ax = plt.subplots()
+         ax.plot(xx, ys, label='B', ls='-')
+         ax.plot(xx, oys, label='OB', ls='-')
+         # ax.plot(xx, oys ** 2, label='B_Squared', ls='-')
+         # s = rejection_sampling(obspline_squared, 1000, xmin=0, xmax=1, ymax=max_val)
+         # ax.hist(np.array(s), density=True, bins=100)
+
+         ax.grid(True)
+         plt.show()
 
 
 
