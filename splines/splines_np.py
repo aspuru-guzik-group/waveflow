@@ -26,12 +26,12 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 
    return all_x[:num_samples]
 
-# def M(x, k, i, t, max_k):
+# def M(coordinates, k, i, t, max_k):
 #    is_superflious_node = i < (max_k - 1) or i >= len(t) - max_k
 #    is_first_node = i + k <= max_k-1 or i >= len(t) - max_k
 #
 #    if k == 1:
-#       if (x >= t[i] and x < t[i+1]) or (i >= len(t) - (max_k+1) and x >= t[i] and x <= t[i+1]):
+#       if (coordinates >= t[i] and coordinates < t[i+1]) or (i >= len(t) - (max_k+1) and coordinates >= t[i] and coordinates <= t[i+1]):
 #          if t[i+1] - t[i] == 0: #is_superflious_node:
 #             return 0
 #          else:
@@ -41,7 +41,7 @@ def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
 #    if t[i+k] - t[i] == 0: #is_first_node:
 #       return 0
 #    else:
-#       return k * ((x - t[i]) * M(x, k - 1, i, t, max_k) + (t[i + k] - x) * M(x, k - 1, i + 1, t, max_k)) / ((k - 1) * (t[i + k] - t[i]))
+#       return k * ((coordinates - t[i]) * M(coordinates, k - 1, i, t, max_k) + (t[i + k] - coordinates) * M(coordinates, k - 1, i + 1, t, max_k)) / ((k - 1) * (t[i + k] - t[i]))
 def M(x, k, i, t, max_k, n_derivatives = 0):
    if k == 1:
       if (x >= t[i] and x < t[i+1]) or (i >= len(t) - (max_k+1) and x >= t[i] and x <= t[i+1]):
@@ -66,7 +66,7 @@ def M(x, k, i, t, max_k, n_derivatives = 0):
 
 def dM(x, k, i, t, max_k):
    # WARNING: Only works for cardinal splines!
-   # return k * (M(x, k - 1, i, t, k - 1) - M(x, k - 1, i + 1, t, k - 1)) / (t[i + k] - t[i])
+   # return k * (M(coordinates, k - 1, i, t, k - 1) - M(coordinates, k - 1, i + 1, t, k - 1)) / (t[i + k] - t[i])
    if i>=len(t)-2*k:
       a2 = 1 / ( ((len(t) - k) - i) / ((len(t) - k) - i - 1))
    elif i < k-1:
@@ -109,7 +109,7 @@ def B(x, k, i, t, max_k, n_derivatives=0):
          else:
             return 0.0
 
-         #return 1.0 if t[i] <= x < t[i+1] else 0.0
+         #return 1.0 if t[i] <= coordinates < t[i+1] else 0.0
       if t[i+k] == t[i]:
          c1 = 0.0
       else:
@@ -172,7 +172,7 @@ def test_splines(test_case):
       fig, ax = plt.subplots()
       for i in range(len(mweights)):
          ys = np.array([M(x, degree, i, mknots, degree, n_derivatives=0) for x in xx])
-         # dys = np.array([M(x, degree, i, mknots, degree, n_derivatives=1) for x in xx])
+         # dys = np.array([M(coordinates, degree, i, mknots, degree, n_derivatives=1) for coordinates in xx])
 
          ax.plot(xx, ys, label='M {}'.format(i), ls='-')
          # ax.plot(xx, dys, label='dM {}/dx analytical'.format(i), ls='-')
@@ -259,14 +259,14 @@ def test_splines(test_case):
          # ob_splines = ortho_splines.get_splinet(basis_splines, degree, len(bknots))
 
          # fig, ax = plt.subplots()
-         # ys = np.array([bspline(x, bknots, bweights, degree, n_derivatives=0) for x in xx])
+         # ys = np.array([bspline(coordinates, bknots, bweights, degree, n_derivatives=0) for coordinates in xx])
          # ax.plot(xx, ys)
          #
          # plt.show()
 
          # for i in range(len(bweights)):
          #    fig, ax = plt.subplots()
-         #    ys = np.array([B(x, degree, i, bknots, degree, n_derivatives=2) for x in xx])
+         #    ys = np.array([B(coordinates, degree, i, bknots, degree, n_derivatives=2) for coordinates in xx])
          #    ax.plot(xx, ys, label='OB {}'.format(i), ls='-')
          #    plt.show()
 
@@ -322,9 +322,9 @@ def test_splines(test_case):
 
       # for i in range(len(bweights)):
       #    fig, ax = plt.subplots()
-      #    ys = np.array([np.array(o_basis_splines[i, j]) for j, x in enumerate(xx)])
+      #    ys = np.array([np.array(o_basis_splines[i, j]) for j, coordinates in enumerate(xx)])
       #    dys_n = np.gradient(ys, 1 / n_points, edge_order=2)
-      #    dys = np.array([np.array(np.array(d_o_basis_splines)[i, j]) for j, x in enumerate(xx)])
+      #    dys = np.array([np.array(np.array(d_o_basis_splines)[i, j]) for j, coordinates in enumerate(xx)])
       #    ax.plot(xx, dys_n, label='del B n', ls='-')
       #    ax.plot(xx, dys, label='del B', ls='-')
       #    ax.legend()
@@ -332,11 +332,11 @@ def test_splines(test_case):
 
 
       # fig, ax = plt.subplots()
-      # ys = np.array([np.array([bweights[i] * o_basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in
+      # ys = np.array([np.array([bweights[i] * o_basis_splines[i, j] for i in range(len(bweights))]).sum() for j, coordinates in
       #                enumerate(xx)])
       # dys_n = np.gradient(ys, 1/n_points, edge_order=2)
       #
-      # dys = np.array([np.array([bweights[i] * d_o_basis_splines[i, j] for i in range(len(bweights))]).sum() for j, x in
+      # dys = np.array([np.array([bweights[i] * d_o_basis_splines[i, j] for i in range(len(bweights))]).sum() for j, coordinates in
       #                enumerate(xx)])
       # ax.plot(xx, dys_n, label='del B n', ls='-')
       # ax.plot(xx, dys, label='del B', ls='-')

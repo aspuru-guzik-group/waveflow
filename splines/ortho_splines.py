@@ -14,13 +14,13 @@ import numpy as np
 #     n_D = k * 2 ** N - n_knots - 1 - n_U
 #
 #     H = b_spline_basis @ b_spline_basis.T
-#     A = np.eye(d)
+#     coordinates = np.eye(d)
 #     I = np.arange(d) #+ 1
 #
 #     for l in range(N):
 #
 #         # A_bar, H_bar = D_update(H[I, I], N - l)
-#         # A[:,I] = A[:, I] @ A_bar
+#         # coordinates[:,I] = coordinates[:, I] @ A_bar
 #         # H[I,I] = H_bar
 #
 #         r_index = []

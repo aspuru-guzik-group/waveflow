@@ -220,9 +220,9 @@ if __name__ == '__main__':
       init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, reverse_fun_tol=0.00001,
                  use_cached_bases=True, n_mesh_points=1000, constraints_dict_left={0: 0.0, 2: 0, 3: 0}, constraints_dict_right={0: 1})
 
-   # def some_transform(params, x):
-   #    itrans = apply_fun_vec_i(params, x)
-   #    return np.log(itrans + 0.1) + x
+   # def some_transform(params, coordinates):
+   #    itrans = apply_fun_vec_i(params, coordinates)
+   #    return np.log(itrans + 0.1) + coordinates
 
 
    # params_i = np.ones_like(params_i)
@@ -263,7 +263,7 @@ if __name__ == '__main__':
    # ax.plot(xx, ys, label='I Spline')
 
    # x_reconstructed = apply_fun_vec_i(params_i, ys_reversed)
-   # ax.plot(xx, x_reconstructed, label='x reconstructed')
+   # ax.plot(xx, x_reconstructed, label='coordinates reconstructed')
 
    # print(np.abs(xx - x_reconstructed).mean())
    # 5.544081e-06
