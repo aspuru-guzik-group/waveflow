@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 @jit
 def simple_sine_squared_cdf(start, end):
-    # CDF for a sine squared without scaling starting from start ending in x
+    # CDF for a sine squared without scaling starting from start ending in coordinates
     # return 0.5 * ( -start + np.sin(start)*np.cos(start) + end - np.sin(end)*np.cos(end) )
     return (2 * jnp.pi * (end - start) + jnp.sin(2 * jnp.pi * start) - jnp.sin(2 * jnp.pi * end)) / (4 * jnp.pi)
 
@@ -43,7 +43,7 @@ def rejection_sampling(rng, function, num_samples, xmin=-10, xmax=10, ymax=1):
 
 def sample_sine_square_dist(rng, params, num_samples):
     # xmin, xmax = params
-    # return rejection_sampling(rng, lambda x: sine_square_dist(params, x), n_sample, xmin=xmin, xmax=xmax, ymax=1 / simple_sine_squared_cdf(xmin, xmax))
+    # return rejection_sampling(rng, lambda coordinates: sine_square_dist(params, coordinates), n_sample, xmin=xmin, xmax=xmax, ymax=1 / simple_sine_squared_cdf(xmin, xmax))
 
     xmin, xmax = params
     ymax = 1 / simple_sine_squared_cdf(xmin, xmax)

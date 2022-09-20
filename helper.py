@@ -92,7 +92,7 @@ def plot_output(psi, sample, weight_dict, protons, box_length, fig, ax, n_eigenf
         ax.plot(x, z)
 
     elif n_space_dimension == 2:
-        # generate 2 2d grids for the x & y bounds
+        # generate 2 2d grids for the coordinates & y bounds
         y, x = np.meshgrid(np.linspace(-box_length/2, box_length/2, N), np.linspace(-box_length/2, box_length/2, N))
         coordinates = np.stack([x, y], axis=-1).reshape(-1, 2)
         # coordinates = coordinates[:, None, :]
@@ -186,7 +186,7 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimensi
         for i, c in zip(range(n_eigenfuncs), color):
             if ground_truth is not None:
                 energies_ax.plot([0, epoch], [ground_truth[i], ground_truth[i]], '--', c=c)
-            # x = np.arange(window // 2 - 1, len(energies_array[:, i]) - (window // 2))
+            # coordinates = np.arange(window // 2 - 1, len(energies_array[:, i]) - (window // 2))
             x = np.arange(0, len(energies_array[:, i]))
             av = uniform_sliding_average(energies_array[:, i], window)
             stdev = uniform_sliding_stdev(energies_array[:, i], window)
@@ -199,7 +199,7 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimensi
         if ground_truth is not None:
             energies_ax.set_yticks([0.0] + (ground_truth+0.25*ground_truth).tolist())
         energies_ax.minorticks_off()
-        energies_ax.yaxis.set_major_formatter(StrMethodFormatter('{x:.3f}'))
+        energies_ax.yaxis.set_major_formatter(StrMethodFormatter('{coordinates:.3f}'))
         energies_fig.savefig('{}/energies'.format(save_dir, save_dir))
 
         fig, ax = plt.subplots()

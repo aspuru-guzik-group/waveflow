@@ -48,11 +48,11 @@ class MSplines(object):
 
     def kernel_fp(self, coord):
         '''
-        Evaluate the degree-th order spline at fixed points x.
+        Evaluate the degree-th order spline at fixed points coordinates.
         Args:
             coord: 1d array, points at which the splines are evaluated, coord has to increase monotonically.
         Returns:
-            2d array: shape of (num_splines, nx). The ith row is the ith spline evaluated at x.
+            2d array: shape of (num_splines, nx). The ith row is the ith spline evaluated at coordinates.
             list of lists: the coordinates are separated according to the knots
         '''
         try:
@@ -64,8 +64,8 @@ class MSplines(object):
 
         # Put the first order splines into the matrix
         count_x = 0
-        group_x = [] # group x values according to the knots.
-        for i in range(self.num_splines): #TODO make a test, return the groups of x so that we can use it for I splines.
+        group_x = [] # group coordinates values according to the knots.
+        for i in range(self.num_splines): #TODO make a test, return the groups of coordinates so that we can use it for I splines.
             group_x.append([])
             while (count_x < nx):
                 if coord[count_x] >= self.knots[i] and coord < self.knots[i+1]:
@@ -121,7 +121,7 @@ def isplines(coord, num_splines, knots, degree=3, msplines=None):
         degree: the spline is continuous up to the (degree)th derivative. This is different from M-Splines.
         msplines: 2d array of m-splines at coord.
     Returns:
-        2d array: shape of (num_splines, nx). The ith row is the ith spline evaluated at x.
+        2d array: shape of (num_splines, nx). The ith row is the ith spline evaluated at coordinates.
     '''
     try:
         nx = len(coord)
@@ -162,7 +162,7 @@ def isplines_int(coord, num_splines, knots, degree=3, msplines=None):
         degree: the spline is continuous up to the (degree)th derivative. This is different from M-Splines.
         msplines: 2d array of m-splines at coord.
     Returns:
-        2d array: shape of (num_splines, nx). The ith row is the ith spline evaluated at x.
+        2d array: shape of (num_splines, nx). The ith row is the ith spline evaluated at coordinates.
     '''
     try:
         nx = len(coord)

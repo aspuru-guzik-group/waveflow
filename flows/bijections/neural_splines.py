@@ -201,39 +201,39 @@ def NeuralSplineAutoregressive(dim, K=5, B=3, hidden_dim=8, base_network=FCNN):
         def reset_parameters():
             init.uniform_(init_param, -1 / 2, 1 / 2)
 
-        def direct_fun(params, x):
-            z = np.zeros_like(x)
+        def direct_fun(params, coordinates):
+            z = np.zeros_like(coordinates)
             log_det = np.zeros(z.shape[0])
             for i in range(dim):
                 if i == 0:
-                    init_param = init_param.expand(x.shape[0], 3 * K - 1)
+                    init_param = init_param.expand(coordinates.shape[0], 3 * K - 1)
                     W, H, D = np.split(init_param, K, dim=1)
                 else:
-                    out = layers[i - 1](x[:, :i])
+                    out = layers[i - 1](coordinates[:, :i])
                     W, H, D = np.split(out, K, dim=1)
                 W, H = nn.softmax(W, axis=1), nn.softmax(H, axis=1)
                 W, H = 2 * B * W, 2 * B * H
                 D = nn.softplus(D)
-                z[:, i], ld = unconstrained_RQS(x[:, i], W, H, D, inverse=False, tail_bound=B)
+                z[:, i], ld = unconstrained_RQS(coordinates[:, i], W, H, D, inverse=False, tail_bound=B)
                 log_det += ld
             return z, log_det
 
         def inverse_fun(params, z):
-            x = np.zeros_like(z)
-            log_det = np.zeros(x.shape[0])
+            coordinates = np.zeros_like(z)
+            log_det = np.zeros(coordinates.shape[0])
             for i in range(dim):
                 if i == 0:
-                    init_param = init_param.expand(x.shape[0], 3 * K - 1)
+                    init_param = init_param.expand(coordinates.shape[0], 3 * K - 1)
                     W, H, D = np.split(init_param, K, dim=1)
                 else:
-                    out = layers[i - 1](x[:, :i])
+                    out = layers[i - 1](coordinates[:, :i])
                     W, H, D = np.split(out, K, dim=1)
                 W, H = nn.softmax(W, axis=1), nn.softmax(H, axis=1)
                 W, H = 2 * B * W, 2 * B * H
                 D = nn.softplus(D)
-                x[:, i], ld = unconstrained_RQS(z[:, i], W, H, D, inverse=True, tail_bound=B)
+                coordinates[:, i], ld = unconstrained_RQS(z[:, i], W, H, D, inverse=True, tail_bound=B)
                 log_det += ld
-            return x, log_det
+            return coordinates, log_det
 
         return (), direct_fun, inverse_fun
 

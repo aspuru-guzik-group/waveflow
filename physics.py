@@ -7,7 +7,7 @@ from helper import compute_hessian_diagonals, vectorized_diagonal, vectorized_tr
 
 
 def second_difference_along_coordinate(weight_dict, fn, x, i, eps):
-    # coordinate = jnp.zeros_like(x)
+    # coordinate = jnp.zeros_like(coordinates)
     # coordinate[:, i] = 1
 
     coordinate = jax.nn.one_hot(i, x.shape[-1])
@@ -56,7 +56,7 @@ def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), n_space_dime
             laplace = jnp.expand_dims(laplace, axis=-1)
 
         return -laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
-        # return v_fn(x)[:,None] * fn_x
+        # return v_fn(coordinates)[:,None] * fn_x
 
     v_fn = get_potential(protons, max_potential_val)
 

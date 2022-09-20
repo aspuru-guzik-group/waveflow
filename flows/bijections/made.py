@@ -1,11 +1,12 @@
 import jax
 import jax.numpy as np
 from jax import random
-from splines.splines_jax import MSpline_fun, ISpline_fun
+from splines.isplines_jax import ISpline_fun
+from splines.msplines_jax import MSpline_fun
 from jax.nn import softmax
 import matplotlib.pyplot as plt
 import numpy as onp
-
+from coordinates import rel2abs
 
 def ShiftLayer(shift):
     def init_fun(rng, input_shape):
@@ -16,6 +17,7 @@ def ShiftLayer(shift):
         return inputs - shift
 
     return init_fun, apply_fun
+
 
 def MaskedDense(mask):
     def init_fun(rng, input_shape):
@@ -95,13 +97,6 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
 
         def direct_fun(params, inputs, **kwargs):
             bijection_params = apply_fun(params, inputs)
-            # bijection_params = bijection_params.split(params_i.shape[-1], axis=-1)
-            # bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
-            # bijection_params = softmax(bijection_params, axis=-1)
-
-            # bijection_params = bijection_params.at[:, :, 1].set( (bijection_params[:, :, 1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
-            # bijection_params = bijection_params.at[:, :, -2].set( (bijection_params[:, :, -2] + (spline_regularization / bijection_params.shape[-1])) / spline_degree )
-            # bijection_params = bijection_params.at[:, :, 2:-2].set(bijection_params[:, :, 2:-2] + (spline_regularization / bijection_params.shape[-1]))
             bijection_params = bijection_params + spline_regularization
             bijection_params = remove_bias(bijection_params.reshape(-1, bijection_params.shape[-1])).reshape(bijection_params.shape[0],
                                                                                                  bijection_params.shape[1], bijection_params.shape[2])
@@ -123,13 +118,6 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
             outputs = np.zeros_like(inputs)
             for i_col in range(inputs.shape[-1]):
                 bijection_params = apply_fun(params, inputs)
-                # bijection_params = bijection_params.split(params_i.shape[-1], axis=-1)
-                # bijection_params = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bijection_params], axis=-1)
-                # bijection_params = softmax(bijection_params, axis=-1)
-
-                # bijection_params = bijection_params.at[:, :, 1].set((bijection_params[:, :, 1] + (spline_regularization / bijection_params.shape[-1])) / spline_degree)
-                # bijection_params = bijection_params.at[:, :, -2].set((bijection_params[:, :, -2] + (spline_regularization / bijection_params.shape[-1])) / spline_degree)
-                # bijection_params = bijection_params.at[:, :, 2:-2].set(bijection_params[:, :, 2:-2] + (spline_regularization / bijection_params.shape[-1]))
                 bijection_params = bijection_params + spline_regularization
                 bijection_params = remove_bias(bijection_params.reshape(-1, bijection_params.shape[-1])).reshape(bijection_params.shape[0],
                                                                                                         bijection_params.shape[1], bijection_params.shape[2])
@@ -145,6 +133,64 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
 
 
         return params, direct_fun, inverse_fun
+
+    return init_fun
+
+
+def BoxTransformLayer(box_side=1):
+    '''
+    Transforms autoregressively [0,1] into relative coordinates of a box of length box_side, and vice versa
+    Args:
+        box_side: length of one half of the box
+
+    '''
+
+    def init_fun(rng, input_dim, **kwargs):
+
+        def direct_fun(params, inputs, num_tollerance=1e-7):
+            '''
+
+            Args:
+                params: placeholder, function doesn't use params
+                inputs: array (batch_size, n_dimension) scales dimensions autoregressively up into [0,1]
+
+            Returns:
+
+            '''
+
+            outputs = np.ones_like(inputs)
+
+            outputs = outputs.at[:, 0].set( (inputs[:, 0] + box_side)/(2*box_side) )
+            for i in range(1, outputs.shape[-1]):
+                outputs = outputs.at[:, i].set( (inputs[:, i] - inputs[:, i-1])/(box_side - inputs[:, i-1] + num_tollerance) )
+
+            log_det_jacobian = - np.log(2*box_side) - np.log(box_side -inputs[:, :-1] + num_tollerance).sum(-1)
+
+            return outputs, log_det_jacobian
+
+
+
+        def reverse_fun(params, inputs):
+            '''
+            Args:
+                params: placeholder, funciton doesn't use params
+                inputs: array (batch_size, n_dimension) of relative coordinates in [0,1]. Scales the coordinates autoregressivel
+                        down to fit in the spepcified box dimensions
+
+            Returns: array (batch_size, n_dimension) of scaled relative coordinates
+
+            '''
+
+            inputs = inputs.at[:, 0].set((inputs[:, 0] - 0.5) * 2*box_side)
+            for i in range(1, inputs.shape[-1]):
+                inputs = inputs.at[:, i].set(inputs[:, i] * (box_side - inputs[:, i-1]) + inputs[:, i-1])
+
+            return inputs, 0
+
+
+
+
+        return (), direct_fun, reverse_fun
 
     return init_fun
 

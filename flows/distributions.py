@@ -3,12 +3,13 @@ from jax.nn import softmax
 from jax import random
 from jax.scipy.special import logsumexp
 from jax.scipy.stats import norm, multivariate_normal, uniform
-from splines.splines_jax import MSpline_fun, ISpline_fun
+from splines.isplines_jax import ISpline_fun
+from splines.msplines_jax import MSpline_fun
 
 def Normal(offset=0.0):
     """
     Returns:
-        A function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
+        coordinates function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
     """
 
     def init_fun(rng, input_dim):
@@ -26,7 +27,7 @@ def Normal(offset=0.0):
 def Uniform():
     """
     Returns:
-        A function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
+        coordinates function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
     """
 
     def init_fun(rng, input_dim):
@@ -73,7 +74,7 @@ def Flow(transformation, prior=Normal(), prior_support=None):
             ``(params, log_pdf, sample)`` triplet
 
     Returns:
-        A function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
+        coordinates function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
 
     Examples:
         >>> import flows
@@ -206,7 +207,7 @@ def InvFlow(transformation, prior=Normal(), prior_support=None):
             ``(params, log_pdf, sample)`` triplet
 
     Returns:
-        A function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
+        coordinates function mapping ``(rng, input_dim)`` to a ``(params, log_pdf, sample)`` triplet.
     """
 
     def init_fun(rng, input_dim):
