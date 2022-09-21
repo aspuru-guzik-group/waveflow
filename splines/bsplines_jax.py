@@ -171,8 +171,8 @@ def BSpline_fun():
 
       sample_fun_vec = vmap(sample_fun, in_axes=(0, 0, None))
 
-      def enforce_boundary_conditions(weights, enforcement_side):
-         if enforcement_side == 'left':
+      def enforce_boundary_conditions(weights, enforcement_left):
+         if enforcement_left:
              for p in constraints_dict_left.items():
                 n_derivative, constrain_value = p
                 previous_value_list = [B_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
@@ -198,7 +198,7 @@ def BSpline_fun():
          # weights = np.flip(weights)
 
          return weights / np.sqrt(np.sum(weights ** 2))#weights.sum()
-      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None)))
+      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None)), static_argnums=(1,))
 
       return initial_params, apply_fun_vec, apply_fun_vec_grad, sample_fun_vec, knots, enforce_boundary_conditions
 

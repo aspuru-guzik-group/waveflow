@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import jax
 import jax.numpy as np
 from jax.config import config
-config.update('jax_disable_jit', True)
+# config.update('jax_disable_jit', True)
 # config.update("jax_debug_nans", True)
 config.update("jax_enable_x64", True)
 
@@ -15,7 +15,7 @@ input_dim = 2
 
 left_grid = -1.0
 right_grid = 1.0
-n_grid_points = 10
+n_grid_points = 100
 dx = ((right_grid - left_grid) / n_grid_points) ** 2
 x = np.linspace(left_grid, right_grid, n_grid_points)
 y = np.linspace(left_grid, right_grid, n_grid_points)
@@ -28,7 +28,7 @@ grid = np.concatenate([xv, yv], axis=-1)
 grid_flat = grid.reshape(-1, 2)
 
 
-init_fun = get_waveflow_model(n_flow_layers=0)
+init_fun = get_waveflow_model(input_dim, n_flow_layers=3)
 params, psi, log_pdf, sample = init_fun(flow_rng, input_dim)
 psi = jax.jit(psi)
 log_pdf = jax.jit(log_pdf)

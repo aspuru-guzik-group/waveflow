@@ -20,47 +20,50 @@ def vh(fn):
     return jax.vmap(_laplacian, in_axes=(None, 0))
 
 if test_wavefunction:
-    init_fun = get_waveflow_model(n_flow_layers=4)
+    init_fun = get_waveflow_model(input_dim, n_flow_layers=0)
     params, psi, log_pdf, sample = init_fun(flow_rng, input_dim)
     fun = lambda params, x: psi(params, x)
+
+    grid_sample = np.linspace(0.01, .99, 20)[:, None]
+    grid_sample = np.concatenate([grid_sample]*input_dim, axis=-1)
 else:
     init_fun = get_model(i_constraint_dict_left={0: 0, 2: 0, 3: 0}, i_constraint_dict_right={0: 1},
                          prior_constraint_dict_left={0: 0, 2: 0}, set_nn_output_grad_to_zero=True)
     params, log_pdf, sample = init_fun(flow_rng, input_dim)
 
     fun = lambda params, x: np.exp(log_pdf(params, x))
+
+
+    left_grid = 0.0
+    right_grid = 1.0
+    n_grid_points = 1000
+    dx = ((right_grid - left_grid) / n_grid_points)
+
+    grid = []
+    meshgrid_x = []
+    for _ in range(input_dim):
+        meshgrid_x.append(np.linspace(left_grid, right_grid, n_grid_points))
+    for xv in np.meshgrid(*meshgrid_x):
+        xv = xv.reshape(-1)
+        xv = np.expand_dims(xv, axis=-1)
+        grid.append(xv)
+    grid = np.concatenate(grid, axis=-1)
+    grid = grid.reshape(*[n_grid_points]*input_dim, input_dim)
+    grid_boundaries = []
+    for i in range(grid.shape[-1]):
+        grid_boundaries.append(grid[(slice(None),) * i + (0,)].reshape(-1, input_dim))
+    grid_boundaries = np.concatenate(grid_boundaries)
+    random_index_array = jax.random.randint(rng, (10,), 0, grid_boundaries.shape[0])
+    grid_sample = grid_boundaries[random_index_array]
+
+    if input_dim == 2:
+        grid_crosssection_horizontal = grid[:, 150]
+        grid_crosssection_vertical = grid[150, :]
+
+
+
 fun_j = jax.vmap(jax.jacrev(fun, argnums=-1), in_axes=(None, 0))
 fun_h = vh(fun)
-
-left_grid = 0.0
-right_grid = 1.0
-n_grid_points = 1000
-dx = ((right_grid - left_grid) / n_grid_points)
-
-grid = []
-meshgrid_x = []
-for _ in range(input_dim):
-    meshgrid_x.append(np.linspace(left_grid, right_grid, n_grid_points))
-for xv in np.meshgrid(*meshgrid_x):
-    xv = xv.reshape(-1)
-    xv = np.expand_dims(xv, axis=-1)
-    grid.append(xv)
-grid = np.concatenate(grid, axis=-1)
-grid = grid.reshape(*[n_grid_points]*input_dim, input_dim)
-grid_boundaries = []
-for i in range(grid.shape[-1]):
-    grid_boundaries.append(grid[(slice(None),) * i + (0,)].reshape(-1, input_dim))
-grid_boundaries = np.concatenate(grid_boundaries)
-random_index_array = jax.random.randint(rng, (10,), 0, grid_boundaries.shape[0])
-grid_sample = grid_boundaries[random_index_array]
-
-if input_dim == 2:
-    grid_crosssection_horizontal = grid[:, 150]
-    grid_crosssection_vertical = grid[150, :]
-
-
-
-
 print(grid_sample)
 print(fun_h(params, grid_sample)[:, 0, 0, 0])
 print(fun_h(params, grid_sample)[:, 0, 1, 1])
