@@ -171,35 +171,34 @@ def BSpline_fun():
 
       sample_fun_vec = vmap(sample_fun, in_axes=(0, 0, None))
 
-      def enforce_boundary_conditions(weights):
-         # Currently can only set things to 0, work on normalization scheme for other values
-         for p in constraints_dict_left.items():
-            n_derivative, constrain_value = p
-            previous_value_list = [B_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
-                                   range(n_derivative)]
-            value = B_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
+      def enforce_boundary_conditions(weights, enforcement_side):
+         if enforcement_side == 'left':
+             for p in constraints_dict_left.items():
+                n_derivative, constrain_value = p
+                previous_value_list = [B_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
+                                       range(n_derivative)]
+                value = B_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
 
-            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
-            summed_previous_values = constrain_value - summed_previous_values
+                summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
+                summed_previous_values = constrain_value - summed_previous_values
 
-            weights = weights.at[n_derivative].set(summed_previous_values / value)
+                weights = weights.at[n_derivative].set(summed_previous_values / value)
+         else:
+             for p in constraints_dict_right.items():
+                n_derivative, constrain_value = p
+                previous_value_list = [B_cached(1.0, len(weights) - j - 1, cached_bases_dict, n_derivative=n_derivative) for
+                                       j in range(n_derivative)]
+                value = B_cached(1.0, len(weights) - n_derivative - 1, cached_bases_dict, n_derivative=n_derivative)
 
-         # weights = np.flip(weights)
-         for p in constraints_dict_right.items():
-            n_derivative, constrain_value = p
-            previous_value_list = [B_cached(1.0, len(weights) - j - 1, cached_bases_dict, n_derivative=n_derivative) for
-                                   j in range(n_derivative)]
-            value = B_cached(1.0, len(weights) - n_derivative - 1, cached_bases_dict, n_derivative=n_derivative)
+                summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, np.flip(weights))]).sum()
+                summed_previous_values = constrain_value - summed_previous_values
 
-            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, np.flip(weights))]).sum()
-            summed_previous_values = constrain_value - summed_previous_values
-
-            weights = weights.at[len(weights) - n_derivative - 1].set(summed_previous_values / value)
+                weights = weights.at[len(weights) - n_derivative - 1].set(summed_previous_values / value)
 
          # weights = np.flip(weights)
 
          return weights / np.sqrt(np.sum(weights ** 2))#weights.sum()
-      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0)))
+      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None)))
 
       return initial_params, apply_fun_vec, apply_fun_vec_grad, sample_fun_vec, knots, enforce_boundary_conditions
 

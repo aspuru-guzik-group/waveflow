@@ -8,7 +8,7 @@ from jax.scipy.stats import norm, multivariate_normal, uniform
 from splines.bsplines_jax import BSpline_fun
 
 def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots, constraints_dict_left={0: 0}, constraints_dict_right={0: 0},
-          set_nn_output_grad_to_zero=False, n_spline_base_mesh_points=2000):
+          constrained_dimension_indices_left=np.array([], dtype=int), constrained_dimension_indices_right=np.array([], dtype=int), set_nn_output_grad_to_zero=True, n_spline_base_mesh_points=2000):
 
     def init_fun(rng, input_dim):
         rng, transformation_rng = random.split(rng)
@@ -55,8 +55,22 @@ def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots,
             u, log_det = direct_fun(transform_params, inputs)
 
             prior_params = sp_transform_apply_fun(sp_transform_params, u)
-            prior_params = enforce_boundary_conditions(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
-                                                                                                                 prior_params.shape[1], prior_params.shape[2])
+            prior_params = prior_params.at[:, constrained_dimension_indices_left].set(
+                enforce_boundary_conditions(
+                    prior_params[:, constrained_dimension_indices_left].reshape(-1, prior_params.shape[-1]),
+                    'left'
+                ).reshape(
+                    prior_params.shape[0], len(constrained_dimension_indices_left), prior_params.shape[2]
+                )
+            )
+            prior_params = prior_params.at[:, constrained_dimension_indices_right].set(
+                enforce_boundary_conditions(
+                    prior_params[:, constrained_dimension_indices_right].reshape(-1, prior_params.shape[-1]),
+                    'right'
+                ).reshape(
+                    prior_params.shape[0], len(constrained_dimension_indices_right), prior_params.shape[2]
+                )
+            )
 
             u = np.clip(u, a_min=0.0, a_max=1.0)
             probs = bspline_apply_fun_vec(prior_params.reshape(-1, prior_params_init.shape[-1]), u.reshape(-1))

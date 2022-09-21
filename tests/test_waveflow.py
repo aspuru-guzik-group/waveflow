@@ -15,7 +15,7 @@ input_dim = 2
 
 left_grid = -1.0
 right_grid = 1.0
-n_grid_points = 300
+n_grid_points = 10
 dx = ((right_grid - left_grid) / n_grid_points) ** 2
 x = np.linspace(left_grid, right_grid, n_grid_points)
 y = np.linspace(left_grid, right_grid, n_grid_points)
