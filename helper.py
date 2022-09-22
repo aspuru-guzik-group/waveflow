@@ -44,47 +44,8 @@ def moving_average(running_average, new_data, beta):
     return running_average - beta * (running_average - new_data)
 
 
-def get_exact_eigenvalues(system_name, n_eigenfuncs, n_space_dimension, box_length, charge=1):
-    if n_space_dimension == 1:
-        quantum_nos = np.arange(1, n_eigenfuncs + 1)
 
-        if system_name == 'laplace':
-            return -((quantum_nos * np.pi) / (box_length)) ** 2
-
-        if system_name == 'H':
-            if charge is None:
-                raise Exception("charge is not provided")
-            energies = -2 * charge ** 2 / (quantum_nos ** 2)
-            energies /= 2  # convert back to units in the paper
-            return energies
-
-    if n_space_dimension == 2:
-
-        if system_name == 'laplace':
-            def e(n):
-                return -((n * np.pi) / (box_length)) ** 2
-
-            size = 5  # will be correct for at least n_eigenfuncs=9, maybe more
-            tmp = []
-            for i in range(1, size):
-                for j in range(1, size):
-                    tmp.append(e(i) + e(j))
-            ground_truth = np.flip(np.sort(tmp))[:n_eigenfuncs]
-            return ground_truth
-
-        if system_name == 'H':
-            max_n = int(np.ceil(np.sqrt(n_eigenfuncs))) + 1
-            tmp = []
-            for n in range(0, max_n):
-                for _ in range(2 * n + 1):
-                    tmp.append(n)
-            quantum_nos = np.array(tmp)[:n_eigenfuncs]
-            ground_truth = -charge ** 2 / (2 * (quantum_nos + 0.5) ** 2)
-            ground_truth /= 2  # convert back to units in the paper
-            return ground_truth
-
-
-def plot_output(psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, n_eigenfunc=0, N=100):
+def plot_output(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, n_eigenfunc=0, N=100):
     if n_space_dimension*n_particle == 1:
         x = np.linspace(-box_length/2, box_length/2, N)[:, None]
 
@@ -103,13 +64,16 @@ def plot_output(psi, sample, weight_dict, protons, box_length, fig, ax, n_partic
         z = psi(weight_dict, sorted_coordinates)
         z = z * ((-1) ** (inversion_count))
 
+        dx = (2*box_length / N) ** 2
+        print('Normalization ', (z**2 * dx).sum())
+
         if len(z.shape) == 1:
             z = z[:,None]
         z = z[:, n_eigenfunc].reshape(N, N)
         z_min, z_max = -np.abs(z).max(), np.abs(z).max()
         # plt.imshow(z, extent=[-box_length / 2, box_length / 2, -box_length / 2, box_length / 2], origin='lower')
         # plt.show()
-        sample_points = sample(jax.random.PRNGKey(0), weight_dict, 250)
+        sample_points = sample(rng, weight_dict, 250)
         # sample_points = sample_points[:, 0, :]
 
         c = ax.pcolormesh(x, y, z, cmap='RdBu', vmin=z_min, vmax=z_max)
@@ -159,7 +123,7 @@ def uniform_sliding_stdev(data, window):
     return np.std(rolling, 1)
 
 
-def create_checkpoint(save_dir, psi, sample, params, box_length, n_particle, n_space_dimension, opt_state, epoch, loss, energies, protons, system_name, window, n_plotting, psi_fig,
+def create_checkpoint(rng, save_dir, psi, sample, params, box_length, n_particle, n_space_dimension, opt_state, epoch, loss, energies, protons, system_name, window, n_plotting, psi_fig,
                       psi_ax, energies_fig, energies_ax, n_eigenfuncs=1):
     # checkpoints.save_checkpoint('{}/checkpoints'.format(save_dir),
     #                             (weight_dict, opt_state, epoch, sigma_t_bar, j_sigma_t_bar), epoch, keep=2)
@@ -175,7 +139,7 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_particle, n_s
     if n_space_dimension == 1:
         psi_ax.cla()
     for i in range(n_eigenfuncs):
-        plot_output(psi, sample, params, protons, box_length, psi_fig, psi_ax, n_particle, n_space_dimension, n_eigenfunc=i, N=n_plotting)
+        plot_output(rng, psi, sample, params, protons, box_length, psi_fig, psi_ax, n_particle, n_space_dimension, n_eigenfunc=i, N=n_plotting)
     eigenfunc_dir = f'{save_dir}/eigenfunctions'
     Path(eigenfunc_dir).mkdir(parents=True, exist_ok=True)
     psi_fig.savefig(f'{eigenfunc_dir}/epoch_{epoch}.png')
@@ -184,26 +148,19 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_particle, n_s
         energies_array = np.array(energies)
         Path(save_dir).mkdir(parents=True, exist_ok=True)
         energies_ax.cla()
-        ground_truth = get_exact_eigenvalues(system_name, n_eigenfuncs, n_space_dimension, box_length)
         color = plt.cm.tab10(np.arange(n_eigenfuncs))
         for i, c in zip(range(n_eigenfuncs), color):
-            if ground_truth is not None:
-                energies_ax.plot([0, epoch], [ground_truth[i], ground_truth[i]], '--', c=c)
             # coordinates = np.arange(window // 2 - 1, len(energies_array[:, i]) - (window // 2))
             x = np.arange(0, len(energies_array[:, i]))
             av = uniform_sliding_average(energies_array[:, i], window)
             stdev = uniform_sliding_stdev(energies_array[:, i], window)
             energies_ax.plot(x, av, c=c, label='Eigenvalue {}'.format(i))
             energies_ax.fill_between(x, av - stdev / 2, av + stdev / 2, color=c, alpha=.5)
-        if system_name == 'H':
-            energies_ax.set_ylim(min(ground_truth) - .1, 0)
+
         energies_ax.legend()
         energies_ax.set_yscale('symlog', linthresh=.1)
-        if ground_truth is not None:
-            energies_ax.set_yticks([0.0] + (ground_truth+0.25*ground_truth).tolist())
         energies_ax.minorticks_off()
-        energies_ax.yaxis.set_major_formatter(StrMethodFormatter('{coordinates:.3f}'))
-        energies_fig.savefig('{}/energies'.format(save_dir, save_dir))
+        energies_fig.savefig('{}/energies'.format(save_dir))
 
         fig, ax = plt.subplots()
         ax.plot(loss)

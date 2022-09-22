@@ -18,6 +18,10 @@ import matplotlib.pyplot as plt
 from systems import system_catalogue
 from line_profiler_pycharm import profile
 from model_factory import get_waveflow_model
+from jax.config import config
+# config.update('jax_disable_jit', True)
+# config.update("jax_debug_nans", True)
+config.update("jax_enable_x64", True)
 
 
 def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=1, rng=0):
@@ -26,7 +30,7 @@ def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=
     init_fun = get_waveflow_model(n_particle, base_spline_degree=5, i_spline_degree=5, n_prior_internal_knots=16,
                        n_i_internal_knots=16,
                        i_spline_reg=0.1, i_spline_reverse_fun_tol=0.000001,
-                       n_flow_layers=1, box_size=box_length)
+                       n_flow_layers=2, box_size=box_length)
 
     params, psi, log_pdf, sample = init_fun(rng, n_particle)
 
@@ -139,9 +143,9 @@ class ModelTrainer:
         # Flow parameter
 
         # Turn on/off real time plotting
-        self.realtime_plots = True
+        self.realtime_plots = False
         self.n_plotting = 200
-        self.log_every = 1000
+        self.log_every = 200
         self.window = 100
 
         # Optimizer
@@ -149,7 +153,7 @@ class ModelTrainer:
 
         # Train setup
         self.num_epochs = 200000
-        self.batch_size = 256
+        self.batch_size = 128
         self.save_dir = './results/{}_{}d'.format(self.system_name, self.n_space_dimension)
 
         # Simulation size
@@ -190,7 +194,7 @@ class ModelTrainer:
 
             # Save a check point
             if epoch % self.log_every == 0 or epoch == 1:
-                helper.create_checkpoint(self.save_dir, psi, sample, params, self.box_length, self.n_particle,
+                helper.create_checkpoint(rng, self.save_dir, psi, sample, params, self.box_length, self.n_particle,
                                          self.n_space_dimension, opt_state, epoch, loss,
                                          energies, self.system, self.system_name, self.window,
                                          self.n_plotting, *plots)
