@@ -14,63 +14,21 @@ import jax.numpy as jnp
 
 from jax import grad, jit, value_and_grad, custom_jvp
 from jax.example_libraries import stax, optimizers
-from wavefunctions import ParticleInBoxWrapper, get_particle_in_the_box_fns, WaveFlow
-from scipy.stats.sampling import NumericalInverseHermite
 import matplotlib.pyplot as plt
 from systems import system_catalogue
 from line_profiler_pycharm import profile
+from model_factory import get_waveflow_model
 
 
-
-def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=2, prior_wavefunction_n=1, rng=0):
-    def get_masks(input_dim, hidden_dim=64, num_hidden=1):
-        masks = []
-        input_degrees = jnp.arange(input_dim)
-        degrees = [input_degrees]
-
-        for n_h in range(num_hidden + 1):
-            degrees += [jnp.arange(hidden_dim) % (input_dim - 1)]
-        degrees += [input_degrees % input_dim - 1]
-
-        for (d0, d1) in zip(degrees[:-1], degrees[1:]):
-            masks += [jnp.transpose(jnp.expand_dims(d1, -1) >= jnp.expand_dims(d0, 0)).astype(jnp.float32)]
-        return masks
-
-    def masked_transform(rng, input_dim):
-        masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
-        # act = stax.Relu
-        act = stax.Softplus
-        init_fun, apply_fun = stax.serial(
-            flows.MaskedDense(masks[0]),
-            act,
-            flows.MaskedDense(masks[1]),
-            act,
-            flows.MaskedDense(masks[2].tile(2)),
-        )
-        _, params = init_fun(rng, (input_dim,))
-        return params, apply_fun
-
-    # psi_prior, pdf_prior, dpdf_prior, cdf_prior, \
-    # wavefunction_centered_prior, pdf_centered_prior, dpdf_centered_prior, cdf_centered_prior, \
-    # wavefunction_uncentered_prior, pdf_uncentered_prior, dpdf_uncentered_prior, cdf_uncentered_prior = get_particle_in_the_box_fns(box_length, prior_wavefunction_n, n_particle - 1)
-    #
-    # particleInBox_centered_prior = ParticleInBoxWrapper(wavefunction_centered_prior, pdf_centered_prior, dpdf_centered_prior, cdf_centered_prior)
-    # sample_centered_prior = NumericalInverseHermite(particleInBox_centered_prior, domain=(-box_length / 2, box_length / 2), order=1, u_resolution=1e-7)
-    # particleInBox_uncentered_prior = ParticleInBoxWrapper(wavefunction_uncentered_prior, pdf_uncentered_prior, dpdf_uncentered_prior, cdf_uncentered_prior)
-    # sample_uncentered_prior = NumericalInverseHermite(particleInBox_uncentered_prior, domain=(0, box_length), order=1, u_resolution=1e-7)
-    # sample_prior = lambda n_sample, n_particle, n_space_dimension: \
-    #     jnp.concatenate([
-    #         sample_centered_prior.rvs(n_sample * (n_particle -1)).reshape(n_sample, n_particle - 1),
-    #         sample_uncentered_prior.rvs(n_sample * (n_particle * n_space_dimension - (n_particle -1))).reshape(n_sample, n_particle * n_space_dimension - (n_particle -1))
-    #     ], axis=-1)
+def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=1, rng=0):
 
 
+    init_fun = get_waveflow_model(n_particle, base_spline_degree=5, i_spline_degree=5, n_prior_internal_knots=16,
+                       n_i_internal_knots=16,
+                       i_spline_reg=0.1, i_spline_reverse_fun_tol=0.000001,
+                       n_flow_layers=1, box_size=box_length)
 
-    init_fun = WaveFlow(
-        flows.Serial(*(flows.MADE(masked_transform), flows.Reverse()) * 5),
-    )
-
-    params, psi, log_pdf, sample = init_fun(rng, n_particle, n_space_dimension, prior_wavefunction_n=prior_wavefunction_n, normalization_length=10)
+    params, psi, log_pdf, sample = init_fun(rng, n_particle)
 
     opt_init, opt_update, get_params = optimizers.adam(step_size=learning_rate)
     opt_state = opt_init(params)
@@ -97,7 +55,7 @@ def train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batc
 
 
 def loss_fn(params, psi, h_fn, batch):
-    psi_val = psi(params, batch)[:,None]
+    psi_val = psi(params, batch)[:, None]
     energies_val = h_fn(params, batch)
     loss_val = energies_val / psi_val
     return loss_val.mean(), (energies_val, psi_val)
@@ -174,13 +132,11 @@ class ModelTrainer:
         # Hyperparameter
         # Problem definition
 
-        self.system_name = 'H'
-        self.system, self.n_particle = system_catalogue[self.system_name]
-        self.n_space_dimension = 2
-        self.charge = 1
+        self.system_name = 'He'
+        self.n_space_dimension = 1
+        self.system, self.n_particle = system_catalogue[self.n_space_dimension][self.system_name]
 
         # Flow parameter
-        self.prior_wavefunction_n = 2
 
         # Turn on/off real time plotting
         self.realtime_plots = True
@@ -197,8 +153,7 @@ class ModelTrainer:
         self.save_dir = './results/{}_{}d'.format(self.system_name, self.n_space_dimension)
 
         # Simulation size
-        self.box_length_model = 5
-        self.box_length = 15
+        self.box_length = 3
 
     @profile
     def start_training(self, show_progress=True, callback=None):
@@ -208,11 +163,10 @@ class ModelTrainer:
         rng = jax.random.PRNGKey(2)
         split_rng, rng = jax.random.split(rng)
         # Create initial state
-        psi, log_pdf, sample, opt_state, opt_update, get_params = create_train_state(self.box_length_model,
+        psi, log_pdf, sample, opt_state, opt_update, get_params = create_train_state(self.box_length,
                                                                                  self.learning_rate,
                                                                                  n_particle=self.n_particle,
                                                                                  n_space_dimension=self.n_space_dimension,
-                                                                                 prior_wavefunction_n=self.prior_wavefunction_n,
                                                                                  rng=split_rng)
         h_fn = construct_hamiltonian_function(psi, protons=self.system, n_space_dimensions=self.n_space_dimension, eps=0.0)
 
@@ -228,7 +182,6 @@ class ModelTrainer:
         if self.realtime_plots:
             plt.ion()
         plots = helper.create_plots(self.n_space_dimension)
-        # gradeitns_fig, gradients_ax = plt.subplots(1, 1)
         running_average = jnp.zeros(1)
 
         pbar = tqdm(range(start_epoch + 1, start_epoch + self.num_epochs + 1), disable=not show_progress)
@@ -237,7 +190,7 @@ class ModelTrainer:
 
             # Save a check point
             if epoch % self.log_every == 0 or epoch == 1:
-                helper.create_checkpoint(self.save_dir, psi, sample, params, self.box_length,
+                helper.create_checkpoint(self.save_dir, psi, sample, params, self.box_length, self.n_particle,
                                          self.n_space_dimension, opt_state, epoch, loss,
                                          energies, self.system, self.system_name, self.window,
                                          self.n_plotting, *plots)
@@ -253,7 +206,6 @@ class ModelTrainer:
             # batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
             #                            shape=(self.batch_size, self.n_space_dimension))
 
-            print(params[-2], params[-1])
             batch = sample(split_rng, params, self.batch_size)
 
 

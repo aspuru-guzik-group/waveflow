@@ -9,6 +9,8 @@ import pickle
 from matplotlib.ticker import StrMethodFormatter, NullFormatter
 from sklearn.neighbors import KernelDensity
 from pathlib import Path
+from coordinates import get_num_inversion_count
+
 
 def vectorized_diagonal(m):
     return vmap(jnp.diag)(m)
@@ -82,8 +84,8 @@ def get_exact_eigenvalues(system_name, n_eigenfuncs, n_space_dimension, box_leng
             return ground_truth
 
 
-def plot_output(psi, sample, weight_dict, protons, box_length, fig, ax, n_eigenfunc=0, n_space_dimension=2, N=100):
-    if n_space_dimension == 1:
+def plot_output(psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, n_eigenfunc=0, N=100):
+    if n_space_dimension*n_particle == 1:
         x = np.linspace(-box_length/2, box_length/2, N)[:, None]
 
         z = psi(weight_dict, x)[:, n_eigenfunc]
@@ -91,14 +93,16 @@ def plot_output(psi, sample, weight_dict, protons, box_length, fig, ax, n_eigenf
 
         ax.plot(x, z)
 
-    elif n_space_dimension == 2:
+    elif n_space_dimension*n_particle == 2:
+
         # generate 2 2d grids for the coordinates & y bounds
-        y, x = np.meshgrid(np.linspace(-box_length/2, box_length/2, N), np.linspace(-box_length/2, box_length/2, N))
+        y, x = np.meshgrid(np.linspace(-box_length, box_length, N), np.linspace(-box_length, box_length, N))
         coordinates = np.stack([x, y], axis=-1).reshape(-1, 2)
-        # coordinates = coordinates[:, None, :]
+        inversion_count = get_num_inversion_count(coordinates)
+        sorted_coordinates = np.sort(coordinates, axis=-1)
+        z = psi(weight_dict, sorted_coordinates)
+        z = z * ((-1) ** (inversion_count))
 
-
-        z = psi(weight_dict, coordinates)
         if len(z.shape) == 1:
             z = z[:,None]
         z = z[:, n_eigenfunc].reshape(N, N)
@@ -155,7 +159,7 @@ def uniform_sliding_stdev(data, window):
     return np.std(rolling, 1)
 
 
-def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimension, opt_state, epoch, loss, energies, protons, system_name, window, n_plotting, psi_fig,
+def create_checkpoint(save_dir, psi, sample, params, box_length, n_particle, n_space_dimension, opt_state, epoch, loss, energies, protons, system_name, window, n_plotting, psi_fig,
                       psi_ax, energies_fig, energies_ax, n_eigenfuncs=1):
     # checkpoints.save_checkpoint('{}/checkpoints'.format(save_dir),
     #                             (weight_dict, opt_state, epoch, sigma_t_bar, j_sigma_t_bar), epoch, keep=2)
@@ -171,8 +175,7 @@ def create_checkpoint(save_dir, psi, sample, params, box_length, n_space_dimensi
     if n_space_dimension == 1:
         psi_ax.cla()
     for i in range(n_eigenfuncs):
-        plot_output(psi, sample, params, protons, box_length, psi_fig, psi_ax, n_eigenfunc=i,
-                    n_space_dimension=n_space_dimension, N=n_plotting)
+        plot_output(psi, sample, params, protons, box_length, psi_fig, psi_ax, n_particle, n_space_dimension, n_eigenfunc=i, N=n_plotting)
     eigenfunc_dir = f'{save_dir}/eigenfunctions'
     Path(eigenfunc_dir).mkdir(parents=True, exist_ok=True)
     psi_fig.savefig(f'{eigenfunc_dir}/epoch_{epoch}.png')

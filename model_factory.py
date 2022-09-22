@@ -18,18 +18,33 @@ def get_masked_transform(return_simple_masked_transform=False, allow_negative_pa
             masks += [np.transpose(np.expand_dims(d1, -1) >= np.expand_dims(d0, 0)).astype(np.float32)]
         return masks
 
+    def MaskedDense(mask):
+        def init_fun(rng, input_shape):
+            out_dim = mask.shape[-1]
+            output_shape = input_shape[:-1] + (out_dim,)
+            k1, k2 = jax.random.split(rng)
+            bound = 1.0 / (input_shape[-1] ** 0.5)
+            W = jax.random.uniform(k1, (input_shape[-1], out_dim), minval=-bound, maxval=bound)
+            b = jax.random.uniform(k2, (out_dim,), minval=-bound, maxval=bound)
+            return output_shape, (W, b)
+
+        def apply_fun(params, inputs, **kwargs):
+            W, b = params
+            return np.dot(inputs, W * mask) + b
+
+        return init_fun, apply_fun
+
     def simple_masked_transform(rng, input_dim, output_shape=2):
         masks = get_masks(input_dim, hidden_dim=64, num_hidden=1)
         act = stax.Tanh
         hidden = []
         for i in range(len(masks) - 1):
-            hidden.append(flows.MaskedDense(masks[i]))
+            hidden.append(MaskedDense(masks[i]))
             hidden.append(act)
 
         init_fun, apply_fun = stax.serial(
-            flows.ShiftLayer(0.0),
             *hidden,
-            flows.MaskedDense(np.tile(masks[-1], output_shape)),
+            MaskedDense(np.tile(masks[-1], output_shape)),
         )
 
         _, params = init_fun(rng, (input_dim,))
@@ -58,13 +73,12 @@ def get_masked_transform(return_simple_masked_transform=False, allow_negative_pa
         act = stax.Tanh
         hidden = []
         for i in range(len(masks) - 1):
-            hidden.append(flows.MaskedDense(masks[i]))
+            hidden.append(MaskedDense(masks[i]))
             hidden.append(act)
 
         init_fun, nn_apply_fun = stax.serial(
-            flows.ShiftLayer(0.0),
             *hidden,
-            flows.MaskedDense(np.tile(masks[-1], output_shape)),
+            MaskedDense(np.tile(masks[-1], output_shape)),
         )
 
         zero_params = jax.random.uniform(rng, minval=-0.5, maxval=0.5, shape=(input_dim, output_shape))
@@ -107,8 +121,8 @@ def get_model(base_spline_degree=5, i_spline_degree=5, n_prior_internal_knots=15
 def get_waveflow_model(n_dimension, base_spline_degree=5, i_spline_degree=5, n_prior_internal_knots=16, n_i_internal_knots=16,
                        i_spline_reg=0, i_spline_reverse_fun_tol=0.000001,
                        n_flow_layers=1, box_size=1):
-    constrained_dimension_indices_left_prior = np.arange(1, n_dimension, dtype=int)
-    constrained_dimension_indices_right_prior = np.array([], dtype=int)
+    constrained_dimension_indices_left = np.arange(1, n_dimension, dtype=int)
+    constrained_dimension_indices_right = np.array([], dtype=int)
 
     init_fun = wavefunctions.Waveflow(
         flows.Serial(flows.BoxTransformLayer(box_size), *(flows.IMADE(get_masked_transform(), spline_degree=i_spline_degree, n_internal_knots=n_i_internal_knots,
@@ -117,9 +131,9 @@ def get_waveflow_model(n_dimension, base_spline_degree=5, i_spline_degree=5, n_p
                                    set_nn_output_grad_to_zero=True),) * n_flow_layers),
         get_masked_transform(allow_negative_params=True),
         spline_degree=base_spline_degree, n_internal_knots=n_prior_internal_knots,
-        constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={},
-        constrained_dimension_indices_left=constrained_dimension_indices_left_prior,
-        constrained_dimension_indices_right=constrained_dimension_indices_right_prior,
+        constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0: 0},
+        constrained_dimension_indices_left=constrained_dimension_indices_left,
+        constrained_dimension_indices_right=constrained_dimension_indices_right,
         set_nn_output_grad_to_zero=True
     )
 

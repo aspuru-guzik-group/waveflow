@@ -13,8 +13,8 @@ from coordinates import get_num_inversion_count
 rng, flow_rng = jax.random.split(jax.random.PRNGKey(1))
 input_dim = 2
 
-left_grid = -1.0
-right_grid = 1.0
+left_grid = -2.0
+right_grid = 2.0
 n_grid_points = 100
 dx = ((right_grid - left_grid) / n_grid_points) ** 2
 x = np.linspace(left_grid, right_grid, n_grid_points)
@@ -28,7 +28,7 @@ grid = np.concatenate([xv, yv], axis=-1)
 grid_flat = grid.reshape(-1, 2)
 
 
-init_fun = get_waveflow_model(input_dim, n_flow_layers=3)
+init_fun = get_waveflow_model(input_dim, n_flow_layers=3,box_size=right_grid)
 params, psi, log_pdf, sample = init_fun(flow_rng, input_dim)
 psi = jax.jit(psi)
 log_pdf = jax.jit(log_pdf)
@@ -46,9 +46,9 @@ plt.show()
 pdf_val = np.exp(log_pdf(params, sorted_coordinates))
 pdf_val = pdf_val.reshape(n_grid_points, n_grid_points)
 plt.imshow(pdf_val, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
-plt.show()
+# plt.show()
 print('Normalization ', (pdf_val * dx).sum())
 
 wavefunction_sample = sample(rng, params, num_samples=1000)
-plt.scatter(wavefunction_sample[:, 0], wavefunction_sample[:, 1], s=2, alpha=0.3)
+plt.scatter(wavefunction_sample[:, 0], wavefunction_sample[:, 1], s=2, alpha=0.15, c='r')
 plt.show()

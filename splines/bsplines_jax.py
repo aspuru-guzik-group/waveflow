@@ -171,34 +171,33 @@ def BSpline_fun():
 
       sample_fun_vec = vmap(sample_fun, in_axes=(0, 0, None))
 
-      def enforce_boundary_conditions(weights, enforcement_left):
-         if enforcement_left:
-             for p in constraints_dict_left.items():
-                n_derivative, constrain_value = p
-                previous_value_list = [B_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
-                                       range(n_derivative)]
-                value = B_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
+      def enforce_boundary_conditions(weights):
+         for p in constraints_dict_left.items():
+            n_derivative, constrain_value = p
+            previous_value_list = [B_cached(0.0, j, cached_bases_dict, n_derivative=n_derivative) for j in
+                                   range(n_derivative)]
+            value = B_cached(0.0, n_derivative, cached_bases_dict, n_derivative=n_derivative)
 
-                summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
-                summed_previous_values = constrain_value - summed_previous_values
+            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, weights)]).sum()
+            summed_previous_values = constrain_value - summed_previous_values
 
-                weights = weights.at[n_derivative].set(summed_previous_values / value)
-         else:
-             for p in constraints_dict_right.items():
-                n_derivative, constrain_value = p
-                previous_value_list = [B_cached(1.0, len(weights) - j - 1, cached_bases_dict, n_derivative=n_derivative) for
-                                       j in range(n_derivative)]
-                value = B_cached(1.0, len(weights) - n_derivative - 1, cached_bases_dict, n_derivative=n_derivative)
+            weights = weights.at[n_derivative].set(summed_previous_values / value)
 
-                summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, np.flip(weights))]).sum()
-                summed_previous_values = constrain_value - summed_previous_values
+         for p in constraints_dict_right.items():
+            n_derivative, constrain_value = p
+            previous_value_list = [B_cached(1.0, len(weights) - j - 1, cached_bases_dict, n_derivative=n_derivative) for
+                                   j in range(n_derivative)]
+            value = B_cached(1.0, len(weights) - n_derivative - 1, cached_bases_dict, n_derivative=n_derivative)
 
-                weights = weights.at[len(weights) - n_derivative - 1].set(summed_previous_values / value)
+            summed_previous_values = np.array([pv * c for pv, c in zip(previous_value_list, np.flip(weights))]).sum()
+            summed_previous_values = constrain_value - summed_previous_values
+
+            weights = weights.at[len(weights) - n_derivative - 1].set(summed_previous_values / value)
 
          # weights = np.flip(weights)
 
          return weights / np.sqrt(np.sum(weights ** 2))#weights.sum()
-      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0, None)), static_argnums=(1,))
+      enforce_boundary_conditions = jit(vmap(enforce_boundary_conditions, in_axes=(0,)))
 
       return initial_params, apply_fun_vec, apply_fun_vec_grad, sample_fun_vec, knots, enforce_boundary_conditions
 
@@ -220,7 +219,7 @@ if __name__ == '__main__':
     params_b, apply_fun_vec_b, apply_fun_vec_grad_b, sample_fun_vec_b, knots_b, enforce_boundary_conditions_b = \
         init_fun_b(rng, k, n_internal_knots, cardinal_splines=True, use_cached_bases=True,
                    cached_bases_path_root='../splines/cached_bases/B/',
-                   constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={})
+                   constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0:0, 2:0})
 
     # params_m = np.ones_like(params_m)
     params_b = np.repeat(params_b[:, None], n_points, axis=1).T
@@ -240,6 +239,7 @@ if __name__ == '__main__':
 
     ax.plot(xx, ys, label='B Spline')
     ax.plot(xx, ys**2, label='B^2 Spline')
+    ax.xlim(0,0.1)
     ax.hist(np.array(s), density=True, bins=100)
     ax.grid(True)
     ax.legend(loc='best')

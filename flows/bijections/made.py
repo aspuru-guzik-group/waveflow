@@ -8,34 +8,6 @@ import matplotlib.pyplot as plt
 import numpy as onp
 from coordinates import rel2abs
 
-def ShiftLayer(shift):
-    def init_fun(rng, input_shape):
-        output_shape = input_shape
-        return output_shape, ()
-
-    def apply_fun(params, inputs, **kwargs):
-        return inputs - shift
-
-    return init_fun, apply_fun
-
-
-def MaskedDense(mask):
-    def init_fun(rng, input_shape):
-        out_dim = mask.shape[-1]
-        output_shape = input_shape[:-1] + (out_dim,)
-        k1, k2 = random.split(rng)
-        bound = 1.0 / (input_shape[-1] ** 0.5)
-        W = random.uniform(k1, (input_shape[-1], out_dim), minval=-bound, maxval=bound)
-        b = random.uniform(k2, (out_dim,), minval=-bound, maxval=bound)
-        return output_shape, (W, b)
-
-
-    def apply_fun(params, inputs, **kwargs):
-        W, b = params
-        return np.dot(inputs, W * mask) + b
-
-
-    return init_fun, apply_fun
 
 
 def MADE(transform):
@@ -76,12 +48,14 @@ def MADE(transform):
 
 
 def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization=0.0, reverse_fun_tol=0.0001,
-          constraints_dict_left={0: 0.0}, constraints_dict_right={0: 1.0}, set_nn_output_grad_to_zero=False,
+          constraints_dict_left={0: 0.0}, constraints_dict_right={0: 1.0},
+          set_nn_output_grad_to_zero=False,
           n_spline_base_mesh_points=2000):
 
 
     def init_fun(rng, input_dim, **kwargs):
         init_fun_i = ISpline_fun()
+
         params_i, apply_fun_vec_i, apply_fun_vec_grad_i, reverse_fun_vec_i, knots_i, enforce_boundary_conditions, remove_bias = init_fun_i(rng, spline_degree, n_internal_knots,
                                                                                                               use_cached_bases=True,
                                                                                                               cardinal_splines=True,

@@ -7,7 +7,7 @@ from jax.scipy.special import logsumexp
 from jax.scipy.stats import norm, multivariate_normal, uniform
 from splines.bsplines_jax import BSpline_fun
 
-def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots, constraints_dict_left={0: 0}, constraints_dict_right={0: 0},
+def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots, constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0: 0},
              constrained_dimension_indices_left=np.array([], dtype=int), constrained_dimension_indices_right=np.array([], dtype=int),
              set_nn_output_grad_to_zero=True, n_spline_base_mesh_points=2000):
 
@@ -30,6 +30,7 @@ def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots,
                                                                              set_nn_output_grad_to_zero=set_nn_output_grad_to_zero
                                                                              )
 
+
         def log_pdf(params, inputs, log_tol=1e-7, return_sample=False):
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
@@ -37,29 +38,14 @@ def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots,
             u, log_det = direct_fun(transform_params, inputs)
 
             prior_params = sp_transform_apply_fun(sp_transform_params, u)
-            # prior_params = enforce_boundary_conditions(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
-            #                                                                                                      prior_params.shape[1], prior_params.shape[2])
-            prior_params = prior_params.at[:, constrained_dimension_indices_left].set(
-                enforce_boundary_conditions(
-                    prior_params[:, constrained_dimension_indices_left].reshape(-1, prior_params.shape[-1]),
-                    True
-                ).reshape(
-                    prior_params.shape[0], len(constrained_dimension_indices_left), prior_params.shape[2]
-                )
-            )
-            prior_params = prior_params.at[:, constrained_dimension_indices_right].set(
-                enforce_boundary_conditions(
-                    prior_params[:, constrained_dimension_indices_right].reshape(-1, prior_params.shape[-1]),
-                    False
-                ).reshape(
-                    prior_params.shape[0], len(constrained_dimension_indices_right), prior_params.shape[2]
-                )
-            )
+            prior_params = enforce_boundary_conditions(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
+                                                                                                                 prior_params.shape[1], prior_params.shape[2])
+
 
             u = np.clip(u, a_min=0.0, a_max=1.0)
             probs = bspline_apply_fun_vec(prior_params.reshape(-1, prior_params_init.shape[-1]), u.reshape(-1))**2
             probs = probs.reshape(u.shape[0], -1)
-            probs = probs.at[:,constrained_dimension_indices_left].set(probs[:,constrained_dimension_indices_left] / 2)
+            probs = probs.at[:, constrained_dimension_indices_left].set(probs[:, constrained_dimension_indices_left] / 2)
             log_probs = np.log(probs + log_tol).sum(-1)
             if return_sample:
                 return log_probs + log_det, u
@@ -72,22 +58,8 @@ def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots,
             u, log_det = direct_fun(transform_params, inputs)
 
             prior_params = sp_transform_apply_fun(sp_transform_params, u)
-            prior_params = prior_params.at[:, constrained_dimension_indices_left].set(
-                enforce_boundary_conditions(
-                    prior_params[:, constrained_dimension_indices_left].reshape(-1, prior_params.shape[-1]),
-                    True
-                ).reshape(
-                    prior_params.shape[0], len(constrained_dimension_indices_left), prior_params.shape[2]
-                )
-            )
-            prior_params = prior_params.at[:, constrained_dimension_indices_right].set(
-                enforce_boundary_conditions(
-                    prior_params[:, constrained_dimension_indices_right].reshape(-1, prior_params.shape[-1]),
-                    False
-                ).reshape(
-                    prior_params.shape[0], len(constrained_dimension_indices_right), prior_params.shape[2]
-                )
-            )
+            prior_params = enforce_boundary_conditions(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
+                                                                                                                 prior_params.shape[1], prior_params.shape[2])
 
             u = np.clip(u, a_min=0.0, a_max=1.0)
             psi = bspline_apply_fun_vec(prior_params.reshape(-1, prior_params_init.shape[-1]), u.reshape(-1))
@@ -106,24 +78,8 @@ def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots,
 
             for i_col in range(input_dim):
                 prior_params = sp_transform_apply_fun(sp_transform_params, outputs)
-                # prior_params = enforce_boundary_conditions(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
-                #                                                                                                      prior_params.shape[1], prior_params.shape[2])
-                prior_params = prior_params.at[:, constrained_dimension_indices_left].set(
-                    enforce_boundary_conditions(
-                        prior_params[:, constrained_dimension_indices_left].reshape(-1, prior_params.shape[-1]),
-                        True
-                    ).reshape(
-                        prior_params.shape[0], len(constrained_dimension_indices_left), prior_params.shape[2]
-                    )
-                )
-                prior_params = prior_params.at[:, constrained_dimension_indices_right].set(
-                    enforce_boundary_conditions(
-                        prior_params[:, constrained_dimension_indices_right].reshape(-1, prior_params.shape[-1]),
-                        False
-                    ).reshape(
-                        prior_params.shape[0], len(constrained_dimension_indices_right), prior_params.shape[2]
-                    )
-                )
+                prior_params = enforce_boundary_conditions(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
+                                                                                                                     prior_params.shape[1], prior_params.shape[2])
 
                 prior_params_partial = prior_params[:, i_col, :]
 
