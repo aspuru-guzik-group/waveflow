@@ -78,6 +78,8 @@ def plot_output(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_p
 
         c = ax.pcolormesh(x, y, z, cmap='RdBu', vmin=z_min, vmax=z_max)
         ax.scatter(sample_points[:, 0], sample_points[:, 1], c='black', s=4, alpha=0.2)
+        if n_space_dimension == 1:
+            protons = np.concatenate([protons, np.zeros_like(protons)], axis=-1)
         ax.scatter(protons[:, 0], protons[:, 1], c='red', s=9)
         ax.set_title('Eigenfunction {}'.format(n_eigenfunc))
         # set the limits of the plot to the limits of the data
@@ -88,16 +90,6 @@ def create_plots(n_space_dimension):
     energies_fig, energies_ax = plt.subplots(1, 1)
     psi_fig, psi_ax = plt.subplots(figsize=(8, 7))
     return psi_fig, psi_ax, energies_fig, energies_ax
-
-    # if n_space_dimension == 1:
-    #     fig, ax = plt.subplots(1, 1)
-    #     return fig, ax, energies_fig, energies_ax
-    # elif n_space_dimension == 2:
-    #     nfig = max(2, int(np.ceil(np.sqrt(neig))))
-    #     psi_fig, psi_ax = plt.subplots(nfig, nfig, figsize=(10, 10))
-    #     for ax in psi_ax.flatten():
-    #         ax.set_aspect('equal', adjustable='box')
-    #     return psi_fig, psi_ax, energies_fig, energies_ax
 
 
 def uniform_sliding_average(data, window):
@@ -151,6 +143,8 @@ def create_checkpoint(rng, save_dir, psi, sample, params, box_length, n_particle
         color = plt.cm.tab10(np.arange(n_eigenfuncs))
         for i, c in zip(range(n_eigenfuncs), color):
             # coordinates = np.arange(window // 2 - 1, len(energies_array[:, i]) - (window // 2))
+            if energies_array.shape[0] > 30000:
+                energies_array = energies_array[20000:]
             x = np.arange(0, len(energies_array[:, i]))
             av = uniform_sliding_average(energies_array[:, i], window)
             stdev = uniform_sliding_stdev(energies_array[:, i], window)

@@ -1,8 +1,3 @@
-from jax.config import config
-# config.update('jax_platform_name', 'cpu')
-# config.update("jax_enable_x64", True)
-# config.update("jax_debug_nans", True)
-
 import jax
 
 import helper
@@ -21,7 +16,7 @@ from model_factory import get_waveflow_model
 from jax.config import config
 # config.update('jax_disable_jit', True)
 # config.update("jax_debug_nans", True)
-config.update("jax_enable_x64", True)
+# config.update("jax_enable_x64", True)
 
 
 def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=1, rng=0):
@@ -136,7 +131,7 @@ class ModelTrainer:
         # Hyperparameter
         # Problem definition
 
-        self.system_name = 'He'
+        self.system_name = 'He_off_center'
         self.n_space_dimension = 1
         self.system, self.n_particle = system_catalogue[self.n_space_dimension][self.system_name]
 
@@ -145,21 +140,22 @@ class ModelTrainer:
         # Turn on/off real time plotting
         self.realtime_plots = False
         self.n_plotting = 200
-        self.log_every = 200
+        self.log_every = 2000
         self.window = 100
 
         # Optimizer
         self.learning_rate = 1e-4
 
+        # Simulation size
+        self.box_length = 6
+
         # Train setup
         self.num_epochs = 200000
         self.batch_size = 128
-        self.save_dir = './results/{}_{}d'.format(self.system_name, self.n_space_dimension)
+        self.save_dir = './results/{}_{}d_{}box'.format(self.system_name, self.n_space_dimension, self.box_length)
 
-        # Simulation size
-        self.box_length = 3
 
-    @profile
+
     def start_training(self, show_progress=True, callback=None):
         """
         Function for training the model
@@ -173,7 +169,7 @@ class ModelTrainer:
                                                                                  n_space_dimension=self.n_space_dimension,
                                                                                  rng=split_rng)
         h_fn = construct_hamiltonian_function(psi, protons=self.system, n_space_dimensions=self.n_space_dimension, eps=0.0)
-
+        sample = jit(sample, static_argnums=(2,))
 
         start_epoch = 0
         loss = [0]
@@ -202,13 +198,11 @@ class ModelTrainer:
 
 
 
-
-
-
             # Generate a random batch
             split_rng, rng = jax.random.split(rng)
-            # batch = jax.random.uniform(split_rng, minval=-self.box_length/2, maxval=self.box_length/2,
-            #                            shape=(self.batch_size, self.n_space_dimension))
+            # batch = jax.random.uniform(split_rng, minval=-self.box_length, maxval=self.box_length,
+            #                            shape=(self.batch_size, self.n_particle * self.n_space_dimension))
+            # batch = jax.numpy.sort(batch, axis=-1)
 
             batch = sample(split_rng, params, self.batch_size)
 

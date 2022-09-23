@@ -39,12 +39,16 @@ def laplacian(fn):
 
 def get_potential(protons, max_val=None):
     def proton_electron_potential(x):
-        potential = - 1 / jnp.linalg.norm(protons[None] - x[:, None], axis=-1)
-        if max_val is not None:
-            potential = jnp.clip(potential, a_max=max_val)
+
+        proton_electron_potential = - 1 / jnp.linalg.norm(protons[None] - x[:, None], axis=-1)
+        electron_electron_potential = 1 / jnp.linalg.norm(x[:, None] - x[:, None].swapaxes(-1,-2), axis=-1)
+        potential = proton_electron_potential + electron_electron_potential
 
         potential = jnp.sum(potential, axis=-1)
         return potential
+
+
+
 
     return proton_electron_potential
 
