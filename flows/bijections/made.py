@@ -111,7 +111,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
     return init_fun
 
 
-def BoxTransformLayer(box_side=1):
+def BoxTransformLayer(box_side=1, unconstrained_coordinate_type='mean'):
     '''
     Transforms autoregressively [0,1] into relative coordinates of a box of length box_side, and vice versa
     Args:
@@ -121,7 +121,7 @@ def BoxTransformLayer(box_side=1):
 
     def init_fun(rng, input_dim, **kwargs):
 
-        def direct_fun(params, inputs, num_tollerance=1e-7):
+        def direct_fun_first(params, inputs, num_tollerance=1e-7):
             '''
 
             Args:
@@ -138,13 +138,11 @@ def BoxTransformLayer(box_side=1):
             for i in range(1, outputs.shape[-1]):
                 outputs = outputs.at[:, i].set( (inputs[:, i] - inputs[:, i-1])/(box_side - inputs[:, i-1] + num_tollerance) )
 
-            log_det_jacobian = - np.log(2*box_side) - np.log(box_side -inputs[:, :-1] + num_tollerance).sum(-1)
+            log_det_jacobian = - np.log(2*box_side) - np.log(box_side - inputs[:, :-1] + num_tollerance).sum(-1)
 
             return outputs, log_det_jacobian
 
-
-
-        def reverse_fun(params, inputs):
+        def reverse_fun_first(params, inputs):
             '''
             Args:
                 params: placeholder, funciton doesn't use params
@@ -161,10 +159,60 @@ def BoxTransformLayer(box_side=1):
 
             return inputs, 0
 
+        def direct_fun_mean(params, inputs, num_tollerance=1e-7):
+            '''
+
+            Args:
+                params: placeholder, function doesn't use params
+                inputs: array (batch_size, n_dimension) scales dimensions autoregressively up into [0,1]
+
+            Returns:
+
+            '''
+            mean = inputs.mean(-1)
+            l = mean - inputs[:, 0]
+            w = inputs[:, -1] - inputs[:, 0]
+
+            outputs = np.ones_like(inputs)
+            space_left = 2 * box_side
+            log_det_jacobian = np.zeros(inputs.shape[0])
+            for i in range(inputs.shape[-1] - 1):
+                diff = inputs[:, i + 1] - inputs[:, i]
+                outputs = outputs.at[:, i].set(diff / (space_left + num_tollerance))
+                log_det_jacobian = log_det_jacobian - np.log(space_left + num_tollerance)
+                space_left = space_left - diff
+
+            outputs = outputs.at[:, -1].set((mean + box_side - l) / (2*box_side - w + num_tollerance) )
+
+            log_det_jacobian = log_det_jacobian - np.log(2*box_side - w + num_tollerance)
+
+            return outputs, log_det_jacobian
 
 
+        def reverse_fun_mean(params, inputs):
 
-        return (), direct_fun, reverse_fun
+            outputs = np.zeros_like(inputs)
+            space_left = 2*box_side
+            running_sum = 0
+            for i in range(inputs.shape[-1]-1):
+                running_sum = running_sum + inputs[:, i]
+                outputs = outputs.at[:, i+1].set(running_sum * space_left)
+                space_left = 2*box_side - running_sum * space_left
+
+            mean = inputs[:, -1]
+            l = mean - inputs[:, 0]
+            w = inputs[:, -2] - inputs[:, 0]
+            mean = inputs[:, -1] * (2 * box_side - w) - (box_side-l)
+            outputs = outputs + mean[:,None]
+
+            # outputs = outputs.at[:, -1].set(inputs[:, -1] * (2 * box_side - w) - (box_side-l))
+
+            return outputs, 0
+
+        if unconstrained_coordinate_type == 'mean':
+            return (), direct_fun_mean, reverse_fun_mean
+        else:
+            return (), direct_fun_first, reverse_fun_first
 
     return init_fun
 
