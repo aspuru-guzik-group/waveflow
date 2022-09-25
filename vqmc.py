@@ -19,13 +19,14 @@ from jax.config import config
 # config.update("jax_enable_x64", True)
 
 
-def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=1, rng=0):
+def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=1, rng=0, unconstrained_coordinate_type='first'):
 
 
     init_fun = get_waveflow_model(n_particle, base_spline_degree=5, i_spline_degree=5, n_prior_internal_knots=16,
-                       n_i_internal_knots=16,
-                       i_spline_reg=0.1, i_spline_reverse_fun_tol=0.000001,
-                       n_flow_layers=2, box_size=box_length)
+                                  n_i_internal_knots=16,
+                                  i_spline_reg=0.1, i_spline_reverse_fun_tol=0.000001,
+                                  n_flow_layers=2, box_size=box_length,
+                                  unconstrained_coordinate_type=unconstrained_coordinate_type)
 
     params, psi, log_pdf, sample = init_fun(rng, n_particle)
 
@@ -136,6 +137,8 @@ class ModelTrainer:
         self.system, self.n_particle = system_catalogue[self.n_space_dimension][self.system_name]
 
         # Flow parameter
+        unconstrained_coordinate_type = 'mean'
+
 
         # Turn on/off real time plotting
         self.realtime_plots = False
@@ -167,7 +170,8 @@ class ModelTrainer:
                                                                                  self.learning_rate,
                                                                                  n_particle=self.n_particle,
                                                                                  n_space_dimension=self.n_space_dimension,
-                                                                                 rng=split_rng)
+                                                                                 rng=split_rng,
+                                                                                 unconstrained_coordinate_type=unconstrained_coordinate_type)
         h_fn = construct_hamiltonian_function(psi, protons=self.system, n_space_dimensions=self.n_space_dimension, eps=0.0)
         sample = jit(sample, static_argnums=(2,))
 
