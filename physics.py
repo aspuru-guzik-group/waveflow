@@ -1,9 +1,7 @@
 import jax.numpy as jnp
-import numpy as np
 import jax
 from functools import partial
 from jax import jit, vmap, jacfwd
-from helper import compute_hessian_diagonals, vectorized_diagonal, vectorized_trace
 
 
 def second_difference_along_coordinate(weight_dict, fn, x, i, eps):
@@ -37,14 +35,22 @@ def laplacian(fn):
     return vmap(_laplacian, in_axes=(None, 0))
 
 
+def get_lower_triangular(m):
+    return m[jnp.tril_indices_from(m, k=-1)]
+
+get_lower_triangular_vec = jax.vmap(get_lower_triangular)
+
 def get_potential(protons, max_val=None):
     def proton_electron_potential(x):
+        # TODO: Only works for 1D, space dimension not handled correclty at the moment
+        proton_electron_potential = - (1 / jnp.abs(protons[None] - x[:, None])).sum(-1).sum(-1)
+        electron_electron_potential = (1 / get_lower_triangular_vec(jnp.abs(x[:, None] - x[:, None].swapaxes(-1, -2)))).sum(-1)
 
-        proton_electron_potential = - 1 / jnp.linalg.norm(protons[None] - x[:, None], axis=-1)
-        electron_electron_potential = 1 / jnp.linalg.norm(x[:, None] - x[:, None].swapaxes(-1,-2), axis=-1)
+        # proton_electron_potential = - 1 / jnp.linalg.norm(protons[None] - x[:, None], axis=-1)
+        # electron_electron_potential = 1 / jnp.linalg.norm(x[:, None] - x[:, None].swapaxes(-1,-2), axis=-1)
         potential = proton_electron_potential + electron_electron_potential
 
-        potential = jnp.sum(potential, axis=-1)
+        # potential = jnp.sum(potential, axis=-1)
         return potential
 
 
@@ -60,7 +66,6 @@ def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), n_space_dime
             laplace = jnp.expand_dims(laplace, axis=-1)
 
         return -laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
-        # return v_fn(coordinates)[:,None] * fn_x
 
     v_fn = get_potential(protons, max_potential_val)
 

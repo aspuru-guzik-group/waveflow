@@ -22,8 +22,8 @@ from jax.config import config
 def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=1, rng=0, unconstrained_coordinate_type='first'):
 
 
-    init_fun = get_waveflow_model(n_particle, base_spline_degree=5, i_spline_degree=5, n_prior_internal_knots=16,
-                                  n_i_internal_knots=16,
+    init_fun = get_waveflow_model(n_particle, base_spline_degree=5, i_spline_degree=5, n_prior_internal_knots=24,
+                                  n_i_internal_knots=24,
                                   i_spline_reg=0.1, i_spline_reverse_fun_tol=0.000001,
                                   n_flow_layers=2, box_size=box_length,
                                   unconstrained_coordinate_type=unconstrained_coordinate_type)
@@ -77,11 +77,14 @@ def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, bat
     energies_val, psi_val = aux
     normalized_energies = energies_val / psi_val
     log_pdf_grad = jax.jacrev(log_pdf, argnums=0)(params, batch)
-    pdf_gradient = jax.tree_multimap(lambda x: (x*(conditional_expand(x, normalized_energies) - running_average)).mean(0), log_pdf_grad)
-    gradients = jax.tree_multimap(lambda x, y: x + y, energy_gradient, pdf_gradient)
+    # pdf_gradient = jax.tree_multimap(lambda x: (x*(conditional_expand(x, normalized_energies) - running_average)).mean(0), log_pdf_grad)
+    # gradients = jax.tree_multimap(lambda x, y: x + y, energy_gradient, pdf_gradient)
+    pdf_gradient = jax.tree_map(lambda x: (x * (conditional_expand(x, normalized_energies) - running_average)).mean(0), log_pdf_grad)
+    gradients = jax.tree_map(lambda x, y: x + y, energy_gradient, pdf_gradient)
     loss_val = jnp.clip(normalized_energies, a_min=-100, a_max=100).mean()
 
-    gradients = jax.tree_multimap(lambda x: jnp.clip(x, a_min=-10, a_max=10), gradients)
+    # gradients = jax.tree_multimap(lambda x: jnp.clip(x, a_min=-10, a_max=10), gradients)
+    gradients = jax.tree_map(lambda x: jnp.clip(x, a_min=-10, a_max=10), gradients)
 
 
     return opt_update(epoch, gradients, opt_state), loss_val
@@ -117,7 +120,8 @@ def train_step_efficient(epoch, psi, h_fn, opt_update, opt_state, params, batch,
     # TODO: Think about adding baseline in policy gradient part to the gradient to reduce variance, probably not though
     loss_val, gradients = value_and_grad(loss_fn_efficient, argnums=0)(params, psi, h_fn, batch, running_average)
 
-    gradients = jax.tree_multimap(lambda x: jnp.clip(x, a_min=-2, a_max=2), gradients)
+    # gradients = jax.tree_multimap(lambda x: jnp.clip(x, a_min=-2, a_max=2), gradients)
+    gradients = jax.tree_map(lambda x: jnp.clip(x, a_min=-2, a_max=2), gradients)
 
     return opt_update(epoch, gradients, opt_state), loss_val
 
@@ -132,12 +136,12 @@ class ModelTrainer:
         # Hyperparameter
         # Problem definition
 
-        self.system_name = 'He_off_center'
+        self.system_name = 'He'
         self.n_space_dimension = 1
         self.system, self.n_particle = system_catalogue[self.n_space_dimension][self.system_name]
 
         # Flow parameter
-        unconstrained_coordinate_type = 'mean'
+        self.unconstrained_coordinate_type = 'mean'
 
 
         # Turn on/off real time plotting
@@ -150,11 +154,11 @@ class ModelTrainer:
         self.learning_rate = 1e-4
 
         # Simulation size
-        self.box_length = 6
+        self.box_length = 20
 
         # Train setup
         self.num_epochs = 200000
-        self.batch_size = 128
+        self.batch_size = 126
         self.save_dir = './results/{}_{}d_{}box'.format(self.system_name, self.n_space_dimension, self.box_length)
 
 
@@ -171,9 +175,10 @@ class ModelTrainer:
                                                                                  n_particle=self.n_particle,
                                                                                  n_space_dimension=self.n_space_dimension,
                                                                                  rng=split_rng,
-                                                                                 unconstrained_coordinate_type=unconstrained_coordinate_type)
+                                                                                 unconstrained_coordinate_type=self.unconstrained_coordinate_type)
         h_fn = construct_hamiltonian_function(psi, protons=self.system, n_space_dimensions=self.n_space_dimension, eps=0.0)
         sample = jit(sample, static_argnums=(2,))
+
 
         start_epoch = 0
         loss = [0]
@@ -190,16 +195,15 @@ class ModelTrainer:
 
         pbar = tqdm(range(start_epoch + 1, start_epoch + self.num_epochs + 1), disable=not show_progress)
         for epoch in pbar:
-            params = get_params(opt_state)
 
+            params = get_params(opt_state)
             # Save a check point
             if epoch % self.log_every == 0 or epoch == 1:
                 helper.create_checkpoint(rng, self.save_dir, psi, sample, params, self.box_length, self.n_particle,
                                          self.n_space_dimension, opt_state, epoch, loss,
                                          energies, self.system, self.system_name, self.window,
                                          self.n_plotting, *plots)
-                plt.pause(.01)
-
+                # plt.pause(.01)
 
 
             # Generate a random batch
@@ -209,7 +213,6 @@ class ModelTrainer:
             # batch = jax.numpy.sort(batch, axis=-1)
 
             batch = sample(split_rng, params, self.batch_size)
-
 
             # Run an optimization step over a training batch
             # opt_state, new_loss = train_step_uniform(epoch, psi, h_fn, opt_update, opt_state, get_params, batch)

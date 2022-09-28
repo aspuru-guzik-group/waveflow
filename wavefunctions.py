@@ -70,11 +70,17 @@ def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots,
 
             return psi * np.exp(0.5 * log_det)
 
+
         def sample(rng, params, num_samples=1, return_original_samples=False):
             transform_params, sp_transform_params = params
 
+
             outputs = np.zeros((num_samples, input_dim))
-            inputs = np.zeros((num_samples, input_dim))
+            # if partial_values is None:
+            #     outputs = outputs.at[:, partial_values_idx].set(partial_values)
+
+
+            # inputs = np.zeros((num_samples, input_dim))
 
             for i_col in range(input_dim):
                 prior_params = sp_transform_apply_fun(sp_transform_params, outputs)
@@ -86,14 +92,18 @@ def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots,
                 rng, split_rng = random.split(rng)
                 rng_array = random.split(split_rng, num_samples)
                 prior_samples = mspline_sample_fun_vec(rng_array, prior_params_partial, 1)
-                inputs = inputs.at[:, i_col].set(prior_samples[:, 0])
+                outputs = outputs.at[:, i_col].set(prior_samples[:, 0])
+                # inputs = inputs.at[:, i_col].set(prior_samples[:, 0])
+                # outputs = inputs
 
-                outputs = inputs
-
-            outputs = partial_inverse_fun(transform_params, outputs)[0]
             if return_original_samples:
-                return outputs, inputs
-            return outputs
+                return partial_inverse_fun(transform_params, outputs)[0], outputs
+            return partial_inverse_fun(transform_params, outputs)[0]
+
+            # outputs = partial_inverse_fun(transform_params, outputs)[0]
+            # if return_original_samples:
+            #     return outputs, inputs
+            # return outputs
 
         return (transform_params, sp_transform_params_init), psi, log_pdf, sample
 

@@ -28,7 +28,7 @@ grid = np.concatenate([xv, yv], axis=-1)
 grid_flat = grid.reshape(-1, 2)
 
 
-init_fun = get_waveflow_model(input_dim, n_flow_layers=3, box_size=right_grid, unconstrained_coordinate_type='mean')
+init_fun = get_waveflow_model(input_dim, n_flow_layers=3, box_size=right_grid, unconstrained_coordinate_type='first')
 params, psi, log_pdf, sample = init_fun(flow_rng, input_dim)
 psi = jax.jit(psi)
 log_pdf = jax.jit(log_pdf)
