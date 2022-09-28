@@ -43,8 +43,10 @@ get_lower_triangular_vec = jax.vmap(get_lower_triangular)
 def get_potential(protons, max_val=None):
     def proton_electron_potential(x):
         # TODO: Only works for 1D, space dimension not handled correclty at the moment
-        proton_electron_potential = - (1 / jnp.abs(protons[None] - x[:, None])).sum(-1).sum(-1)
-        electron_electron_potential = (1 / get_lower_triangular_vec(jnp.abs(x[:, None] - x[:, None].swapaxes(-1, -2)))).sum(-1)
+        # proton_electron_potential = - (1 / jnp.abs(protons[None] - x[:, None])).sum(-1).sum(-1)
+        # electron_electron_potential = (1 / get_lower_triangular_vec(jnp.abs(x[:, None] - x[:, None].swapaxes(-1, -2)))).sum(-1)
+        proton_electron_potential = - (1 / jnp.sqrt(1 + (protons[None] - x[:, None])**2)).sum(-1).sum(-1)
+        electron_electron_potential = (1 / get_lower_triangular_vec(jnp.sqrt(1 + (x[:, None] - x[:, None].swapaxes(-1, -2))**2) )).sum(-1)
 
         # proton_electron_potential = - 1 / jnp.linalg.norm(protons[None] - x[:, None], axis=-1)
         # electron_electron_potential = 1 / jnp.linalg.norm(x[:, None] - x[:, None].swapaxes(-1,-2), axis=-1)

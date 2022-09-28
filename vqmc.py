@@ -15,7 +15,7 @@ from line_profiler_pycharm import profile
 from model_factory import get_waveflow_model
 from jax.config import config
 # config.update('jax_disable_jit', True)
-# config.update("jax_debug_nans", True)
+config.update("jax_debug_nans", True)
 # config.update("jax_enable_x64", True)
 
 
@@ -141,7 +141,7 @@ class ModelTrainer:
         self.system, self.n_particle = system_catalogue[self.n_space_dimension][self.system_name]
 
         # Flow parameter
-        self.unconstrained_coordinate_type = 'mean'
+        self.unconstrained_coordinate_type = 'first'
 
 
         # Turn on/off real time plotting
@@ -154,7 +154,7 @@ class ModelTrainer:
         self.learning_rate = 1e-4
 
         # Simulation size
-        self.box_length = 20
+        self.box_length = 3
 
         # Train setup
         self.num_epochs = 200000
