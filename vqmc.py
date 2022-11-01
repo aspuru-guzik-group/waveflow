@@ -6,6 +6,8 @@ from tqdm import tqdm
 from functools import partial
 import flows
 import jax.numpy as jnp
+from pathlib import Path
+import pickle
 
 from jax import grad, jit, value_and_grad, custom_jvp
 from jax.example_libraries import stax, optimizers
@@ -15,17 +17,17 @@ from line_profiler_pycharm import profile
 from model_factory import get_waveflow_model
 from jax.config import config
 # config.update('jax_disable_jit', True)
-config.update("jax_debug_nans", True)
+# config.update("jax_debug_nans", True)
 # config.update("jax_enable_x64", True)
 
 
 def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=1, rng=0, unconstrained_coordinate_type='first'):
 
 
-    init_fun = get_waveflow_model(n_particle, base_spline_degree=5, i_spline_degree=5, n_prior_internal_knots=24,
-                                  n_i_internal_knots=24,
-                                  i_spline_reg=0.1, i_spline_reverse_fun_tol=0.000001,
-                                  n_flow_layers=2, box_size=box_length,
+    init_fun = get_waveflow_model(n_particle, base_spline_degree=6, i_spline_degree=6, n_prior_internal_knots=23,
+                                  n_i_internal_knots=23,
+                                  i_spline_reg=0.05, i_spline_reverse_fun_tol=0.000001,
+                                  n_flow_layers=3, box_size=box_length,
                                   unconstrained_coordinate_type=unconstrained_coordinate_type)
 
     params, psi, log_pdf, sample = init_fun(rng, n_particle)
@@ -100,7 +102,7 @@ def loss_fn_efficient(params, psi, h_fn, batch, running_average):
 
 @custom_jvp
 def _loss_fn_efficient(energies_val, psi_val, running_average):
-    return energies_val / (psi_val + 1e-7)
+    return energies_val / (psi_val + 1e-8)
 
 @_loss_fn_efficient.defjvp
 def f_fwd(primals, tangents):
@@ -110,7 +112,7 @@ def f_fwd(primals, tangents):
     local_energies = _loss_fn_efficient(energies_val, psi_val, running_average)
     grad = 2 * t_psi_val * (local_energies - running_average) / psi_val + (t_energies_val * psi_val - energies_val * t_psi_val) / psi_val**2
 
-    local_energies = jnp.clip(local_energies, a_min=-50, a_max=50)
+    # local_energies = jnp.clip(local_energies, a_min=-50, a_max=50)
 
     return local_energies, grad
 
@@ -120,8 +122,7 @@ def train_step_efficient(epoch, psi, h_fn, opt_update, opt_state, params, batch,
     # TODO: Think about adding baseline in policy gradient part to the gradient to reduce variance, probably not though
     loss_val, gradients = value_and_grad(loss_fn_efficient, argnums=0)(params, psi, h_fn, batch, running_average)
 
-    # gradients = jax.tree_multimap(lambda x: jnp.clip(x, a_min=-2, a_max=2), gradients)
-    gradients = jax.tree_map(lambda x: jnp.clip(x, a_min=-2, a_max=2), gradients)
+    # gradients = jax.tree_map(lambda x: jnp.clip(x, a_min=-2, a_max=2), gradients)
 
     return opt_update(epoch, gradients, opt_state), loss_val
 
@@ -141,7 +142,7 @@ class ModelTrainer:
         self.system, self.n_particle = system_catalogue[self.n_space_dimension][self.system_name]
 
         # Flow parameter
-        self.unconstrained_coordinate_type = 'first'
+        self.unconstrained_coordinate_type = 'mean'
 
 
         # Turn on/off real time plotting
@@ -154,11 +155,11 @@ class ModelTrainer:
         self.learning_rate = 1e-4
 
         # Simulation size
-        self.box_length = 3
+        self.box_length = 12
 
         # Train setup
         self.num_epochs = 200000
-        self.batch_size = 126
+        self.batch_size = 128
         self.save_dir = './results/{}_{}d_{}box'.format(self.system_name, self.n_space_dimension, self.box_length)
 
 
@@ -183,10 +184,15 @@ class ModelTrainer:
         start_epoch = 0
         loss = [0]
         energies = []
-        # if Path(self.save_dir).is_dir():
-        #     with open('{}/checkpoints/'.format(self.save_dir), 'rb') as f:
-        #         params, opt_state, epoch = pickle.load(f)
-        #     loss, energies = jnp.load('{}/loss.npy'.format(self.save_dir)).tolist(), jnp.load('{}/energies.npy'.format(self.save_dir)).tolist()
+        if Path(self.save_dir).is_dir():
+            with open('{}/checkpoints'.format(self.save_dir), 'rb') as f:
+                params, start_epoch = pickle.load(f)
+            # opt_state[0] = params
+            # params = jnp.load('{}/checkpoints.npy'.format(self.save_dir), allow_pickle=True)
+            loss, energies = jnp.load('{}/loss.npy'.format(self.save_dir)).tolist(), jnp.load('{}/energies.npy'.format(self.save_dir)).tolist()
+        else:
+            params = get_params(opt_state)
+
 
         if self.realtime_plots:
             plt.ion()
@@ -196,7 +202,6 @@ class ModelTrainer:
         pbar = tqdm(range(start_epoch + 1, start_epoch + self.num_epochs + 1), disable=not show_progress)
         for epoch in pbar:
 
-            params = get_params(opt_state)
             # Save a check point
             if epoch % self.log_every == 0 or epoch == 1:
                 helper.create_checkpoint(rng, self.save_dir, psi, sample, params, self.box_length, self.n_particle,
@@ -221,6 +226,9 @@ class ModelTrainer:
             pbar.set_description('Loss {:.3f}'.format(jnp.around(jnp.asarray(new_loss), 3).item()))
             if epoch % 100 == 0:
                 running_average = jnp.array(loss[-100:]).mean()
+
+            params = get_params(opt_state)
+
 
 
             loss.append(new_loss)

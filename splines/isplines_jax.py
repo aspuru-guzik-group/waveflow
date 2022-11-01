@@ -84,7 +84,7 @@ def ISpline_fun():
 
    def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=None,
                 use_cached_bases=True, cached_bases_path_root='./splines/cached_bases/I/', n_mesh_points=1000,
-                constraints_dict_left={0: 0}, constraints_dict_right={0: 1}):
+                constraints_dict_left={0: 0.0}, constraints_dict_right={0: 1.0}):
       if reverse_fun_tol is None:
          reverse_fun_tol = 1/n_mesh_points
       internal_knots = onp.linspace(0, 1, n_internal_knots)
@@ -208,7 +208,7 @@ def ISpline_fun():
 
 # @profile
 if __name__ == '__main__':
-   rng = jax.random.PRNGKey(4)
+   rng = jax.random.PRNGKey(8)
    k = 5
    n_points = 5000
    n_internal_knots = 15
@@ -218,7 +218,7 @@ if __name__ == '__main__':
    init_fun_i = ISpline_fun()
    params_i, apply_fun_vec_i, apply_fun_vec_grad, reverse_fun_vec_i, knots_i, enforce_boundary_conditions_i, remove_bias = \
       init_fun_i(rng, k, n_internal_knots, cardinal_splines=True, zero_border=False, reverse_fun_tol=0.00001,
-                 use_cached_bases=True, n_mesh_points=1000, constraints_dict_left={0: 0.0, 2: 0, 3: 0}, constraints_dict_right={0: 1})
+                 use_cached_bases=True, n_mesh_points=1000, constraints_dict_left={0: 0.0}, constraints_dict_right={0: 1.0})
 
    # def some_transform(params, coordinates):
    #    itrans = apply_fun_vec_i(params, coordinates)
@@ -240,15 +240,19 @@ if __name__ == '__main__':
    # params_i = (params_i, knots_i)
 
    fig, ax = plt.subplots()
-   ax.plot(xx, apply_fun_vec_i(params_i, xx), label='I Spline grad')
+   ax.plot(xx, apply_fun_vec_i(params_i, xx), label='I Spline')
+   ax.plot(xx, reverse_fun_vec_i(params_i, xx), label='I Spline inverse')
    ax.grid(True)
    ax.legend(loc='best')
+   plt.tight_layout()
+   plt.savefig('./../figures/isplinescurve.pdf')
+   # plt.show()
 
-   fig, ax = plt.subplots()
-   ax.plot(xx, apply_fun_vec_grad(params_i, xx), label='I Spline grad')
-   ax.grid(True)
-   ax.legend(loc='best')
-   plt.show()
+   # fig, ax = plt.subplots()
+   # ax.plot(xx, apply_fun_vec_grad(params_i, xx), label='I Spline grad')
+   # ax.grid(True)
+   # ax.legend(loc='best')
+   # plt.show()
 
    # fig, ax = plt.subplots()
    # ax.plot(xx, some_transform(params_i, xx), label='I Spline')
@@ -273,9 +277,9 @@ if __name__ == '__main__':
    # ax.plot(xx, apply_fun_vec_grad(params_i, xx), label='dI/dx Spline analytical')
 
 
-   ax.grid(True)
-   ax.legend(loc='best')
-   plt.show()
+   # ax.grid(True)
+   # ax.legend(loc='best')
+   # plt.show()
 
    # n_knots = len(knots_i)
    # for _ in tqdm.tqdm(range(1000)):
@@ -284,5 +288,40 @@ if __name__ == '__main__':
    #    rng, split_rng = jax.random.split(rng)
    #    xx = jax.random.uniform(rng, shape=(n_points,))
    #    reverse_fun_vec_i(params_i, xx)
+
+
+   transformed_coordinates = apply_fun_vec_i(params_i, xx)
+   det = reverse_fun_vec_i(params_i, xx)
+   n = 2
+   normalization = 1/2 - np.sin(4 * np.pi*n)**2/(8 * np.pi*n)
+   transformed_sine = 1/normalization * np.sin(transformed_coordinates * 2*np.pi *n) * np.sqrt(det)
+
+
+   fig, ax = plt.subplots()
+   ax.plot(xx, 1/normalization * np.sin(xx * 2*np.pi * n))
+   ax.grid(True)
+   #ax.legend(loc='best')
+   plt.tight_layout()
+   plt.savefig('./../figures/simple_sine.pdf')
+
+   ax.cla()
+   ax.plot(xx, transformed_sine)
+   ax.grid(True)
+   #ax.legend(loc='best')
+   plt.tight_layout()
+
+   plt.savefig('./../figures/transformed_sine.pdf')
+
+   n=1
+   transformed_sine = 1 / normalization * np.sin(transformed_coordinates * 2 * np.pi * n) * np.sqrt(det)
+   ax.cla()
+   ax.plot(xx, transformed_sine)
+   ax.grid(True)
+   #ax.legend(loc='best')
+   plt.tight_layout()
+
+   plt.savefig('./../figures/transformed_sine_wrong.pdf')
+
+
 
 

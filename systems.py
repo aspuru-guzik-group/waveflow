@@ -3,6 +3,7 @@ import jax.numpy as jnp
 system_catalogue = \
     {
         1: {
+            'Laplacian_interactive_particles': (jnp.array([]), 2),
             'H': (jnp.array([[0.0]]), 1),
             'He+': (jnp.array([[0.0], [0.0]]), 1),
             'H2+': (jnp.array([[-0.9], [0.9]]), 1),

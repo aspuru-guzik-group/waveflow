@@ -5,7 +5,11 @@ import jax.numpy as np
 from jax.config import config
 # config.update('jax_disable_jit', True)
 # config.update("jax_debug_nans", True)
-config.update("jax_enable_x64", True)
+# config.update("jax_enable_x64", True)
+
+
+import sys
+sys.path.append('../')
 
 from model_factory import get_waveflow_model
 from coordinates import get_num_inversion_count
@@ -28,7 +32,7 @@ grid = np.concatenate([xv, yv], axis=-1)
 grid_flat = grid.reshape(-1, 2)
 
 
-init_fun = get_waveflow_model(input_dim, n_flow_layers=3, box_size=right_grid, unconstrained_coordinate_type='first')
+init_fun = get_waveflow_model(input_dim, n_flow_layers=3, box_size=right_grid, unconstrained_coordinate_type='mean')
 params, psi, log_pdf, sample = init_fun(flow_rng, input_dim)
 psi = jax.jit(psi)
 log_pdf = jax.jit(log_pdf)

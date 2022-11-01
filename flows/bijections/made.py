@@ -194,27 +194,11 @@ def BoxTransformLayer(box_side=1, unconstrained_coordinate_type='mean'):
             position = np.cumsum(inputs[:, :-1], axis=-1) # TODO: handle this for more than 2 dimension
             outputs = outputs.at[:, 1:].set(position)
             mean = np.mean(outputs, axis=-1)
-            l = mean
+            # l = mean
             w = outputs[:, -1]
-            predicted_mean = inputs[:, -1] * (1 - w) - (0.5 - l)
+            predicted_mean = inputs[:, -1] * (1 - w) - (0.5 - mean)
             outputs = (outputs - mean[:,None] + predicted_mean[:,None]) * 2 * box_side
 
-
-            # outputs = np.zeros_like(inputs)-box_side
-            # space_left = 2*box_side
-            # running_sum = 0
-            # for i in range(inputs.shape[-1]-1):
-            #     running_sum = running_sum + inputs[:, i]
-            #     outputs = outputs.at[:, i+1].set(running_sum * space_left - box_side)
-            #     space_left = 2*box_side * (1 - running_sum)
-            #
-            # mean = inputs[:, -1]
-            # l = outputs.mean(-1) - outputs[:, 0]
-            # w = outputs[:, -1] - outputs[:, 0]
-            # mean = inputs[:, -1] * (2 * box_side - w) - (box_side - l)
-            # outputs = outputs + mean[:, None]
-
-            # outputs = outputs.at[:, -1].set(inputs[:, -1] * (2 * box_side - w) - (box_side-l))
 
             return outputs, 0
 

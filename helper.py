@@ -3,7 +3,6 @@ import jax.numpy as jnp  # JAX NumPy
 
 import numpy as np  # Ordinary NumPy
 import matplotlib.pyplot as plt
-from pathlib import Path
 from jax import vmap
 import pickle
 from matplotlib.ticker import StrMethodFormatter, NullFormatter
@@ -46,6 +45,7 @@ def moving_average(running_average, new_data, beta):
 
 
 def plot_output(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, system, N=100):
+    ax.cla()
     if n_space_dimension*n_particle == 1:
         x = np.linspace(-box_length/2, box_length/2, N)[:, None]
 
@@ -121,18 +121,21 @@ def plot_one_electron_density(rng, psi, sample, weight_dict, protons, box_length
 
 def plot_electron_density(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, system, N=100, type='estimate'):
     ax.cla()
+    num_points = 100
     x = np.linspace(-box_length, box_length, N)
-    sample_points = sample(rng, weight_dict, 1000, partial_values_idx=0, partial_values=x)
+    sample_points = sample(rng, weight_dict, num_points, partial_values_idx=0, partial_values=x)
 
     inversion_count = get_num_inversion_count(sample_points)
     sorted_coordinates = np.sort(sample_points, axis=-1)
     z = psi(weight_dict, sorted_coordinates)
     z = z * ((-1) ** (inversion_count))
     z = z**2
-    z = z.mean(-1)
+    z = z.reshape(num_points, x.shape[0])
+    z = z.mean(0)
 
+    zmax = z.max()
     ax.grid(True)
-    ax.title('Electron Density')
+    ax.vlines(protons[0], 0, 0.1 * zmax, colors='r')
     ax.plot(x, z)
 
 
@@ -168,42 +171,42 @@ def uniform_sliding_stdev(data, window):
 
 def create_checkpoint(rng, save_dir, psi, sample, params, box_length, n_particle, n_space_dimension, opt_state, epoch, loss, energies, protons, system_name, window, n_plotting, psi_fig,
                       psi_ax, energies_fig, energies_ax, density_fig, density_ax, n_eigenfuncs=1):
-    # checkpoints.save_checkpoint('{}/checkpoints'.format(save_dir),
-    #                             (weight_dict, opt_state, epoch, sigma_t_bar, j_sigma_t_bar), epoch, keep=2)
-    # checkpoint_dir = f'{save_dir}/'
-    # Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
-    # with open('{}/checkpoints'.format(save_dir), 'wb') as f:
-    #     pickle.dump((params, opt_state, epoch), f)
+
+    checkpoint_dir = f'{save_dir}/'
+    Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
+    # jnp.save('{}/checkpoints'.format(save_dir), params, allow_pickle=True)
+    with open('{}/checkpoints'.format(save_dir), 'wb') as f:
+        # pickle.dump((params, opt_state, epoch), f)
+        pickle.dump((params, epoch), f)
 
 
     checkpoint_dir = f'{save_dir}/'
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
     np.save('{}/loss'.format(save_dir), loss), np.save('{}/energies'.format(save_dir), energies)
 
-    if n_space_dimension == 1:
-        psi_ax.cla()
+
     plot_output(rng, psi, sample, params, protons, box_length, psi_fig, psi_ax, n_particle, n_space_dimension,
                 system=system_name, N=n_plotting)
     eigenfunc_dir = f'{save_dir}/eigenfunctions'
     Path(eigenfunc_dir).mkdir(parents=True, exist_ok=True)
     psi_fig.savefig(f'{eigenfunc_dir}/epoch_{epoch}.png')
 
-    # density_dir = f'{save_dir}/densities_random'
-    # Path(density_dir).mkdir(parents=True, exist_ok=True)
-    # plot_one_electron_density(rng, psi, sample, params, protons, box_length, density_fig, density_ax, n_particle,
-    #                           n_space_dimension, system=system_name, N=n_plotting, type='random')
-    # density_fig.savefig(f'{density_dir}/epoch_{epoch}.png')
-    #
-    # density_dir = f'{save_dir}/densities_on_proton'
-    # Path(density_dir).mkdir(parents=True, exist_ok=True)
-    # plot_one_electron_density(rng, psi, sample, params, protons, box_length, density_fig, density_ax, n_particle,
-    #                           n_space_dimension, system=system_name, N=n_plotting, type='on_proton')
-    # density_fig.savefig(f'{density_dir}/epoch_{epoch}.png')
+    density_dir = f'{save_dir}/densities_random'
+    Path(density_dir).mkdir(parents=True, exist_ok=True)
+    plot_one_electron_density(rng, psi, sample, params, protons, box_length, density_fig, density_ax, n_particle,
+                              n_space_dimension, system=system_name, N=n_plotting, type='random')
+    density_fig.savefig(f'{density_dir}/epoch_{epoch}.png')
+
+    density_dir = f'{save_dir}/densities_on_proton'
+    Path(density_dir).mkdir(parents=True, exist_ok=True)
+    plot_one_electron_density(rng, psi, sample, params, protons, box_length, density_fig, density_ax, n_particle,
+                              n_space_dimension, system=system_name, N=n_plotting, type='on_proton')
+    density_fig.savefig(f'{density_dir}/epoch_{epoch}.png')
 
     # density_dir = f'{save_dir}/electron_density'
     # Path(density_dir).mkdir(parents=True, exist_ok=True)
     # plot_electron_density(rng, psi, sample, params, protons, box_length, density_fig, density_ax, n_particle,
-    #                           n_space_dimension, system=system_name, N=n_plotting, type='on_proton')
+    #                           n_space_dimension, system=system_name, N=n_plotting, type='estimate')
     # density_fig.savefig(f'{density_dir}/epoch_{epoch}.png')
 
     if epoch > 1:
@@ -222,7 +225,8 @@ def create_checkpoint(rng, save_dir, psi, sample, params, box_length, n_particle
             energies_ax.fill_between(x, av - stdev / 2, av + stdev / 2, color=c, alpha=.5)
 
         energies_ax.legend()
-        energies_ax.set_yscale('symlog', linthresh=.1)
+        if energies_array.shape[0] < 30000:
+            energies_ax.set_yscale('symlog', linthresh=.1)
         energies_ax.minorticks_off()
         energies_fig.savefig('{}/energies'.format(save_dir))
 
@@ -347,3 +351,4 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
         np.savetxt('{}/kl_divergences.txt'.format(root_save_path), kde_kl_divergences)
         np.savetxt('{}/hellinger_divergences.txt'.format(root_save_path), kde_hellinger_distances)
         np.savetxt('{}/reconstruction_distances.txt'.format(root_save_path), reconstruction_distances)
+

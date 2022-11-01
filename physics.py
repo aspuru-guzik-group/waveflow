@@ -45,8 +45,9 @@ def get_potential(protons, max_val=None):
         # TODO: Only works for 1D, space dimension not handled correclty at the moment
         # proton_electron_potential = - (1 / jnp.abs(protons[None] - x[:, None])).sum(-1).sum(-1)
         # electron_electron_potential = (1 / get_lower_triangular_vec(jnp.abs(x[:, None] - x[:, None].swapaxes(-1, -2)))).sum(-1)
+
         proton_electron_potential = - (1 / jnp.sqrt(1 + (protons[None] - x[:, None])**2)).sum(-1).sum(-1)
-        electron_electron_potential = (1 / get_lower_triangular_vec(jnp.sqrt(1 + (x[:, None] - x[:, None].swapaxes(-1, -2))**2) )).sum(-1)
+        electron_electron_potential = (1 / get_lower_triangular_vec(jnp.sqrt(1 + (x[:, None] - x[:, None].swapaxes(-1, -2))**2))).sum(-1)
 
         # proton_electron_potential = - 1 / jnp.linalg.norm(protons[None] - x[:, None], axis=-1)
         # electron_electron_potential = 1 / jnp.linalg.norm(x[:, None] - x[:, None].swapaxes(-1,-2), axis=-1)
@@ -67,7 +68,7 @@ def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), n_space_dime
         if eps != 0.0:
             laplace = jnp.expand_dims(laplace, axis=-1)
 
-        return -laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
+        return -0.5*laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
 
     v_fn = get_potential(protons, max_potential_val)
 
