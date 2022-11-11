@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import os
 import glob
 from PIL import Image
+from scipy.stats import uniform
 import jax
 from typing import Any
 from jax import lax, random, vmap, scipy, numpy as jnp
@@ -81,9 +82,11 @@ class CNF(nn.Module):
 
 def log_prior(x):
     return scipy.stats.multivariate_normal.logpdf(x, mean=jnp.array([0., 0.]), cov=jnp.array([[0.1, 0.], [0., 0.1]]))
+    # return scipy.stats.uniform.logpdf(x, -1.5, 3).prod(-1)
 
 def sample_prior(size):
     return jnp.array(np.random.multivariate_normal(mean=np.array([0., 0.]), cov=np.array([[0.1, 0.], [0., 0.1]]), size=size))
+    # return jnp.array(uniform.rvs(-1.5, 3, size=(size,2)))
 
 def create_train_state(rng, learning_rate, in_out_dim, hidden_dim, width):
     """Creates initial 'TrainState'."""
@@ -112,16 +115,16 @@ def set_params(params):
 
 
 
-@partial(jax.jit, static_argnums=(2, 3, 4, 5, 6, 7))
+@partial(jax.jit, static_argnums=(2, 3, 4, 5, 6))
 def train_step(state, batch, in_out_dim, hidden_dim, width, t0, t1):
-    p_z0 = log_prior
     def loss_fn(params):
         func = lambda t, states, args: CNF(in_out_dim, hidden_dim, width).apply({'params': args}, t, states)
         term = diffrax.ODETerm(func)
-        solver = diffrax.Dopri5()
+        # solver = diffrax.Dopri5()
+        solver = diffrax.Tsit5()
         sol = diffrax.diffeqsolve(term, solver, t1, t0, dt0=None, y0=batch, stepsize_controller=diffrax.PIDController(rtol=1e-5, atol=1e-5), adjoint=diffrax.BacksolveAdjoint(), args=params, max_steps=None,)
         y, delta_log_likelihood = sol.ys[:, :, :2], sol.ys[:, :, 2:]
-        logp_x = p_z0(y).squeeze() - delta_log_likelihood.squeeze()
+        logp_x = log_prior(y).squeeze() - delta_log_likelihood.squeeze()
         return -logp_x.mean(0)
 
     grad_fn = jax.value_and_grad(loss_fn)
@@ -153,7 +156,8 @@ def train(learning_rate, n_iters, batch_size, in_out_dim, hidden_dim, width, t0,
 
 def solve_dynamics(dynamics_fn, initial_state, t, params, backwards=False):
     term = diffrax.ODETerm(dynamics_fn)
-    solver = diffrax.Dopri5()
+    # solver = diffrax.Dopri5()
+    solver = diffrax.Tsit5()
     if backwards:
         saveat = diffrax.SaveAt(ts=np.flip(t))
         sol = diffrax.diffeqsolve(term, solver, t[-1], 0, dt0=None, y0=initial_state,
@@ -229,8 +233,7 @@ def create_plots(z_t_samples, z_t_density, logp_diff_t, t0, t1, viz_timesteps, t
         ax1.hist2d(*jnp.transpose(target_sample), bins=300, density=True, range=[[-1.5, 1.5], [-1.5, 1.5]])
         ax2.hist2d(*jnp.transpose(z_sample), bins=300, density=True, range=[[-1.5, 1.5], [-1.5, 1.5]])
 
-        p_z0 = lambda x: scipy.stats.multivariate_normal.logpdf(x, mean=jnp.array([0., 0.]), cov=jnp.array([[0.1, 0.], [0., 0.1]]))
-        logp = p_z0(z_density) - lax.squeeze(logp_diff, dimensions=(1,))
+        logp = log_prior(z_density) - lax.squeeze(logp_diff, dimensions=(1,))
         ax3.tricontourf(*jnp.transpose(z_t1), jnp.exp(logp), 200)
 
         plt.savefig(os.path.join('results_%s/' % dataset, f"cnf-viz-{int(t * 1000):05d}.jpg"), pad_inches=0.2, bbox_inches='tight')
