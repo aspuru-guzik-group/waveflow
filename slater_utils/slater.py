@@ -7,6 +7,7 @@ from tensorflow_probability.substrates.jax.mcmc import NoUTurnSampler, sample_ch
 from functools import partial
 from sgmcmcjax.samplers import build_sgld_sampler
 from scipy.special import factorial
+from complex_normal import build_orthonormal_wavefunction_system_up_to_n
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
@@ -15,16 +16,12 @@ from jax import config
 # config.update('jax_debug_nans', True)
 
 def pib1d(x, k):
-    return jax.lax.cond(np.abs(x) > 1/2, lambda x, k: 1e-6,
+    return jax.lax.cond(np.abs(x) > 1/2, lambda x, k: 1e-7,
                         lambda x, k: jax.lax.cond(k % 2 == 0,
                                         lambda x, k: np.sqrt(2) * np.sin(np.pi * (k * x)),
                                         lambda x, k: np.sqrt(2) * np.cos(np.pi * (k * x)),
                                         x, k),
                         x, k) * np.sqrt(2)
-    # if k % 2 == 0:
-    #     return np.sqrt(2) * np.sin(np.pi * k * x)
-    # else:
-    #     return np.sqrt(2) * np.cos(np.pi * k * x)
 
 def pib(x, y, kx, ky):
     return pib1d(x, kx) * pib1d(y, ky)
@@ -54,6 +51,34 @@ def ass2d3p(p1, p2, p3):
         [pib(p3[0], p3[1], 1, 1), pib(p3[0], p3[1], 1, 2), pib(p3[0], p3[1], 2, 2)]
     ])
     return np.linalg.det(sm)
+
+
+function_set, function_set_vec = build_orthonormal_wavefunction_system_up_to_n(3)
+@partial(jit, static_argnums=(1,2))
+def n_space_dimensional_single_particle_function(x, n_state=0, n_space_dimensions=1):
+    if n_space_dimensions == 1:
+        k1 = n_state
+        return function_set[k1](x)
+    elif n_space_dimensions == 2:
+        k1, k2 = np.floor(n_state/2), np.ceil(n_state/2)
+        return function_set[k1](x[0]) * function_set[k2](x[1])
+    elif n_space_dimensions == 3:
+        k1, k2 = np.floor(n_state / 3), np.ceil(n_state / 3)
+        k3 = n_state - (k1 + k2)
+        return function_set[k1](x[0]) * function_set[k2](x[1]) * function_set[k3](x[2])
+
+@partial(jit, static_argnums=(1,2))
+def slater_det_function(x, n_space_dimensions=1, n_particles=2):
+    single_particle_functions_matrix = np.empty((n_space_dimensions,n_space_dimensions))
+    for i in range(n_particles):
+        for j in range(n_particles):
+            single_particle_function = n_space_dimensional_single_particle_function(x[(i+j)%n_particles], n_state=i, n_space_dimensions=n_space_dimensions)
+            single_particle_functions_matrix.at[i,j].set(single_particle_function)
+
+    return np.linalg.det(single_particle_functions_matrix)
+
+print(slater_det_function([0.1, -0.2]))
+
 
 eps = 0.05
 num_sample = int(1e3)

@@ -1,10 +1,12 @@
 import jax
 import jax.numpy as jnp
-from jax import scipy
+from jax import scipy, jit
 from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from copy import deepcopy
 import tqdm
+import dill
+from functools import partial
 
 def complex_quadrature(func, a, b):
     def real_func(x):
@@ -19,12 +21,12 @@ def complex_quadrature(func, a, b):
 def inner_product(func1, func2, a=-20, b=20):
     inner_product, real_error, imag_error = complex_quadrature(lambda x: func1(x) * jnp.conjugate(func2(x)), a, b)
     assert jnp.abs(jnp.imag(inner_product)) < 0.1, 'Inner product has imaginary part > 0, this should not happen, something is wrong'
-    assert real_error[0] < 1e-5, 'Error on real part is too high'
-    assert imag_error[0] < 1e-5, 'Error on imaginary part is too high'
+    assert real_error[0] < 1e-3, 'Error on real part is too high'
+    assert imag_error[0] < 1e-3, 'Error on imaginary part is too high'
 
     return jnp.real(inner_product)
 
-
+@partial(jit, static_argnums=(1,))
 def gaussian_spiral(x, n):
     # return jnp.sqrt(scipy.stats.multivariate_normal.pdf(x, mean=jnp.array([0.]), cov=jnp.array([1]))) * jnp.exp(1j * 2 * jnp.pi * n * x)
     R = jnp.sqrt(scipy.stats.multivariate_normal.pdf(x, mean=jnp.array(0.), cov=jnp.array(1.0)))
@@ -56,25 +58,40 @@ def build_orthonormal_wavefunction_system_up_to_n(n):
     orthonormal_wavefunction_list_vec = [jax.vmap(orthonormal_wavefunction) for orthonormal_wavefunction in orthonormal_wavefunction_list]
     return orthonormal_wavefunction_list, orthonormal_wavefunction_list_vec
 
-N = 3
-function_set, function_set_vec = build_orthonormal_wavefunction_system_up_to_n(N)
 
-print('Check for normalization')
-for i in range(N):
-    print(inner_product(function_set[i], function_set[i]))
+if __name__ == '__main__':
+    N = 5
+    function_set, function_set_vec = build_orthonormal_wavefunction_system_up_to_n(N)
 
-print('Check for orthogonality')
-for i in range(N):
-    for j in range(N):
-        if i != j:
-            print(inner_product(function_set[i], function_set[j]))
+    # with open('./function_set_n_{}'.format(N), 'wb') as dill_file:
+    #     dill.dump(function_set, dill_file)
 
-n = 1
-x = jnp.arange(-6, 6, 0.2)
+    # with open('./function_set_vec_n_{}'.format(N), 'wb') as dill_file:
+    #     dill.dump(function_set_vec, dill_file)
+
+    # with open('./function_set_n_{}'.format(N), 'rb') as dill_file:
+    #     function_set = dill.load(dill_file)
+
+    # with open('./function_set_vec_n_{}'.format(N), 'rb') as dill_file:
+    #     function_set_vec = dill.load(dill_file)
 
 
-for i in range(N):
-    plt.plot(x, jnp.real(function_set_vec[i](x)), label='real')
-    plt.plot(x, jnp.imag(function_set_vec[i](x)), label='imag')
-    plt.legend()
-    plt.show()
+    print('Check for normalization')
+    for i in range(N):
+        print(inner_product(function_set[i], function_set[i]))
+
+    print('Check for orthogonality')
+    for i in range(N):
+        for j in range(N):
+            if i != j:
+                print(inner_product(function_set[i], function_set[j]))
+
+    n = 1
+    x = jnp.arange(-6, 6, 0.2)
+
+
+    for i in range(N):
+        plt.plot(x, jnp.real(function_set_vec[i](x)), label='real')
+        plt.plot(x, jnp.imag(function_set_vec[i](x)), label='imag')
+        plt.legend()
+        plt.show()
