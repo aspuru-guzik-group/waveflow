@@ -9,7 +9,7 @@ def create_report(root_path):
     style_dict = {'0': '-', '0.01': '--', '0.1': '-.'}
 
     experiments = os.listdir(root_path)
-    burn_in = 10000
+    burn_in = 10
     for experiment in experiments:
         experiment_path = '{}/{}'.format(root_path, experiment)
 
