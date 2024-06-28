@@ -6,11 +6,12 @@ from jax import grad, custom_jvp
 import jax
 from line_profiler_pycharm import profile
 from functools import partial
-from helper import binary_search
 import os
 from pathlib import Path
 import numpy as onp
-from splines.splines_np import I as I_onp
+from waveflow.splines.splines_np import I as I_onp
+from waveflow.utils.helper import binary_search
+
 # config.update('jax_disable_jit', True)
 
 

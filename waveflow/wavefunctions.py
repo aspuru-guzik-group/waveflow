@@ -4,8 +4,7 @@ import jax.numpy as np
 from jax.nn import softmax
 from jax import random
 from jax.scipy.special import logsumexp
-from jax.scipy.stats import norm, multivariate_normal, uniform
-from splines.bsplines_jax import BSpline_fun
+from waveflow.splines.bsplines_jax import BSpline_fun
 
 def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots, constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0: 0},
              constrained_dimension_indices_left=np.array([], dtype=int), constrained_dimension_indices_right=np.array([], dtype=int),

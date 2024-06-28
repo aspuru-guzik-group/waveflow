@@ -1,8 +1,8 @@
 import jax
 import jax.numpy as jnp
-import flows
+from waveflow import flows, wavefunctions
 from jax.example_libraries import stax
-import wavefunctions
+
 
 def get_masked_transform(return_simple_masked_transform=False, allow_negative_params=False):
     def get_masks(input_dim, hidden_dim=64, num_hidden=1):

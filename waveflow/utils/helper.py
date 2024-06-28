@@ -5,10 +5,9 @@ import numpy as np  # Ordinary NumPy
 import matplotlib.pyplot as plt
 from jax import vmap
 import pickle
-from matplotlib.ticker import StrMethodFormatter, NullFormatter
 from sklearn.neighbors import KernelDensity
 from pathlib import Path
-from coordinates import get_num_inversion_count
+from waveflow.utils.coordinates import get_num_inversion_count
 
 
 def vectorized_diagonal(m):

@@ -4,12 +4,11 @@ import jax.numpy as np
 from jax import jit, vmap
 from jax import grad, custom_jvp
 import jax
-from line_profiler_pycharm import profile
 from functools import partial
 import os
 from pathlib import Path
 import numpy as onp
-from splines.splines_np import M as M_onp
+from waveflow.splines.splines_np import M as M_onp
 # config.update('jax_disable_jit', True)
 
 

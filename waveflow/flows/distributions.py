@@ -3,8 +3,7 @@ from jax.nn import softmax
 from jax import random
 from jax.scipy.special import logsumexp
 from jax.scipy.stats import norm, multivariate_normal, uniform
-from splines.isplines_jax import ISpline_fun
-from splines.msplines_jax import MSpline_fun
+from waveflow.splines.msplines_jax import MSpline_fun
 
 def Normal(offset=0.0):
     """

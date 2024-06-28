@@ -1,9 +1,6 @@
-from scipy.interpolate import BSpline
 import matplotlib.pyplot as plt
 import numpy as np
-from line_profiler_pycharm import profile
-import tqdm
-import splines.ortho_splines as ortho_splines
+import waveflow.splines.ortho_splines as ortho_splines
 
 def rejection_sampling(function, num_samples, xmin=-10, xmax=10, ymax=1):
    x = np.random.uniform(low=xmin, high=xmax, size=num_samples * 4)

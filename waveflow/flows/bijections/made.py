@@ -1,12 +1,6 @@
-import jax
 import jax.numpy as jnp
-from jax import random
-from splines.isplines_jax import ISpline_fun
-from splines.msplines_jax import MSpline_fun
-from jax.nn import softmax
-import matplotlib.pyplot as plt
-import numpy as onp
-from coordinates import rel2abs
+from waveflow.splines.isplines_jax import ISpline_fun
+from waveflow.splines.msplines_jax import MSpline_fun
 
 
 
