@@ -114,7 +114,6 @@ def Flow(transformation, prior=Normal(), prior_support=None):
 
 
 
-
 def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, constraints_dict_left={0: 0}, constraints_dict_right={0: 0},
           set_nn_output_grad_to_zero=False, n_spline_base_mesh_points=2000):
 
@@ -138,7 +137,8 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
                                                                              set_nn_output_grad_to_zero=set_nn_output_grad_to_zero
                                                                              )
 
-        def log_pdf(params, inputs, log_tol=1e-7, return_sample=False):
+        def log_pdf(params, inputs, return_sample=False):
+            log_tol=1e-7
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
             transform_params, sp_transform_params = params
@@ -193,8 +193,6 @@ def MFlow(transformation, sp_transformation, spline_degree, n_internal_knots, co
         return (transform_params, sp_transform_params_init), log_pdf, sample
 
     return init_fun
-
-
 
 
 

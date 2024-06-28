@@ -31,7 +31,8 @@ def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots,
                                                                              )
 
 
-        def log_pdf(params, inputs, log_tol=1e-7, return_sample=False):
+        def log_pdf(params, inputs, return_sample=False):
+            log_tol=1e-7
             if len(inputs.shape) == 1:
                 inputs = inputs[None]
             transform_params, sp_transform_params = params

@@ -9,7 +9,7 @@ from jax.example_libraries import stax, optimizers
 from model_factory import get_model, get_masked_transform
 from create_figures import create_report
 
-from jax.config import config
+from jax import config
 # config.update("jax_debug_nans", True)
 
 def get_dataset(dataset, n_samples, length, margin, do_plot=False):
@@ -81,8 +81,6 @@ def get_dataset(dataset, n_samples, length, margin, do_plot=False):
         if do_plot:
             plt.hist2d(X[:, 0], X[:, 1], bins=n_bins, range=plot_range)
             plt.show()
-
-
     return X
 
 
@@ -177,14 +175,15 @@ def train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_si
 if __name__ == '__main__':
     rng, flow_rng = random.split(random.PRNGKey(0))
 
-    n_samples = 9000
+    n_samples = 500 # 9000
     length = 1
     margin = 0.025
     plot_range = [(0, length), (0, length)]
     n_bins = 100
     input_dim = 2
-    num_epochs, batch_size = 50001, 100
-    n_model_sample = 20000
+    num_epochs, batch_size = 501, 1000 # 50001, 100 
+    n_model_sample = 500 # 20000
+
 
     dataset_list = ['gaussian_mixtures', 'halfmoon', 'circles']
     model_type_list = ['Flow', 'IFlow', 'MFlow']
@@ -197,6 +196,7 @@ if __name__ == '__main__':
 
             for model_type in model_type_list:
                 for spline_reg in spline_reg_list:
+                    print(f"Training {model_type} with splines regulation = {spline_reg}")
                     if model_type == 'Flow' and spline_reg != 0:
                         continue
                     print('=========================================== \n '
@@ -206,8 +206,11 @@ if __name__ == '__main__':
                           '=========================================== '.format(dataset, model_type, spline_reg))
                     init_fun = get_model(model_type, spline_reg)
                     params, log_pdf, sample = init_fun(flow_rng, input_dim)
-                    log_pdf = jit(log_pdf, static_argnums=(2, 3))
+                    # log_pdf = jit(log_pdf, static_argnums=(2, 3))
+
+                    log_pdf = jit(log_pdf, static_argnums=(2, ))
                     sample = jit(sample, static_argnums=(2, 3))
+                    # sample = jit(sample, static_argnums=(2, 3))
 
                     opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
                     opt_state = opt_init(params)
@@ -230,3 +233,6 @@ if __name__ == '__main__':
         opt_state = opt_init(params)
 
         train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs, batch_size, n_model_sample, save_figs=False, model_type='{}_{}'.format(model_type, spline_reg))
+        print('Creating report... ')
+        create_report('./results/pdf/')
+        print('Done!')

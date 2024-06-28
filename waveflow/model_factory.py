@@ -1,5 +1,5 @@
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 import flows
 from jax.example_libraries import stax
 import wavefunctions
@@ -7,15 +7,15 @@ import wavefunctions
 def get_masked_transform(return_simple_masked_transform=False, allow_negative_params=False):
     def get_masks(input_dim, hidden_dim=64, num_hidden=1):
         masks = []
-        input_degrees = np.arange(input_dim)
+        input_degrees = jnp.arange(input_dim)
         degrees = [input_degrees]
 
         for n_h in range(num_hidden + 1):
-            degrees += [np.arange(hidden_dim) % (input_dim - 1)]
+            degrees += [jnp.arange(hidden_dim) % (input_dim - 1)]
         degrees += [input_degrees % input_dim - 1]
 
         for (d0, d1) in zip(degrees[:-1], degrees[1:]):
-            masks += [np.transpose(np.expand_dims(d1, -1) >= np.expand_dims(d0, 0)).astype(np.float32)]
+            masks += [jnp.transpose(jnp.expand_dims(d1, -1) >= jnp.expand_dims(d0, 0)).astype(jnp.float32)]
         return masks
 
     def MaskedDense(mask):
@@ -30,7 +30,7 @@ def get_masked_transform(return_simple_masked_transform=False, allow_negative_pa
 
         def apply_fun(params, inputs, **kwargs):
             W, b = params
-            return np.dot(inputs, W * mask) + b
+            return jnp.dot(inputs, W * mask) + b
 
         return init_fun, apply_fun
 
@@ -44,7 +44,7 @@ def get_masked_transform(return_simple_masked_transform=False, allow_negative_pa
 
         init_fun, apply_fun = stax.serial(
             *hidden,
-            MaskedDense(np.tile(masks[-1], output_shape)),
+            MaskedDense(jnp.tile(masks[-1], output_shape)),
         )
 
         _, params = init_fun(rng, (input_dim,))
@@ -56,14 +56,14 @@ def get_masked_transform(return_simple_masked_transform=False, allow_negative_pa
         def calculate_bijection_params(params, x):
             params_nn, zero_params = params
             bij_p = nn_apply_fun(params_nn, x)
-            bij_p = bij_p.split(bij_p.shape[-1]//x.shape[-1], axis=-1)
-            bij_p = np.concatenate([np.expand_dims(bp, axis=-1) for bp in bij_p], axis=-1)
+            bij_p = jnp.split(bij_p, bij_p.shape[-1]//x.shape[-1], axis=-1)
+            bij_p = jnp.concatenate([jnp.expand_dims(bp, axis=-1) for bp in bij_p], axis=-1)
             if not allow_negative_params:
                 bij_p = jax.nn.sigmoid(bij_p)
-                zero_params = np.abs(zero_params)
+                zero_params = jnp.abs(zero_params)
             if set_nn_output_grad_to_zero:
-                cubed_input_product = np.roll(np.cumprod(x ** 3, axis=-1), 1, axis=-1).at[:, 0].set(1)
-                cubed_input_product = np.expand_dims(cubed_input_product, axis=-1)
+                cubed_input_product = jnp.roll(jnp.cumprod(x ** 3, axis=-1), 1, axis=-1).at[:, 0].set(1)
+                cubed_input_product = jnp.expand_dims(cubed_input_product, axis=-1)
                 bij_p = cubed_input_product * bij_p + zero_params
 
             bij_p = bij_p / bij_p.sum(-1, keepdims=True)
@@ -78,7 +78,7 @@ def get_masked_transform(return_simple_masked_transform=False, allow_negative_pa
 
         init_fun, nn_apply_fun = stax.serial(
             *hidden,
-            MaskedDense(np.tile(masks[-1], output_shape)),
+            MaskedDense(jnp.tile(masks[-1], output_shape)),
         )
 
         zero_params = jax.random.uniform(rng, minval=-0.5, maxval=0.5, shape=(input_dim, output_shape))
@@ -122,11 +122,11 @@ def get_waveflow_model(n_dimension, base_spline_degree=5, i_spline_degree=5, n_p
                        i_spline_reg=0, i_spline_reverse_fun_tol=0.000001,
                        n_flow_layers=1, box_size=1, unconstrained_coordinate_type='mean'):
     if unconstrained_coordinate_type == 'mean':
-        constrained_dimension_indices_left = np.arange(0, n_dimension-1, dtype=int)
-        constrained_dimension_indices_right = np.array([], dtype=int)
+        constrained_dimension_indices_left = jnp.arange(0, n_dimension-1, dtype=int)
+        constrained_dimension_indices_right = jnp.array([], dtype=int)
     else:
-        constrained_dimension_indices_left = np.arange(1, n_dimension, dtype=int)
-        constrained_dimension_indices_right = np.array([], dtype=int)
+        constrained_dimension_indices_left = jnp.arange(1, n_dimension, dtype=int)
+        constrained_dimension_indices_right = jnp.array([], dtype=int)
 
     init_fun = wavefunctions.Waveflow(
         flows.Serial(flows.BoxTransformLayer(box_size, unconstrained_coordinate_type=unconstrained_coordinate_type),

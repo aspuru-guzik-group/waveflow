@@ -1,5 +1,5 @@
 import jax
-import jax.numpy as np
+import jax.numpy as jnp
 from jax import random
 from splines.isplines_jax import ISpline_fun
 from splines.msplines_jax import MSpline_fun
@@ -25,19 +25,19 @@ def MADE(transform):
         params, apply_fun = transform(rng, input_dim)
 
         def direct_fun(params, inputs, **kwargs):
-            log_weight, bias = apply_fun(params, inputs).split(2, axis=1)
-            # log_weight = np.clip(log_weight, -8, 8)
-            outputs = (inputs - bias) * np.exp(-log_weight)
+            log_weight, bias = jnp.split(apply_fun(params, inputs), 2, axis=1)
+            # log_weight = jnp.clip(log_weight, -8, 8)
+            outputs = (inputs - bias) * jnp.exp(-log_weight)
             log_det_jacobian = -log_weight.sum(-1)
 
             return outputs, log_det_jacobian
 
         def inverse_fun(params, inputs, **kwargs):
-            outputs = np.zeros_like(inputs)
+            outputs = jnp.zeros_like(inputs)
             for i_col in range(inputs.shape[1]):
-                log_weight, bias = apply_fun(params, outputs).split(2, axis=1)
-                # log_weight = np.clip(log_weight, -8, 8)
-                outputs = outputs.at[:, i_col].set(inputs[:, i_col] * np.exp(log_weight[:, i_col]) + bias[:, i_col])
+                log_weight, bias = jnp.split(apply_fun(params, outputs), 2, axis=1)
+                # log_weight = jnp.clip(log_weight, -8, 8)
+                outputs = outputs.at[:, i_col].set(inputs[:, i_col] * jnp.exp(log_weight[:, i_col]) + bias[:, i_col])
 
             # log_det_jacobian = -log_weight.sum(-1)
             return outputs, 0#log_det_jacobian
@@ -82,14 +82,14 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
 
 
             bijection_derivative = apply_fun_vec_grad_i(bijection_params, inputs.reshape(-1)).reshape(-1, input_dim)
-            log_det_jacobian = np.log(bijection_derivative + 1e-7).sum(-1)
+            log_det_jacobian = jnp.log(bijection_derivative + 1e-7).sum(-1)
 
             return outputs, log_det_jacobian
 
 
 
         def inverse_fun(params, inputs, **kwargs):
-            outputs = np.zeros_like(inputs)
+            outputs = jnp.zeros_like(inputs)
             for i_col in range(inputs.shape[-1]):
                 bijection_params = apply_fun(params, inputs)
                 bijection_params = bijection_params + spline_regularization
@@ -132,13 +132,13 @@ def BoxTransformLayer(box_side=1, unconstrained_coordinate_type='mean'):
 
             '''
 
-            outputs = np.ones_like(inputs)
+            outputs = jnp.ones_like(inputs)
 
             outputs = outputs.at[:, 0].set( (inputs[:, 0] + box_side)/(2*box_side) )
             for i in range(1, outputs.shape[-1]):
                 outputs = outputs.at[:, i].set( (inputs[:, i] - inputs[:, i-1])/(box_side - inputs[:, i-1] + num_tollerance) )
 
-            log_det_jacobian = - np.log(2*box_side) - np.log(box_side - inputs[:, :-1] + num_tollerance).sum(-1)
+            log_det_jacobian = - jnp.log(2*box_side) - jnp.log(box_side - inputs[:, :-1] + num_tollerance).sum(-1)
 
             return outputs, log_det_jacobian
 
@@ -173,27 +173,27 @@ def BoxTransformLayer(box_side=1, unconstrained_coordinate_type='mean'):
             l = mean - inputs[:, 0]
             w = inputs[:, -1] - inputs[:, 0]
 
-            outputs = np.ones_like(inputs)
+            outputs = jnp.ones_like(inputs)
             space_left = 2 * box_side
-            log_det_jacobian = np.zeros(inputs.shape[0])
+            log_det_jacobian = jnp.zeros(inputs.shape[0])
             for i in range(inputs.shape[-1] - 1):
                 diff = inputs[:, i + 1] - inputs[:, i]
                 outputs = outputs.at[:, i].set(diff / (space_left + num_tollerance))
-                log_det_jacobian = log_det_jacobian - np.log(space_left + num_tollerance)
+                log_det_jacobian = log_det_jacobian - jnp.log(space_left + num_tollerance)
                 space_left = space_left - diff
 
             outputs = outputs.at[:, -1].set((mean + box_side - l) / (2*box_side - w + num_tollerance) )
 
-            log_det_jacobian = log_det_jacobian - np.log(2*box_side - w + num_tollerance)
+            log_det_jacobian = log_det_jacobian - jnp.log(2*box_side - w + num_tollerance)
 
             return outputs, log_det_jacobian
 
 
         def reverse_fun_mean(params, inputs):
-            outputs = np.zeros_like(inputs)
-            position = np.cumsum(inputs[:, :-1], axis=-1) # TODO: handle this for more than 2 dimension
+            outputs = jnp.zeros_like(inputs)
+            position = jnp.cumsum(inputs[:, :-1], axis=-1) # TODO: handle this for more than 2 dimension
             outputs = outputs.at[:, 1:].set(position)
-            mean = np.mean(outputs, axis=-1)
+            mean = jnp.mean(outputs, axis=-1)
             # l = mean
             w = outputs[:, -1]
             predicted_mean = inputs[:, -1] * (1 - w) - (0.5 - mean)
