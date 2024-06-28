@@ -2,17 +2,15 @@ import matplotlib.pyplot as plt
 
 import jax
 import jax.numpy as np
-from jax.config import config
+from jax import config
 # config.update('jax_disable_jit', True)
 # config.update("jax_debug_nans", True)
 # config.update("jax_enable_x64", True)
 
 
-import sys
-sys.path.append('../')
 
-from model_factory import get_waveflow_model
-from coordinates import get_num_inversion_count
+from waveflow.model_factory import get_waveflow_model
+from waveflow.utils.coordinates import get_num_inversion_count
 
 rng, flow_rng = jax.random.split(jax.random.PRNGKey(1))
 input_dim = 2

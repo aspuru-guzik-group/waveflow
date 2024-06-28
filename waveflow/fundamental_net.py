@@ -1,21 +1,20 @@
-import jax
+# import jax
 
-import helper
-from physics import construct_hamiltonian_function
-from tqdm import tqdm
-from functools import partial
-import flows
-import jax.numpy as jnp
-from pathlib import Path
-import pickle
+# from utils import helper, physics
+# from tqdm import tqdm
+# from functools import partial
+# import flows
+# import jax.numpy as jnp
+# from pathlib import Path
+# import pickle
 
-from jax import grad, jit, value_and_grad, custom_jvp
-from jax.example_libraries import stax, optimizers
+# from jax import grad, jit, value_and_grad, custom_jvp
+# from jax.example_libraries import stax, optimizers
 import matplotlib.pyplot as plt
 from systems import system_catalogue
 from line_profiler_pycharm import profile
 from model_factory import get_waveflow_model
-from jax.config import config
+from jax import config
 # config.update('jax_disable_jit', True)
 # config.update("jax_debug_nans", True)
 # config.update("jax_enable_x64", True)
@@ -177,7 +176,7 @@ class ModelTrainer:
                                                                                  n_space_dimension=self.n_space_dimension,
                                                                                  rng=split_rng,
                                                                                  unconstrained_coordinate_type=self.unconstrained_coordinate_type)
-        h_fn = construct_hamiltonian_function(psi, protons=self.system, n_space_dimensions=self.n_space_dimension, eps=0.0)
+        h_fn = physics.construct_hamiltonian_function(psi, protons=self.system, n_space_dimensions=self.n_space_dimension, eps=0.0)
         sample = jit(sample, static_argnums=(2,))
 
 

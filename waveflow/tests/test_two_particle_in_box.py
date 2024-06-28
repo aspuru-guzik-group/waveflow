@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 
 import jax
 import jax.numpy as np
-from jax.config import config
-from physics import laplacian
+# from jax import config
+from waveflow.utils.physics import laplacian
 
 def particle_in_a_box(x,y):
     return (np.sin(x)*np.cos(2*y) - np.sin(y)*np.cos(2*x))/np.sqrt(2)

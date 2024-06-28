@@ -26,9 +26,6 @@ def laplacian_numerical(fn, eps=0.1):
 
 
 
-
-
-
 def laplacian(fn):
 
     _laplacian = lambda params, x: jnp.trace(jax.hessian(fn, argnums=1)(params, x), axis1=1, axis2=2)
@@ -55,9 +52,6 @@ def get_potential(protons, max_val=None):
 
         # potential = jnp.sum(potential, axis=-1)
         return potential
-
-
-
 
     return proton_electron_potential
 
