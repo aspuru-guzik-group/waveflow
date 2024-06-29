@@ -12,7 +12,6 @@
 # from jax.example_libraries import stax, optimizers
 import matplotlib.pyplot as plt
 from systems import system_catalogue
-from line_profiler_pycharm import profile
 from model_factory import get_waveflow_model
 from jax import config
 # config.update('jax_disable_jit', True)

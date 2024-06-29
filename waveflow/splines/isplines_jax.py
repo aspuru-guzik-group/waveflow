@@ -4,13 +4,13 @@ import jax.numpy as np
 from jax import jit, vmap
 from jax import grad, custom_jvp
 import jax
-from line_profiler_pycharm import profile
 from functools import partial
 import os
 from pathlib import Path
 import numpy as onp
 from waveflow.splines.splines_np import I as I_onp
 from waveflow.utils.helper import binary_search
+from waveflow.splines import msplines_jax
 
 # config.update('jax_disable_jit', True)
 
@@ -20,7 +20,7 @@ def I_body_fun(m, x, k, i, t, max_k, j):
 
    res = jax.lax.cond(m < i, lambda x: np.zeros_like(x),
                 lambda x: jax.lax.cond(m > j, lambda x: np.zeros_like(x),
-                             lambda x: (t[m + k + 1] - t[m]) * M(x, k + 1, m, t, max_k) / (k + 1), x), x)
+                             lambda x: (t[m + k + 1] - t[m]) * msplines_jax.M(x, k + 1, m, t, max_k) / (k + 1), x), x)
 
    return res
 
