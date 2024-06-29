@@ -1,10 +1,8 @@
 import jax
 
-import helper
-from physics import construct_hamiltonian_function
+from waveflow.utils import helper, physics
 from tqdm import tqdm
 from functools import partial
-import flows
 import jax.numpy as jnp
 from pathlib import Path
 import pickle
@@ -12,10 +10,8 @@ import pickle
 from jax import grad, jit, value_and_grad, custom_jvp
 from jax.example_libraries import stax, optimizers
 import matplotlib.pyplot as plt
-from systems import system_catalogue
-from line_profiler_pycharm import profile
-from model_factory import get_waveflow_model
-from jax.config import config
+from waveflow.model_factory import get_waveflow_model
+from jax import config
 # config.update('jax_disable_jit', True)
 # config.update("jax_debug_nans", True)
 # config.update("jax_enable_x64", True)
@@ -36,8 +32,6 @@ def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=
     opt_state = opt_init(params)
 
     return psi, log_pdf, sample, opt_state, opt_update, get_params
-
-
 
 
 
@@ -88,10 +82,7 @@ def train_step(epoch, psi, h_fn, log_pdf, opt_update, opt_state, get_params, bat
     # gradients = jax.tree_multimap(lambda x: jnp.clip(x, a_min=-10, a_max=10), gradients)
     gradients = jax.tree_map(lambda x: jnp.clip(x, a_min=-10, a_max=10), gradients)
 
-
     return opt_update(epoch, gradients, opt_state), loss_val
-
-
 
 
 
@@ -127,11 +118,6 @@ def train_step_efficient(epoch, psi, h_fn, opt_update, opt_state, params, batch,
     return opt_update(epoch, gradients, opt_state), loss_val
 
 
-
-
-
-
-
 class ModelTrainer:
     def __init__(self) -> None:
         # Hyperparameter
@@ -139,7 +125,7 @@ class ModelTrainer:
 
         self.system_name = 'He'
         self.n_space_dimension = 1
-        self.system, self.n_particle = system_catalogue[self.n_space_dimension][self.system_name]
+        self.system, self.n_particle = physics.system_catalogue[self.n_space_dimension][self.system_name]
 
         # Flow parameter
         self.unconstrained_coordinate_type = 'mean'
@@ -177,7 +163,7 @@ class ModelTrainer:
                                                                                  n_space_dimension=self.n_space_dimension,
                                                                                  rng=split_rng,
                                                                                  unconstrained_coordinate_type=self.unconstrained_coordinate_type)
-        h_fn = construct_hamiltonian_function(psi, protons=self.system, n_space_dimensions=self.n_space_dimension, eps=0.0)
+        h_fn = physics.construct_hamiltonian_function(psi, protons=self.system, n_space_dimensions=self.n_space_dimension, eps=0.0)
         sample = jit(sample, static_argnums=(2,))
 
 
@@ -239,9 +225,9 @@ class ModelTrainer:
 
 
 
-if __name__ == "__main__":
-    trainer = ModelTrainer()
-    trainer.start_training()
+# if __name__ == "__main__":
+#     trainer = ModelTrainer()
+#     trainer.start_training()
 
 
 

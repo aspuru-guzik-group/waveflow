@@ -1,5 +1,3 @@
-import matplotlib.pyplot as plt
-
 import jax
 import jax.numpy as np
 # from jax import config

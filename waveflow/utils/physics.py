@@ -1,8 +1,29 @@
 import jax.numpy as jnp
 import jax
-from functools import partial
-from jax import jit, vmap, jacfwd
+from jax import vmap
 
+
+system_catalogue = {
+        1: {
+            'Laplacian_interactive_particles': (jnp.array([]), 2),
+            'H': (jnp.array([[0.0]]), 1),
+            'He+': (jnp.array([[0.0], [0.0]]), 1),
+            'H2+': (jnp.array([[-0.9], [0.9]]), 1),
+            'H2+_wide': (jnp.array([[-3.0], [3.0]]), 1),
+            'He': (jnp.array([[0.0], [0.0]]), 2),
+            'He_off_center': (jnp.array([[2.5], [2.5]]), 2),
+            'H2': (jnp.array([[-0.9], [0.9]]), 2),
+            'H2_wide': (jnp.array([[-3.0], [3.0]]), 2),
+        },
+        2: {
+            'H': (jnp.array([[0.0, 0.0]]), 1),
+            'He+': (jnp.array([[0.0, 0.0], [0.0, 0.0]]), 1),
+            'H2+': (jnp.array([[-0.9, 0.0], [0.9, 0.0]]), 1),
+            'H2+_wide': (jnp.array([[-3.0, 0.0], [3.0, 0.0]]), 1),
+            'He': (jnp.array([[0.0, 0.0], [0.0, 0.0]]), 2),
+            'H2': (jnp.array([[-0.9, 0.0], [0.9, 0.0]]), 2),
+        }
+}
 
 def second_difference_along_coordinate(weight_dict, fn, x, i, eps):
     # coordinate = jnp.zeros_like(coordinates)
