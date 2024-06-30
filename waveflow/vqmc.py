@@ -108,7 +108,6 @@ class ModelTrainer:
             opt_state, new_loss = train_step_efficient(epoch, psi, h_fn, opt_update, opt_state, params, batch, running_average)
             # new_loss, new_gradients = train_step_efficient(psi, h_fn, params, batch, running_average)
             # opt_state = opt_update(epoch, new_gradients, opt_state)
-            print(f"epoch {epoch} | Loss: {jnp.around(jnp.asarray(new_loss), 3).item()}")
             # pbar.set_description('Loss {:.3f}'.format(jnp.around(jnp.asarray(new_loss), 3).item()))
             if epoch % 100 == 0:
                 running_average = jnp.array(loss[-100:]).mean()
