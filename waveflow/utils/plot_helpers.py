@@ -38,6 +38,7 @@ def two_pinb_analytical():
 def plot_output(save_dir, epoch):
     fname = f"{save_dir}/outputs/wavefunctions_2d/values_epoch{epoch}.npy"
     sample_fname = f"{save_dir}/outputs/sample_points/values_epoch{epoch}.npy"
+    save_fig_dir = f'{save_dir}/figures/eigenfunctions'
     system_dict = json.load(f"{save_dir}/system_info.json")
     box_length = system_dict["box_length"]
     n_particle = system_dict["n_particle"]
@@ -74,7 +75,7 @@ def plot_output(save_dir, epoch):
         # ax.set_title('Groundstate of {}'.format(system))
         # set the limits of the plot to the limits of the data
         ax.axis([x.min(), x.max(), y.min(), y.max()])
-
+    fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_epoch{epoch}.pdf")
 
 def plot_one_electron_density(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, system, ngrid=100, type='random'):
     ax.cla()
