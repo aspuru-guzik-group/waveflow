@@ -1,0 +1,8 @@
+{
+    "system_name": "He",
+    "box_length": 10,
+    "n_particle": 2,
+    "n_space_dimension": 1,
+    "window": 100,
+    "n_plotting": 200
+}
