@@ -71,27 +71,27 @@ def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots,
             return psi * np.exp(0.5 * log_det)
 
 
-        def sample(rng, params, num_samples=1, return_original_samples=False, partial_values_idx=None, partial_values=None):
+        def sample(rng, params, num_samples=1):
+
             transform_params, sp_transform_params = params
+            outputs = np.zeros((num_samples, input_dim))
 
-
-
-            if partial_values_idx is not None:
-                outputs = np.zeros((num_samples, partial_values.shape[0], input_dim))
-                outputs = outputs.at[:, :, partial_values_idx].set(partial_values)
-                outputs = outputs.reshape(-1, input_dim)
-                num_samples = num_samples * partial_values.shape[0]
-            else:
-                outputs = np.zeros((num_samples, input_dim))
+            # if partial_values_idx is not None:
+            #     outputs = np.zeros((num_samples, partial_values.shape[0], input_dim))
+            #     outputs = outputs.at[:, :, partial_values_idx].set(partial_values)
+            #     outputs = outputs.reshape(-1, input_dim)
+            #     num_samples = num_samples * partial_values.shape[0]
+            # else:
+            #     outputs = np.zeros((num_samples, input_dim))
 
             # inputs = np.zeros((num_samples, input_dim))
 
             for i_col in range(input_dim):
-                if i_col == partial_values_idx:
-                    continue
+
                 prior_params = sp_transform_apply_fun(sp_transform_params, outputs)
                 prior_params = enforce_boundary_conditions(prior_params.reshape(-1, prior_params.shape[-1])).reshape(prior_params.shape[0],
-                                                                                                                     prior_params.shape[1], prior_params.shape[2])
+                                                                                                                     prior_params.shape[1], 
+                                                                                                                     prior_params.shape[2])
 
                 prior_params_partial = prior_params[:, i_col, :]
 
@@ -102,14 +102,10 @@ def Waveflow(transformation, sp_transformation, spline_degree, n_internal_knots,
                 # inputs = inputs.at[:, i_col].set(prior_samples[:, 0])
                 # outputs = inputs
 
-            if return_original_samples:
-                return partial_inverse_fun(transform_params, outputs)[0], outputs
+            # if return_original_samples:
+            #     return partial_inverse_fun(transform_params, outputs)[0], outputs
             return partial_inverse_fun(transform_params, outputs)[0]
 
-            # outputs = partial_inverse_fun(transform_params, outputs)[0]
-            # if return_original_samples:
-            #     return outputs, inputs
-            # return outputs
 
         return (transform_params, sp_transform_params_init), psi, log_pdf, sample
 

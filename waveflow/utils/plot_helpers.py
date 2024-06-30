@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from waveflow.utils import physics
 import json
 
 def two_pinb_analytical():
@@ -40,8 +41,10 @@ def plot_output(save_dir, epoch):
     system_dict = json.load(f"{save_dir}/system_info.json")
     box_length = system_dict["box_length"]
     n_particle = system_dict["n_particle"]
+    system_name = system_dict["system_name"]
     n_space_dimension = system_dict["n_space_dimension"]
-    protons = system_dict["protons"]
+    protons, _ = physics.system_catalogue[n_space_dimension][system_name] 
+
 
     z = np.load(fname)
     ngrid = z.shape[-1]

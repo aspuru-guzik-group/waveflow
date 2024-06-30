@@ -19,14 +19,14 @@ from jax import config
 # config.update("jax_enable_x64", True)
 
 '''
-def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=1, rng=0, unconstrained_coordinate_type='first'):
+def create_train_state(box_length, learning_rate, n_particle, n_space_dimension=1, rng=0, xu_coord_type='first'):
 
 
     init_fun = get_waveflow_model(n_particle, base_spline_degree=6, i_spline_degree=6, n_prior_internal_knots=23,
                                   n_i_internal_knots=23,
                                   i_spline_reg=0.05, i_spline_reverse_fun_tol=0.000001,
                                   n_flow_layers=3, box_size=box_length,
-                                  unconstrained_coordinate_type=unconstrained_coordinate_type)
+                                  xu_coord_type=xu_coord_type)
 
     params, psi, log_pdf, sample = init_fun(rng, n_particle)
 
@@ -140,7 +140,7 @@ class ModelTrainer:
         self.system, self.n_particle = system_catalogue[self.n_space_dimension][self.system_name]
 
         # Flow parameter
-        self.unconstrained_coordinate_type = 'mean'
+        self.xu_coord_type = 'mean'
 
 
         # Turn on/off real time plotting
@@ -174,7 +174,7 @@ class ModelTrainer:
                                                                                  n_particle=self.n_particle,
                                                                                  n_space_dimension=self.n_space_dimension,
                                                                                  rng=split_rng,
-                                                                                 unconstrained_coordinate_type=self.unconstrained_coordinate_type)
+                                                                                 xu_coord_type=self.xu_coord_type)
         h_fn = physics.construct_hamiltonian_function(psi, protons=self.system, n_space_dimensions=self.n_space_dimension, eps=0.0)
         sample = jit(sample, static_argnums=(2,))
 

@@ -120,8 +120,8 @@ def get_model(base_spline_degree=5, i_spline_degree=5, n_prior_internal_knots=15
 
 def get_waveflow_model(n_dimension, base_spline_degree=5, i_spline_degree=5, n_prior_internal_knots=16, n_i_internal_knots=16,
                        i_spline_reg=0, i_spline_reverse_fun_tol=0.000001,
-                       n_flow_layers=1, box_size=1, unconstrained_coordinate_type='mean'):
-    if unconstrained_coordinate_type == 'mean':
+                       n_flow_layers=1, box_size=1, xu_coord_type='mean'):
+    if xu_coord_type == 'mean':
         constrained_dimension_indices_left = jnp.arange(0, n_dimension-1, dtype=int)
         constrained_dimension_indices_right = jnp.array([], dtype=int)
     else:
@@ -129,7 +129,7 @@ def get_waveflow_model(n_dimension, base_spline_degree=5, i_spline_degree=5, n_p
         constrained_dimension_indices_right = jnp.array([], dtype=int)
 
     init_fun = wavefunctions.Waveflow(
-        flows.Serial(flows.BoxTransformLayer(box_size, unconstrained_coordinate_type=unconstrained_coordinate_type),
+        flows.Serial(flows.BoxTransformLayer(box_size, xu_coord_type=xu_coord_type),
                      *(flows.IMADE(get_masked_transform(), spline_degree=i_spline_degree, n_internal_knots=n_i_internal_knots,
                                    spline_regularization=i_spline_reg, reverse_fun_tol=i_spline_reverse_fun_tol,
                                    constraints_dict_left={0: 0}, constraints_dict_right={0: 1},

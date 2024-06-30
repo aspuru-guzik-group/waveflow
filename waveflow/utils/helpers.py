@@ -5,6 +5,7 @@ import numpy as np  # Ordinary NumPy
 import matplotlib.pyplot as plt
 from jax import vmap
 import pickle
+from waveflow.utils import physics
 from sklearn.neighbors import KernelDensity
 from pathlib import Path
 from waveflow.utils.coordinates import get_num_inversion_count
@@ -44,7 +45,8 @@ def create_checkpoint(rng, save_dir, psi, sample, params, epoch, loss, energies,
     box_length = system_dict["box_length"]
     n_particle = system_dict["n_particle"]
     n_space_dimension = system_dict["n_space_dimension"]
-    protons = system_dict["protons"]
+    system_name = system_dict["system_name"]
+    protons, _ = physics.system_catalogue[n_space_dimension][system_name] 
 
     # save wavefunction
     # 1. plot output

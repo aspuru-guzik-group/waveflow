@@ -105,7 +105,7 @@ def IMADE(transform, spline_degree=4, n_internal_knots=12, spline_regularization
     return init_fun
 
 
-def BoxTransformLayer(box_side=1, unconstrained_coordinate_type='mean'):
+def BoxTransformLayer(box_side=1, xu_coord_type='mean'):
     '''
     Transforms autoregressively [0,1] into relative coordinates of a box of length box_side, and vice versa
     Args:
@@ -196,7 +196,7 @@ def BoxTransformLayer(box_side=1, unconstrained_coordinate_type='mean'):
 
             return outputs, 0
 
-        if unconstrained_coordinate_type == 'mean':
+        if xu_coord_type == 'mean':
             return (), direct_fun_mean, reverse_fun_mean
         else:
             return (), direct_fun_first, reverse_fun_first
