@@ -143,20 +143,4 @@ def get_waveflow_model(n_dimension, base_spline_degree=5, i_spline_degree=5, n_p
         set_nn_output_grad_to_zero=False
     )
 
-    # init_fun = wavefunctions.Waveflow(
-    #     flows.Serial(flows.BoxTransformLayer(box_size, unconstrained_coordinate_type=unconstrained_coordinate_type),
-    #                  *(flows.IMADE(get_masked_transform(), spline_degree=i_spline_degree,
-    #                                n_internal_knots=n_i_internal_knots,
-    #                                spline_regularization=i_spline_reg, reverse_fun_tol=i_spline_reverse_fun_tol,
-    #                                constraints_dict_left={0: 0, 2: 0, 3: 0}, constraints_dict_right={0: 1},
-    #                                set_nn_output_grad_to_zero=True), flows.Reverse()) * n_flow_layers
-    #                  ),
-    #     get_masked_transform(allow_negative_params=True),
-    #     spline_degree=base_spline_degree, n_internal_knots=n_prior_internal_knots,
-    #     constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0: 0},
-    #     constrained_dimension_indices_left=constrained_dimension_indices_left,
-    #     constrained_dimension_indices_right=constrained_dimension_indices_right,
-    #     set_nn_output_grad_to_zero=True
-    # )
-
     return init_fun

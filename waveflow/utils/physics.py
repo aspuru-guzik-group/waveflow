@@ -48,7 +48,6 @@ def laplacian_numerical(fn, eps=0.1):
 
 
 def laplacian(fn):
-
     _laplacian = lambda params, x: jnp.trace(jax.hessian(fn, argnums=1)(params, x), axis1=1, axis2=2)
     return vmap(_laplacian, in_axes=(None, 0))
 
@@ -82,7 +81,6 @@ def construct_hamiltonian_function(fn, protons=jnp.array([[0, 0]]), n_space_dime
         laplace = laplacian_fn(weight_dict, x)
         if eps != 0.0:
             laplace = jnp.expand_dims(laplace, axis=-1)
-
         return -0.5*laplace + v_fn(x)[:, None] * fn(weight_dict, x)[:, None]
 
     v_fn = get_potential(protons, max_potential_val)

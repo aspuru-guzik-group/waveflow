@@ -9,6 +9,80 @@ from sklearn.neighbors import KernelDensity
 from pathlib import Path
 from waveflow.utils.coordinates import get_num_inversion_count
 
+def make_result_dirs(save_dir):
+    '''
+    Create directories to save the training results.
+    '''
+    Path(save_dir).mkdir(parents=True, exist_ok=True)
+    eigenfunc_dir = f'{save_dir}/figures/eigenfunctions'
+    Path(eigenfunc_dir).mkdir(parents=True, exist_ok=True)
+    density_dir = f'{save_dir}/figures/densities_random'
+    Path(density_dir).mkdir(parents=True, exist_ok=True)
+    density_dir = f'{save_dir}/figures/densities_on_proton'
+    Path(density_dir).mkdir(parents=True, exist_ok=True)
+    output_dir = f'{save_dir}/outputs'
+    wavefunc_dir = f'{output_dir}/wavefunctions_2d/'
+    Path(wavefunc_dir).mkdir(parents=True, exist_ok=True)
+    sample_dir = f'{output_dir}/sample_points/'
+    Path(sample_dir).mkdir(parents=True, exist_ok=True)
+    one_elec_density_dir = f'{output_dir}/density_1e/'
+    Path(one_elec_density_dir).mkdir(parents=True, exist_ok=True)
+
+
+def create_checkpoint(rng, save_dir, psi, sample, params, epoch, loss, energies,
+                      system_dict, ngrid=100, nsample=250):
+    '''
+    Save the training progress. 
+    '''
+    
+    with open('{}/checkpoints'.format(save_dir), 'wb') as f:
+        pickle.dump((params, epoch), f)
+
+    np.save(f'{save_dir}/loss.npy', loss)
+    np.save(f'{save_dir}/energies.npy', energies)
+    n_eigenfuncs = 1
+    box_length = system_dict["box_length"]
+    n_particle = system_dict["n_particle"]
+    n_space_dimension = system_dict["n_space_dimension"]
+    protons = system_dict["protons"]
+
+    # save wavefunction
+    # 1. plot output
+    wavefunc_2d_dir = f"{save_dir}/outputs/wavefunctions_2d/"
+    y, x = np.meshgrid(np.linspace(-box_length, box_length, ngrid), np.linspace(-box_length, box_length, ngrid))
+    coordinates = np.stack([x, y], axis=-1).reshape(-1, 2)
+    inversion_count = get_num_inversion_count(coordinates)
+    sorted_coordinates = np.sort(coordinates, axis=-1)
+    z = psi(params, sorted_coordinates)
+    z = z * ((-1) ** (inversion_count))
+    np.save(f"{wavefunc_2d_dir}/values_epoch{epoch}.npy", z)
+
+    # 2. one-electron density
+    one_elec_density_dir = f"{save_dir}/outputs/density_1e/"
+    # random 
+    x = sample(rng, params, 1)
+    x = np.repeat(x, ngrid, axis=0)
+    x = x.at[:, 0].set(np.linspace(-box_length, box_length, ngrid))
+    inversion_count = get_num_inversion_count(x)
+    sorted_coordinates = np.sort(x, axis=-1)
+    z = psi(params, sorted_coordinates)
+    z = z * ((-1) ** (inversion_count))
+    np.save(f"{one_elec_density_dir}/random_epoch{epoch}.npy", z)
+    # on proton
+    x = np.ones((1, n_particle*n_space_dimension)) * protons[0]
+    x = np.repeat(x, ngrid, axis=0)
+    x = x.at[:, 0].set(np.linspace(-box_length, box_length, ngrid))
+    inversion_count = get_num_inversion_count(x)
+    sorted_coordinates = np.sort(x, axis=-1)
+    z = psi(params, sorted_coordinates)
+    z = z * ((-1) ** (inversion_count))
+    np.save(f"{one_elec_density_dir}/onproton_epoch{epoch}.npy", z)
+
+    # save sample points
+    sample_dir = f"{save_dir}/outputs/sample_points/"
+    sample_points = sample(rng, params, nsample)
+    np.save(f"{sample_dir}/values_epoch{epoch}.npy", sample_points)
+
 
 def vectorized_diagonal(m):
     return vmap(jnp.diag)(m)
@@ -43,7 +117,8 @@ def moving_average(running_average, new_data, beta):
 
 
 
-def plot_output(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, system, N=100):
+def plot_output(rng, psi, sample, weight_dict, protons, box_length, ax, 
+                n_particle, n_space_dimension, system, N=100):
     ax.cla()
     if n_space_dimension*n_particle == 1:
         x = np.linspace(-box_length/2, box_length/2, N)[:, None]
@@ -118,27 +193,27 @@ def plot_one_electron_density(rng, psi, sample, weight_dict, protons, box_length
         ax.plot(x, z, label='Wavefuntion')
 
 
-def plot_electron_density(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, system, N=100, type='estimate'):
-    ax.cla()
-    num_points = 100
-    x = np.linspace(-box_length, box_length, N)
-    sample_points = sample(rng, weight_dict, num_points, partial_values_idx=0, partial_values=x)
+# def plot_electron_density(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, system, N=100, type='estimate'):
+#     ax.cla()
+#     num_points = 100
+#     x = np.linspace(-box_length, box_length, N)
+#     sample_points = sample(rng, weight_dict, num_points, partial_values_idx=0, partial_values=x)
 
-    inversion_count = get_num_inversion_count(sample_points)
-    sorted_coordinates = np.sort(sample_points, axis=-1)
-    z = psi(weight_dict, sorted_coordinates)
-    z = z * ((-1) ** (inversion_count))
-    z = z**2
-    z = z.reshape(num_points, x.shape[0])
-    z = z.mean(0)
+#     inversion_count = get_num_inversion_count(sample_points)
+#     sorted_coordinates = np.sort(sample_points, axis=-1)
+#     z = psi(weight_dict, sorted_coordinates)
+#     z = z * ((-1) ** (inversion_count))
+#     z = z**2
+#     z = z.reshape(num_points, x.shape[0])
+#     z = z.mean(0)
 
-    zmax = z.max()
-    ax.grid(True)
-    ax.vlines(protons[0], 0, 0.1 * zmax, colors='r')
-    ax.plot(x, z)
+#     zmax = z.max()
+#     ax.grid(True)
+#     ax.vlines(protons[0], 0, 0.1 * zmax, colors='r')
+#     ax.plot(x, z)
 
 
-def create_plots(n_space_dimension):
+def create_plots():
     energies_fig, energies_ax = plt.subplots(1, 1)
     psi_fig, psi_ax = plt.subplots(figsize=(8, 7))
     density_fig, density_ax = plt.subplots(figsize=(8, 7))
@@ -168,74 +243,6 @@ def uniform_sliding_stdev(data, window):
     return np.std(rolling, 1)
 
 
-def create_checkpoint(rng, save_dir, psi, sample, params, box_length, n_particle, n_space_dimension, opt_state, epoch, loss, energies, protons, system_name, window, n_plotting, psi_fig,
-                      psi_ax, energies_fig, energies_ax, density_fig, density_ax, n_eigenfuncs=1):
-
-    checkpoint_dir = f'{save_dir}/'
-    Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
-    # jnp.save('{}/checkpoints'.format(save_dir), params, allow_pickle=True)
-    with open('{}/checkpoints'.format(save_dir), 'wb') as f:
-        # pickle.dump((params, opt_state, epoch), f)
-        pickle.dump((params, epoch), f)
-
-
-    checkpoint_dir = f'{save_dir}/'
-    Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
-    np.save('{}/loss'.format(save_dir), loss), np.save('{}/energies'.format(save_dir), energies)
-
-
-    plot_output(rng, psi, sample, params, protons, box_length, psi_fig, psi_ax, n_particle, n_space_dimension,
-                system=system_name, N=n_plotting)
-    eigenfunc_dir = f'{save_dir}/eigenfunctions'
-    Path(eigenfunc_dir).mkdir(parents=True, exist_ok=True)
-    psi_fig.savefig(f'{eigenfunc_dir}/epoch_{epoch}.png')
-
-    density_dir = f'{save_dir}/densities_random'
-    Path(density_dir).mkdir(parents=True, exist_ok=True)
-    plot_one_electron_density(rng, psi, sample, params, protons, box_length, density_fig, density_ax, n_particle,
-                              n_space_dimension, system=system_name, N=n_plotting, type='random')
-    density_fig.savefig(f'{density_dir}/epoch_{epoch}.png')
-
-    density_dir = f'{save_dir}/densities_on_proton'
-    Path(density_dir).mkdir(parents=True, exist_ok=True)
-    plot_one_electron_density(rng, psi, sample, params, protons, box_length, density_fig, density_ax, n_particle,
-                              n_space_dimension, system=system_name, N=n_plotting, type='on_proton')
-    density_fig.savefig(f'{density_dir}/epoch_{epoch}.png')
-
-    # density_dir = f'{save_dir}/electron_density'
-    # Path(density_dir).mkdir(parents=True, exist_ok=True)
-    # plot_electron_density(rng, psi, sample, params, protons, box_length, density_fig, density_ax, n_particle,
-    #                           n_space_dimension, system=system_name, N=n_plotting, type='estimate')
-    # density_fig.savefig(f'{density_dir}/epoch_{epoch}.png')
-
-    if epoch > 1:
-        energies_array = np.array(energies)
-        Path(save_dir).mkdir(parents=True, exist_ok=True)
-        energies_ax.cla()
-        color = plt.cm.tab10(np.arange(n_eigenfuncs))
-        for i, c in zip(range(n_eigenfuncs), color):
-            # coordinates = np.arange(window // 2 - 1, len(energies_array[:, i]) - (window // 2))
-            if energies_array.shape[0] > 30000:
-                energies_array = energies_array[20000:]
-            x = np.arange(0, len(energies_array[:, i]))
-            av = uniform_sliding_average(energies_array[:, i], window)
-            stdev = uniform_sliding_stdev(energies_array[:, i], window)
-            energies_ax.plot(x, av, c=c, label='Eigenvalue {}'.format(i))
-            energies_ax.fill_between(x, av - stdev / 2, av + stdev / 2, color=c, alpha=.5)
-
-        energies_ax.legend()
-        if energies_array.shape[0] < 30000:
-            energies_ax.set_yscale('symlog', linthresh=.1)
-        energies_ax.minorticks_off()
-        energies_fig.savefig('{}/energies'.format(save_dir))
-
-        fig, ax = plt.subplots()
-        ax.plot(loss)
-        fig.savefig('{}/loss'.format(save_dir))
-        plt.close(fig)
-
-        np.save('{}/loss'.format(save_dir), loss)
-        np.save('{}/energies'.format(save_dir), energies)
 
 
 def binary_search(func, low=0.0, high=1.0, tol=1e-3):
