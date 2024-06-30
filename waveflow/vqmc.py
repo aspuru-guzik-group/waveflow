@@ -10,10 +10,10 @@ import pickle
 from jax import grad, jit, value_and_grad, custom_jvp
 from jax.example_libraries import optimizers
 from waveflow.model_factory import get_waveflow_model
-from jax import config
-# config.update('jax_disable_jit', True)
-# config.update("jax_debug_nans", True)
-# config.update("jax_enable_x64", True)
+# from jax import config
+# # config.update('jax_disable_jit', True)
+# # config.update("jax_debug_nans", True)
+# # config.update("jax_enable_x64", True)
 
 
 def create_train_state(box_length, learning_rate, n_particle, rng=0, xu_coord_type='mean'):

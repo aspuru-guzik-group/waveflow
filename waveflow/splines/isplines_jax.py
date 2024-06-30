@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import numpy as onp
 from waveflow.splines.splines_np import I as I_onp
-from waveflow.utils.helper import binary_search
+from waveflow.utils.helpers import binary_search
 from waveflow.splines import msplines_jax
 
 # config.update('jax_disable_jit', True)

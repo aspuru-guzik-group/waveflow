@@ -7,7 +7,7 @@ from waveflow import flows
 from jax import grad, jit, random
 from jax.example_libraries import stax, optimizers
 from waveflow.model_factory import get_model, get_masked_transform
-from waveflow.utils import helper, create_figures 
+from waveflow.utils import helpers, create_figures 
 
 from jax import config
 # config.update("jax_debug_nans", True)
@@ -151,7 +151,7 @@ def train_model(rng, params, log_pdf, sample, X, opt_state, num_epochs,
         if epoch % check_step == 0:# and epoch > 0:
 
             params = get_params(opt_state)
-            helper.check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
+            helpers.check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
                                  reconstruction_distances,
                                  n_model_sample=n_model_sample, system=dataset, model_type=model_type, epoch=epoch,
                                  save_figs=save_figs)

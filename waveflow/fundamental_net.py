@@ -1,6 +1,6 @@
 # import jax
 
-# from utils import helper, physics
+# from utils import helpers, physics
 # from tqdm import tqdm
 # from functools import partial
 # import flows
@@ -194,7 +194,7 @@ class ModelTrainer:
 
         if self.realtime_plots:
             plt.ion()
-        plots = helper.create_plots(self.n_space_dimension)
+        plots = helpers.create_plots(self.n_space_dimension)
         running_average = jnp.zeros(1)
 
         pbar = tqdm(range(start_epoch + 1, start_epoch + self.num_epochs + 1), disable=not show_progress)
@@ -202,7 +202,7 @@ class ModelTrainer:
 
             # Save a check point
             if epoch % self.log_every == 0 or epoch == 1:
-                helper.create_checkpoint(rng, self.save_dir, psi, sample, params, self.box_length, self.n_particle,
+                helpers.create_checkpoint(rng, self.save_dir, psi, sample, params, self.box_length, self.n_particle,
                                          self.n_space_dimension, opt_state, epoch, loss,
                                          energies, self.system, self.system_name, self.window,
                                          self.n_plotting, *plots)
