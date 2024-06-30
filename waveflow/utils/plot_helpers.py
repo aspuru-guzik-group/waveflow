@@ -39,7 +39,8 @@ def plot_output(save_dir, epoch):
     fname = f"{save_dir}/outputs/wavefunctions_2d/values_epoch{epoch}.npy"
     sample_fname = f"{save_dir}/outputs/sample_points/values_epoch{epoch}.npy"
     save_fig_dir = f'{save_dir}/figures/eigenfunctions'
-    system_dict = json.load(f"{save_dir}/system_info.json")
+    with open(f"{save_dir}/system_info.json", "r") as system_file:
+        system_dict = json.load(system_file)
     box_length = system_dict["box_length"]
     n_particle = system_dict["n_particle"]
     system_name = system_dict["system_name"]
