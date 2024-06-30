@@ -9,7 +9,6 @@ import pickle
 
 from jax import grad, jit, value_and_grad, custom_jvp
 from jax.example_libraries import optimizers
-import matplotlib.pyplot as plt
 from waveflow.model_factory import get_waveflow_model
 from jax import config
 # config.update('jax_disable_jit', True)
