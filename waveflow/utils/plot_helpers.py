@@ -3,6 +3,24 @@ import matplotlib.pyplot as plt
 from waveflow.utils import physics
 import json
 
+RcParams={
+        # 'font.family': 'sans-serif',
+        "mathtext.fontset" : "stix",
+        'legend.fontsize': 'x-large',
+         'axes.labelsize': 'xx-large',
+         'axes.titlesize':'x-large',
+         'xtick.labelsize':'x-large',
+         'ytick.labelsize':'x-large',
+         'axes.linewidth': 0.8,
+         'figure.autolayout': True,
+         'savefig.dpi': 400,
+         'lines.linewidth': 1,
+         'lines.markersize': 6,
+         'lines.markerfacecolor': 'None',
+         'lines.markeredgewidth': 1
+        }
+plt.rcParams.update(RcParams)
+
 def two_pinb_analytical():
 
     length = 2
@@ -35,7 +53,7 @@ def two_pinb_analytical():
 
 
 
-def plot_output(save_dir, epoch):
+def plot_wavefunctin_2d(save_dir, epoch):
     fname = f"{save_dir}/outputs/wavefunctions_2d/values_epoch{epoch}.npy"
     sample_fname = f"{save_dir}/outputs/sample_points/values_epoch{epoch}.npy"
     save_fig_dir = f'{save_dir}/figures/eigenfunctions'
@@ -47,18 +65,18 @@ def plot_output(save_dir, epoch):
     n_space_dimension = system_dict["n_space_dimension"]
     protons, _ = physics.system_catalogue[n_space_dimension][system_name] 
 
-
     z = np.load(fname)
-    ngrid = z.shape[-1]
+    ngrid = int(np.sqrt(z.shape[-1]))
     y, x = np.meshgrid(np.linspace(-box_length, box_length, ngrid), np.linspace(-box_length, box_length, ngrid))
-
     fig, ax = plt.subplots()
-    ax.cla()
+    ax.set_aspect('equal', adjustable='box')
+
+    # fig.set_size_inches(6,6)
     if n_space_dimension*n_particle == 1:
         x = np.linspace(-box_length/2, box_length/2, ngrid)[:, None]
         ax.plot(x, z)
-    elif n_space_dimension*n_particle == 2:
 
+    elif n_space_dimension*n_particle == 2:
         dx = (2*box_length / ngrid) ** 2
         print('Normalization ', (z**2 * dx).sum())
 
@@ -72,11 +90,81 @@ def plot_output(save_dir, epoch):
         ax.scatter(sample_points[:, 0], sample_points[:, 1], c='black', s=4, alpha=0.2)
         if n_space_dimension == 1:
             protons = np.concatenate([protons, np.zeros_like(protons)], axis=-1)
-        ax.scatter(protons[:, 0], protons[:, 1], c='red', s=9)
-        # ax.set_title('Groundstate of {}'.format(system))
-        # set the limits of the plot to the limits of the data
-        ax.axis([x.min(), x.max(), y.min(), y.max()])
-    fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_epoch{epoch}.pdf")
+        # ax.scatter(protons[:, 0], protons[:, 1], c='k', s=12)
+        xmin, xmax, ymin, ymax = x.min(), x.max(), y.min(), y.max()
+        ax.plot([0,0],[ymin, ymax], c="grey", ls='--', lw=1, alpha=0.5)
+        ax.plot([xmin, xmax], [0,0], c="grey", ls='--', lw=1, alpha=0.5)
+        ax.set_xlabel(r"$x_0$")
+        ax.set_ylabel(r"$x_1$")
+        ax.set_xticks([-box_length, 0, box_length], [r"-$L$", 0, r"-$L$"])
+        ax.set_yticks([-box_length, 0, box_length], [r"-$L$", 0, r"-$L$"])
+        ax.axis([xmin, xmax, ymin, ymax])
+
+    plt.show()
+    # fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_epoch{epoch}.pdf")
+
+def plot_wavefunctin_2d_multi(save_dir, epochs):
+    '''
+    Plot many epochs together
+    '''
+    assert len(epochs)==6, "please input 6 epochs"
+    n_epoch = len(epochs)
+    with open(f"{save_dir}/system_info.json", "r") as system_file:
+        system_dict = json.load(system_file)
+    box_length = system_dict["box_length"]
+    n_particle = system_dict["n_particle"]
+    system_name = system_dict["system_name"]
+    n_space_dimension = system_dict["n_space_dimension"]
+    protons, _ = physics.system_catalogue[n_space_dimension][system_name] 
+    save_fig_dir = f'{save_dir}/figures/eigenfunctions'
+    wavefunc_dir = f"{save_dir}/outputs/wavefunctions_2d/"
+    sample_dir = f"{save_dir}/outputs/sample_points/"
+
+    nfig_x, nfig_y = 2,3
+    fig, axs = plt.subplots(nfig_x, nfig_y)
+    fig.tight_layout()
+    for i in range(nfig_x):
+        for j in range(nfig_y):
+            k = i*nfig_y + j 
+            axs[i, j].set_aspect('equal', adjustable='box')
+
+            fname = f"{wavefunc_dir}/values_epoch{epochs[k]}.npy"
+            sample_fname = f"{sample_dir}/values_epoch{epochs[k]}.npy"
+
+            z = np.load(fname)
+            ngrid = int(np.sqrt(z.shape[-1]))
+            y, x = np.meshgrid(np.linspace(-box_length, box_length, ngrid), np.linspace(-box_length, box_length, ngrid))
+            dx = (2*box_length / ngrid) ** 2
+            print('Normalization ', (z**2 * dx).sum())
+
+            if len(z.shape) == 1:
+                z = z[:,None]
+            z = z[:, 0].reshape(ngrid, ngrid)
+            z_min, z_max = -np.abs(z).max(), np.abs(z).max()
+            sample_points = np.load(sample_fname)
+
+            c = axs[i, j].pcolormesh(x, y, z, cmap='RdBu', vmin=z_min, vmax=z_max)
+            axs[i, j].scatter(sample_points[:, 0], sample_points[:, 1], c='k', s=0.5, alpha=0.2)
+            if n_space_dimension == 1:
+                protons = np.concatenate([protons, np.zeros_like(protons)], axis=-1)
+            # ax.scatter(protons[:, 0], protons[:, 1], c='k', s=12)
+            xmin, xmax, ymin, ymax = x.min(), x.max(), y.min(), y.max()
+            axs[i, j].plot([0,0],[ymin, ymax], c="grey", ls='--', lw=0.7, alpha=0.5)
+            axs[i, j].plot([xmin, xmax], [0,0], c="grey", ls='--', lw=0.7, alpha=0.5)
+            # axs[i, j].set_xlabel(r"$x_0$")
+            # axs[i, j].set_ylabel(r"$x_1$")
+            # axs[i, j].set_xticks([-box_length, 0, box_length], [r"-$L$", 0, r"-$L$"])
+            # axs[i, j].set_yticks([-box_length, 0, box_length], [r"-$L$", 0, r"-$L$"])
+            axs[i, j].set_xticks([])
+            axs[i, j].set_yticks([])
+            # axs[i, j].axis([xmin, xmax, ymin, ymax])
+            axs[i, j].set_title(f"epoch = {epochs[k]}",fontsize=10)
+            for location in ['left', 'right', 'top', 'bottom']:
+                axs[i, j].spines[location].set_linewidth(0.01)
+    fig.subplots_adjust(wspace=0.2, hspace=-0.1)
+
+    # plt.show()
+    fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_all.pdf", bbox_inches='tight')
 
 def plot_one_electron_density(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, system, ngrid=100, type='random'):
     ax.cla()
