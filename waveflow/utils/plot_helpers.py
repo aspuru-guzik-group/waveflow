@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from waveflow.utils import physics
 import json
+from pathlib import Path
 
 RcParams={
         # 'font.family': 'sans-serif',
@@ -102,6 +103,7 @@ def plot_wavefunctin_2d(save_dir, epoch):
 
     plt.show()
     # fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_epoch{epoch}.pdf")
+
 
 def plot_wavefunctin_2d_multi(save_dir, epochs):
     '''
@@ -219,9 +221,15 @@ def plot_one_electron_density(rng, psi, sample, weight_dict, protons, box_length
 #     ax.plot(x, z)
 
 
-def create_plots():
-    energies_fig, energies_ax = plt.subplots(1, 1)
-    psi_fig, psi_ax = plt.subplots(figsize=(8, 7))
-    density_fig, density_ax = plt.subplots(figsize=(8, 7))
-    return psi_fig, psi_ax, energies_fig, energies_ax, density_fig, density_ax
+def plot_pdf_grid(save_dir, epoch):
 
+    figure_dir = f"{save_dir}/figures/"
+    Path(figure_dir).mkdir(parents=True, exist_ok=True)
+    pdf_grid = np.load(f"{save_dir}/outputs/pdf_grid_epoch{epoch}.npy")
+    left_grid = 0.0
+    right_grid = 1.0    
+    plt.imshow(pdf_grid, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$y$")
+    plt.savefig(f'{figure_dir}/pdf_grid_epoch{epoch}.png')
+   

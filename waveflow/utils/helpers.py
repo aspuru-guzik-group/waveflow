@@ -30,7 +30,7 @@ def make_result_dirs(save_dir):
     Path(one_elec_density_dir).mkdir(parents=True, exist_ok=True)
 
 
-def create_checkpoint(rng, save_dir, psi, sample, params, epoch, loss, energies,
+def create_checkpoint_wavefunc(rng, save_dir, psi, sample, params, epoch, loss, energies,
                       system_dict, ngrid=100, nsample=250):
     '''
     Save the training progress. 
@@ -164,25 +164,17 @@ def binary_search(func, low=0.0, high=1.0, tol=1e-3):
 
 
 
-def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
-                         reconstruction_distances, n_model_sample=5000, root_save_path='./results/pdf/', system=None,
-                         model_type=None, epoch=0, save_figs=False):
-    root_save_path = '{}/{}/{}'.format(root_save_path, system, model_type)
-    root_save_path_per_epoch = '{}/epoch_{}'.format(root_save_path, epoch)
+def make_checkpoint_benchmark(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
+                            reconstruction_distances, n_model_sample=5000, save_dir='./results/benchmarks/',
+                           epoch=0, ngrid=300):
+    
 
-    plt.plot(losses)
-    if not save_figs or (system is None or model_type is None):
-        plt.show()
-    else:
-        Path(root_save_path_per_epoch).mkdir(exist_ok=True, parents=True)
-        plt.savefig('{}/losses.png'.format(root_save_path))
-        plt.clf()
-
-
+  
+    output_dir = f"{save_dir}/outputs/"
     left_grid = 0.0
     right_grid = 1.0
-    n_grid_points = 300
-    dx = ((right_grid - left_grid) / n_grid_points) ** 2
+    n_grid_points = ngrid
+    # dx = ((right_grid - left_grid) / n_grid_points) ** 2
     x = np.linspace(left_grid, right_grid, n_grid_points)
     y = np.linspace(left_grid, right_grid, n_grid_points)
 
@@ -192,68 +184,24 @@ def check_sample_quality(split_rng, params, log_pdf, sample, losses, kde_kl_dive
     yv = np.expand_dims(yv, axis=-1)
     grid = np.concatenate([xv, yv], axis=-1)
     pdf_grid = np.exp(log_pdf(params, grid).reshape(n_grid_points, n_grid_points))
-    plt.imshow(pdf_grid, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
-    if not save_figs or (system is None or model_type is None):
-        plt.show()
-    else:
-        plt.savefig('{}/pdf_grid.png'.format(root_save_path_per_epoch))
-        plt.clf()
-    print(pdf_grid.sum()*dx)
-
+    np.save(f"{output_dir}/pdf_grid_epoch{epoch}.npy", pdf_grid)
 
     model_samples, original_samples = sample(split_rng, params, num_samples=n_model_sample, return_original_samples=True)
     kde = KernelDensity(kernel='gaussian', bandwidth=0.01, rtol=0.1).fit(model_samples)
-    plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
-               range=[(left_grid, right_grid), (left_grid, right_grid)])  # [-1]
-    if not save_figs or (system is None or model_type is None):
-        plt.show()
-    else:
-        plt.savefig('{}/sample.png'.format(root_save_path_per_epoch))
-        plt.clf()
 
     log_pdf_grid_kde = kde.score_samples(grid).reshape(n_grid_points, n_grid_points)
     pdf_grid_kde = np.exp(log_pdf_grid_kde)
-    plt.imshow(pdf_grid_kde, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
-    if not save_figs or (system is None or model_type is None):
-        plt.show()
-    else:
-        plt.savefig('{}/kde_pdf_grid.png'.format(root_save_path_per_epoch))
-        plt.clf()
 
     log_pdf_grid = log_pdf(params, grid).reshape(n_grid_points, n_grid_points)
-
     kde_kl_divergences.append((pdf_grid * (log_pdf_grid - log_pdf_grid_kde)).mean())
-    plt.plot(kde_kl_divergences)
-    plt.title('KL Divergence')
-    if not save_figs or (system is None or model_type is None):
-        plt.show()
-    else:
-        plt.savefig('{}/kl_divergence.png'.format(root_save_path))
-        plt.clf()
-
     kde_hellinger_distances.append(((np.sqrt(pdf_grid) - np.sqrt(pdf_grid_kde)) ** 2).mean())
-    plt.plot(kde_hellinger_distances)
-    plt.title('Hellinger distance')
-    if not save_figs or (system is None or model_type is None):
-        plt.show()
-    else:
-        plt.savefig('{}/hellinger_divergence.png'.format(root_save_path))
-        plt.clf()
-
 
     _, reconstructed_samples = log_pdf(params, model_samples, return_sample=True)
     reconstruction_distances.append(np.linalg.norm(original_samples - reconstructed_samples, axis=-1).mean())
-    plt.plot(reconstruction_distances)
-    plt.title('Reconstruction error')
-    if not save_figs or (system is None or model_type is None):
-        plt.show()
-    else:
-        plt.savefig('{}/reconstruction_distances.png'.format(root_save_path))
-        plt.clf()
 
-    if save_figs:
-        np.savetxt('{}/losses.txt'.format(root_save_path), losses)
-        np.savetxt('{}/kl_divergences.txt'.format(root_save_path), kde_kl_divergences)
-        np.savetxt('{}/hellinger_divergences.txt'.format(root_save_path), kde_hellinger_distances)
-        np.savetxt('{}/reconstruction_distances.txt'.format(root_save_path), reconstruction_distances)
+
+    np.savetxt(f'{save_dir}/losses.txt', losses)
+    np.savetxt(f'{save_dir}/kl_divergences.txt', kde_kl_divergences)
+    np.savetxt(f'{save_dir}/hellinger_divergences.txt', kde_hellinger_distances)
+    np.savetxt(f'{save_dir}/reconstruction_distances.txt', reconstruction_distances)
 

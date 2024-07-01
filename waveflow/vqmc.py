@@ -96,7 +96,7 @@ class ModelTrainer:
         for epoch in range(start_epoch + 1, start_epoch + self.num_epochs + 1):
             # Save a check point
             if epoch % self.log_every == 0 or epoch == 1:
-                helpers.create_checkpoint(rng, save_dir, psi, sample, params, 
+                helpers.create_checkpoint_wavefunc(rng, save_dir, psi, sample, params, 
                                          epoch, loss, energies, system_dict)
                 
             # Generate a random batch
