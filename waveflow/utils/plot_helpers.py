@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 RcParams={
-        # 'font.family': 'sans-serif',
+        'font.family': 'serif',
         "mathtext.fontset" : "stix",
         'legend.fontsize': 'x-large',
          'axes.labelsize': 'xx-large',
@@ -231,5 +231,6 @@ def plot_pdf_grid(save_dir, epoch):
     plt.imshow(pdf_grid, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
     plt.xlabel(r"$x$")
     plt.ylabel(r"$y$")
+    # plt.show()
     plt.savefig(f'{figure_dir}/pdf_grid_epoch{epoch}.png')
    
