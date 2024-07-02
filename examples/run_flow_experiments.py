@@ -6,14 +6,14 @@ from waveflow import benchmark_tests
 
 rng, flow_rng = random.split(random.PRNGKey(0))
 
-n_samples = 1000 # 9000
+n_samples = 9000 # 9000
 length = 1
 margin = 0.025
 plot_range = [(0, length), (0, length)]
 n_bins = 100
 input_dim = 2
-num_epochs = 5000
-n_model_sample = 500 # 20000
+num_epochs = 50000
+n_model_sample = 20000 # 20000
 
 
 dataset_list = ['gaussian_mixtures', 'halfmoon', 'circles']

@@ -221,7 +221,7 @@ def plot_one_electron_density(rng, psi, sample, weight_dict, protons, box_length
 #     ax.plot(x, z)
 
 
-def plot_pdf_grid(save_dir, epoch):
+def plot_pdf_grid(save_dir, epoch, show_fig=False):
 
     figure_dir = f"{save_dir}/figures/"
     Path(figure_dir).mkdir(parents=True, exist_ok=True)
@@ -231,6 +231,8 @@ def plot_pdf_grid(save_dir, epoch):
     plt.imshow(pdf_grid, extent=(left_grid, right_grid, left_grid, right_grid), origin='lower')
     plt.xlabel(r"$x$")
     plt.ylabel(r"$y$")
-    # plt.show()
-    plt.savefig(f'{figure_dir}/pdf_grid_epoch{epoch}.png')
+    if show_fig:
+        plt.show()
+    else:
+        plt.savefig(f'{figure_dir}/pdf_grid_epoch{epoch}.pdf')
    
