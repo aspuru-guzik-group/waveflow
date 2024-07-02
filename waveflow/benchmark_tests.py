@@ -6,7 +6,8 @@ from jax.example_libraries import optimizers
 from waveflow.model_factory import get_masked_transform
 from waveflow.utils import helpers
 from pathlib import Path
-import datetime, os
+import os
+from datetime import datetime
 # from jax import config
 # # config.update("jax_debug_nans", True)
 
