@@ -242,3 +242,18 @@ def plot_pdf_grid(save_dir, epoch, show_fig=False):
     else:
         plt.savefig(f'{figure_dir}/pdf_grid_epoch{epoch}.pdf')
    
+def plot_benchmark_samples(save_dir, epoch, n_grid_points=300,
+                           show_fig=False):
+    figure_dir = f"{save_dir}/figures/"
+    Path(figure_dir).mkdir(parents=True, exist_ok=True)
+    model_samples = np.load(f"{save_dir}/outputs/samples_epoch{epoch}.npy")
+    left_grid = 0.0
+    right_grid = 1.0   
+    plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
+               range=[(left_grid, right_grid), (left_grid, right_grid)]) 
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$y$")
+    if show_fig:
+        plt.show()
+    else:
+        plt.savefig(f'{figure_dir}/samples_epoch{epoch}.pdf')
