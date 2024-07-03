@@ -113,7 +113,7 @@ def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow',
     output_dir = f"{data_save_dir}/outputs/"
     if os.path.exists(output_dir):
         formatted_datetime = datetime.now().strftime("%M-%D-%H")
-        output_dir = f"{data_save_dir}/outputs/{formatted_datetime}"
+        data_save_dir = f"{data_save_dir}/{formatted_datetime}"
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     for epoch in range(1, num_epochs+1):
         split_rng, rng = random.split(rng)
@@ -121,7 +121,7 @@ def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow',
             params = get_params(opt_state)
             helpers.make_checkpoint_benchmark(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
                                  reconstruction_distances,
-                                 n_model_sample=n_model_sample, save_dir=output_dir, epoch=epoch, ngrid=ngrid)
+                                 n_model_sample=n_model_sample, save_dir=data_save_dir, epoch=epoch, ngrid=ngrid)
 
         inputs = random.permutation(split_rng, inputs)
 
