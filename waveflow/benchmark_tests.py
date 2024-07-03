@@ -117,7 +117,7 @@ def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow',
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     for epoch in range(1, num_epochs+1):
         split_rng, rng = random.split(rng)
-        if epoch % check_step == 0:# and epoch > 0:
+        if epoch % check_step == 0 or epoch == 1:
             params = get_params(opt_state)
             helpers.make_checkpoint_benchmark(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
                                  reconstruction_distances,
