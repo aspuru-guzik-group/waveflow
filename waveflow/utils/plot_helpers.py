@@ -54,10 +54,11 @@ def two_pinb_analytical():
 
 
 
-def plot_wavefunctin_2d(save_dir, epoch):
+def plot_wavefunctin_2d(save_dir, epoch, show_fig=False):
     fname = f"{save_dir}/outputs/wavefunctions_2d/values_epoch{epoch}.npy"
     sample_fname = f"{save_dir}/outputs/sample_points/values_epoch{epoch}.npy"
     save_fig_dir = f'{save_dir}/figures/eigenfunctions'
+    Path(save_fig_dir).mkdir(parents=True, exist_ok=True)
     with open(f"{save_dir}/system_info.json", "r") as system_file:
         system_dict = json.load(system_file)
     box_length = system_dict["box_length"]
@@ -101,11 +102,13 @@ def plot_wavefunctin_2d(save_dir, epoch):
         ax.set_yticks([-box_length, 0, box_length], [r"-$L$", 0, r"-$L$"])
         ax.axis([xmin, xmax, ymin, ymax])
 
-    plt.show()
-    # fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_epoch{epoch}.pdf")
+    if show_fig:
+        plt.show()
+    else:
+        fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_epoch{epoch}.pdf")
 
 
-def plot_wavefunctin_2d_multi(save_dir, epochs):
+def plot_wavefunctin_2d_multi(save_dir, epochs, show_fig=False):
     '''
     Plot many epochs together
     '''
@@ -119,6 +122,7 @@ def plot_wavefunctin_2d_multi(save_dir, epochs):
     n_space_dimension = system_dict["n_space_dimension"]
     protons, _ = physics.system_catalogue[n_space_dimension][system_name] 
     save_fig_dir = f'{save_dir}/figures/eigenfunctions'
+    Path(save_fig_dir).mkdir(parents=True, exist_ok=True)
     wavefunc_dir = f"{save_dir}/outputs/wavefunctions_2d/"
     sample_dir = f"{save_dir}/outputs/sample_points/"
 
@@ -165,8 +169,10 @@ def plot_wavefunctin_2d_multi(save_dir, epochs):
                 axs[i, j].spines[location].set_linewidth(0.01)
     fig.subplots_adjust(wspace=0.2, hspace=-0.1)
 
-    # plt.show()
-    fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_all.pdf", bbox_inches='tight')
+    if show_fig:
+        plt.show()
+    else:
+        fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_all.pdf", bbox_inches='tight')
 
 def plot_one_electron_density(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, system, ngrid=100, type='random'):
     ax.cla()

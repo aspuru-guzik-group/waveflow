@@ -171,6 +171,7 @@ def make_checkpoint_benchmark(split_rng, params, log_pdf, sample, losses, kde_kl
 
   
     output_dir = f"{save_dir}/outputs/"
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     left_grid = 0.0
     right_grid = 1.0
     n_grid_points = ngrid

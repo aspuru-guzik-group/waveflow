@@ -59,7 +59,8 @@ def get_model(model_type, spline_reg, spline_degree=3, num_knots=15,
     elif model_type == 'IFlow':
         init_fun = flows.Flow(
             flows.Serial(*(flows.IMADE(get_masked_transform(), spline_degree=spline_degree, n_internal_knots=num_knots, spline_regularization=spline_reg, reverse_fun_tol=reverse_tol), flows.Reverse()) * num_layers),
-            flows.Uniform(), prior_support=(0.0, 1.0)
+            # flows.Uniform(), prior_support=(0.0, 1.0)
+            flows.Normal(-0.5), prior_support=(0.0, 1.0)
         )
 
     elif model_type == 'MFlow':
@@ -118,7 +119,7 @@ def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow',
             params = get_params(opt_state)
             helpers.make_checkpoint_benchmark(split_rng, params, log_pdf, sample, losses, kde_kl_divergences, kde_hellinger_distances,
                                  reconstruction_distances,
-                                 n_model_sample=n_model_sample, save_dir=data_save_dir, epoch=epoch, ngrid=ngrid)
+                                 n_model_sample=n_model_sample, save_dir=output_dir, epoch=epoch, ngrid=ngrid)
 
         inputs = random.permutation(split_rng, inputs)
 
