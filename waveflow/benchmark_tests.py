@@ -109,10 +109,10 @@ def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow',
     kde_kl_divergences = []
     kde_hellinger_distances = []
     reconstruction_distances = []
-    data_save_dir = f"{save_dir}/{dataset_name}/{model_type}_{spline_reg}"
+    data_save_dir = f"{save_dir}/{dataset_name}/{model_type}_{spline_reg}_{num_flow_layer}_{num_knots}/"
     output_dir = f"{data_save_dir}/outputs/"
     if os.path.exists(output_dir):
-        formatted_datetime = datetime.now().strftime("%B-%d-%H")
+        formatted_datetime = datetime.now().strftime("%M-%D-%H")
         output_dir = f"{data_save_dir}/outputs/{formatted_datetime}"
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     for epoch in range(1, num_epochs+1):
