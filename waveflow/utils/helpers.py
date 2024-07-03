@@ -185,19 +185,23 @@ def make_checkpoint_benchmark(split_rng, params, log_pdf, sample, losses, kde_kl
     yv = np.expand_dims(yv, axis=-1)
     grid = np.concatenate([xv, yv], axis=-1)
     pdf_grid = np.exp(log_pdf(params, grid).reshape(n_grid_points, n_grid_points))
+
     np.save(f"{output_dir}/pdf_grid_epoch{epoch}.npy", pdf_grid)
 
     model_samples, original_samples = sample(split_rng, params, num_samples=n_model_sample, return_original_samples=True)
-    kde = KernelDensity(kernel='gaussian', bandwidth=0.01, rtol=0.1).fit(model_samples)
+    np.save(f"{output_dir}/samples_epoch{epoch}.npy", model_samples)
 
+    kde = KernelDensity(kernel='gaussian', bandwidth=0.01, rtol=0.1).fit(model_samples)
     log_pdf_grid_kde = kde.score_samples(grid).reshape(n_grid_points, n_grid_points)
     pdf_grid_kde = np.exp(log_pdf_grid_kde)
+    np.save(f"{output_dir}/kde_pdf_grid_epoch{epoch}.npy", pdf_grid_kde)
 
     log_pdf_grid = log_pdf(params, grid).reshape(n_grid_points, n_grid_points)
     kde_kl_divergences.append((pdf_grid * (log_pdf_grid - log_pdf_grid_kde)).mean())
     kde_hellinger_distances.append(((np.sqrt(pdf_grid) - np.sqrt(pdf_grid_kde)) ** 2).mean())
 
     _, reconstructed_samples = log_pdf(params, model_samples, return_sample=True)
+
     reconstruction_distances.append(np.linalg.norm(original_samples - reconstructed_samples, axis=-1).mean())
 
 

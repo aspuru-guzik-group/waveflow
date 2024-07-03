@@ -17,12 +17,12 @@ def get_dataset(dataset_name, n_samples, margin, rng=None):
         rng, _ = random.split(random.PRNGKey(0))
     if dataset_name == 'gaussian_mixtures':
 
-        inputs = datasets.make_blobs(center_box=(-1, 1), cluster_std=0.1, random_state=3)[0]
-        input_dim = inputs.shape[1]
+        target = datasets.make_blobs(center_box=(-1, 1), cluster_std=0.1, random_state=3)[0]
+        input_dim = target.shape[1]
         init_key, sample_key = random.split(random.PRNGKey(0))
 
         gmm = mixture.GaussianMixture(3)
-        gmm.fit(inputs)
+        gmm.fit(target)
         init_fun = flows.GMM(gmm.means_, gmm.covariances_, gmm.weights_)
         params_gt, log_pdf_gt, sample_gt = init_fun(init_key, input_dim)
         X = sample_gt(rng, params_gt, 10000)
@@ -78,13 +78,13 @@ def get_model(model_type, spline_reg, spline_degree=3, num_knots=15,
     return init_fun
 
 
-def loss(params, inputs, log_pdf):
+def loss(params, target, log_pdf):
 
-    loss_val = -log_pdf(params, inputs).mean()
+    loss_val = -log_pdf(params, target).mean()
     return loss_val
 
 
-def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow', 
+def train_model(target, num_epochs, n_model_sample, model_type='IFlow', 
                 dataset_name='halfmoon', check_step=5000, spline_reg=0.1, input_dim=2,
                 save_dir="./results/benchmarks/", ngrid=300, num_flow_layer=3,
                 spline_degree=5, num_knots=23, prior_spline_degree=3, prior_num_knots=15):
@@ -99,14 +99,14 @@ def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow',
     opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
     opt_state = opt_init(params)
 
-    def step(i, opt_state, inputs):
+    def step(i, opt_state, target):
         params = get_params(opt_state)
-        loss_val = loss(params, inputs, log_pdf)
-        gradients = grad(loss)(params, inputs, log_pdf)
+        loss_val = loss(params, target, log_pdf)
+        gradients = grad(loss)(params, target, log_pdf)
         return opt_update(i, gradients, opt_state), loss_val
     step = jit(step)
     
-    losses = [-log_pdf(params, inputs).mean()]
+    losses = [-log_pdf(params, target).mean()]
     kde_kl_divergences = []
     kde_hellinger_distances = []
     reconstruction_distances = []
@@ -130,6 +130,7 @@ def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow',
     }
     with open(f"{data_save_dir}/system_info.json", "w") as fin_sys:
         json.dump(args, fin_sys)
+    
     for epoch in range(1, num_epochs+1):
         split_rng, rng = random.split(rng)
         if epoch % check_step == 0 or epoch == 1:
@@ -138,9 +139,9 @@ def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow',
                                  reconstruction_distances,
                                  n_model_sample=n_model_sample, save_dir=data_save_dir, epoch=epoch, ngrid=ngrid)
 
-        inputs = random.permutation(split_rng, inputs)
+        target = random.permutation(split_rng, target)
 
-        opt_state, loss_val = step(epoch, opt_state, inputs)
+        opt_state, loss_val = step(epoch, opt_state, target)
         losses.append(loss_val)
         if epoch % check_step == 0:
             print(f"Epoch {epoch} | loss: {loss_val}")
