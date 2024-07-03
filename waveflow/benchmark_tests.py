@@ -6,7 +6,7 @@ from jax.example_libraries import optimizers
 from waveflow.model_factory import get_masked_transform
 from waveflow.utils import helpers
 from pathlib import Path
-import os
+import os, json
 from datetime import datetime
 # from jax import config
 # # config.update("jax_debug_nans", True)
@@ -89,6 +89,7 @@ def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow',
                 save_dir="./results/benchmarks/", ngrid=300, num_flow_layer=3,
                 spline_degree=5, num_knots=23, prior_spline_degree=3, prior_num_knots=15):
     
+    
 
     rng, flow_rng = random.split(random.PRNGKey(0))
     init_fun = get_model(model_type, spline_reg, spline_degree=spline_degree,
@@ -114,7 +115,18 @@ def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow',
     if os.path.exists(output_dir):
         formatted_datetime = datetime.now().strftime("%M-%D-%H")
         data_save_dir = f"{data_save_dir}/{formatted_datetime}"
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    Path(data_save_dir).mkdir(parents=True, exist_ok=True)
+    # save arguments
+    args = {
+        "model_type" : model_type,
+        "dataset_name": dataset_name,
+        "splines_regulation": spline_reg,
+        "flow_spline_degree": spline_degree,
+        "flow_spline_num_knots": num_knots,
+        "prior_spline_degree": prior_spline_degree,
+    }
+    with open(f"{data_save_dir}/system_info.json", "w") as fin_sys:
+        json.dump(args, fin_sys)
     for epoch in range(1, num_epochs+1):
         split_rng, rng = random.split(rng)
         if epoch % check_step == 0 or epoch == 1:
