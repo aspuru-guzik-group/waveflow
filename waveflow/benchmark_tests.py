@@ -48,7 +48,8 @@ def get_dataset(dataset_name, n_samples, margin, rng=None):
 
 
 def get_model(model_type, spline_reg, spline_degree=3, num_knots=15,
-              num_layers=5, reverse_tol=1e-6):
+              num_layers=5, reverse_tol=1e-6, prior_spline_degree=3,
+              prior_num_knots=15):
 
     if model_type == 'Flow':
         init_fun = flows.Flow(
@@ -59,15 +60,15 @@ def get_model(model_type, spline_reg, spline_degree=3, num_knots=15,
     elif model_type == 'IFlow':
         init_fun = flows.Flow(
             flows.Serial(*(flows.IMADE(get_masked_transform(), spline_degree=spline_degree, n_internal_knots=num_knots, spline_regularization=spline_reg, reverse_fun_tol=reverse_tol), flows.Reverse()) * num_layers),
-            # flows.Uniform(), prior_support=(0.0, 1.0)
-            flows.Normal(-0.5), prior_support=(0.0, 1.0)
+            flows.Uniform(), prior_support=(0.0, 1.0)
+            # flows.Normal(-0.5), prior_support=(0.0, 1.0)
         )
 
     elif model_type == 'MFlow':
         init_fun = flows.MFlow(
             flows.Serial(*(flows.IMADE(get_masked_transform(), spline_degree=spline_degree, n_internal_knots=num_knots, spline_regularization=spline_reg, reverse_fun_tol=reverse_tol), flows.Reverse()) * num_layers),
             get_masked_transform(),
-            spline_degree=3, n_internal_knots=15
+            spline_degree=prior_spline_degree, n_internal_knots=prior_num_knots
         )
 
     else:
@@ -86,12 +87,13 @@ def loss(params, inputs, log_pdf):
 def train_model(inputs, num_epochs, n_model_sample, model_type='IFlow', 
                 dataset_name='halfmoon', check_step=5000, spline_reg=0.1, input_dim=2,
                 save_dir="./results/benchmarks/", ngrid=300, num_flow_layer=3,
-                spline_degree=5, num_knots=23):
+                spline_degree=5, num_knots=23, prior_spline_degree=3, prior_num_knots=15):
     
 
     rng, flow_rng = random.split(random.PRNGKey(0))
     init_fun = get_model(model_type, spline_reg, spline_degree=spline_degree,
-                         num_layers=num_flow_layer, num_knots=num_knots)
+                         num_layers=num_flow_layer, num_knots=num_knots, 
+                         prior_spline_degree=prior_spline_degree, prior_num_knots=prior_num_knots)
     params, log_pdf, sample = init_fun(flow_rng, input_dim)
     opt_init, opt_update, get_params = optimizers.adam(step_size=1e-4)
     opt_state = opt_init(params)
