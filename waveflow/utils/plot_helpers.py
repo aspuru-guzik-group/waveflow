@@ -96,16 +96,16 @@ def plot_wavefunctin_2d(save_dir, epoch, show_fig=False):
         xmin, xmax, ymin, ymax = x.min(), x.max(), y.min(), y.max()
         ax.plot([0,0],[ymin, ymax], c="grey", ls='--', lw=1, alpha=0.5)
         ax.plot([xmin, xmax], [0,0], c="grey", ls='--', lw=1, alpha=0.5)
-        ax.set_xlabel(r"$x_0$")
-        ax.set_ylabel(r"$x_1$")
-        ax.set_xticks([-box_length, 0, box_length], [r"-$L$", 0, r"-$L$"])
-        ax.set_yticks([-box_length, 0, box_length], [r"-$L$", 0, r"-$L$"])
+        ax.set_xlabel(r"$x_0$", fontsize="xx-large")
+        ax.set_ylabel(r"$x_1$", fontsize="xx-large")
+        ax.set_xticks([-box_length, 0, box_length], [r"-$L$", 0, r"-$L$"], fontsize='xx-large')
+        ax.set_yticks([-box_length, 0, box_length], [r"-$L$", 0, r"-$L$"], fontsize='xx-large')
         ax.axis([xmin, xmax, ymin, ymax])
 
     if show_fig:
         plt.show()
     else:
-        fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_epoch{epoch}.pdf")
+        fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_epoch{epoch}.pdf",  bbox_inches='tight')
 
 
 def plot_wavefunctin_2d_multi(save_dir, epochs, show_fig=False):
@@ -252,11 +252,16 @@ def plot_benchmark_samples(save_dir, epoch, n_grid_points=300,
         model_samples = np.load(sample_file)
     left_grid = 0.0
     right_grid = 1.0   
-    plt.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
+    fig, ax = plt.subplots() 
+    ax.set_aspect('equal', adjustable='box')
+
+    h, x, y, p = ax.hist2d(model_samples[:, 0], model_samples[:, 1], bins=n_grid_points,
+              density=True, 
                range=[(left_grid, right_grid), (left_grid, right_grid)]) 
-    plt.xlabel(r"$x$")
-    plt.ylabel(r"$y$")
+    plt.imshow(h, origin = "lower", interpolation = "gaussian")
+    ax.set_xlabel(r"$x$")
+    ax.set_ylabel(r"$y$")
     if show_fig:
         plt.show()
     else:
-        plt.savefig(f'{figure_dir}/samples_epoch{epoch}.pdf')
+        fig.savefig(f'{figure_dir}/samples_epoch{epoch}.pdf', bbox_inches='tight')
