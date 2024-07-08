@@ -52,7 +52,7 @@ def bspline(x, t, c, k, cached_bases=None):
 def BSpline_fun():
 
    def init_fun(rng, k, n_internal_knots, cardinal_splines=True, use_cached_bases=True,
-                cached_bases_path_root='./splines/cached_bases/B/', n_mesh_points=1000,
+                cached_bases_path_root='./cached_splines_bases/B/', n_mesh_points=1000,
                 constraints_dict_left={0: 0}, constraints_dict_right={0:0}):
 
       internal_knots = onp.linspace(0, 1, n_internal_knots)
@@ -217,7 +217,7 @@ if __name__ == '__main__':
     init_fun_b = BSpline_fun()
     params_b, apply_fun_vec_b, apply_fun_vec_grad_b, sample_fun_vec_b, knots_b, enforce_boundary_conditions_b = \
         init_fun_b(rng, k, n_internal_knots, cardinal_splines=True, use_cached_bases=True,
-                   cached_bases_path_root='../splines/cached_bases/B/',
+                   cached_bases_path_root='../cached_splines_bases/B/',
                    constraints_dict_left={0: 0, 2: 0}, constraints_dict_right={0:0, 2:0})
 
     # params_m = np.ones_like(params_m)

@@ -84,7 +84,7 @@ def ispline(x, t, c, k, zero_border=True, cached_bases_dict=None):
 def ISpline_fun():
 
    def init_fun(rng, k, n_internal_knots, cardinal_splines=True, zero_border=True, reverse_fun_tol=None,
-                use_cached_bases=True, cached_bases_path_root='./splines/cached_bases/I/', n_mesh_points=1000,
+                use_cached_bases=True, cached_bases_path_root='./cached_splines_bases/I/', n_mesh_points=1000,
                 constraints_dict_left={0: 0.0}, constraints_dict_right={0: 1.0}):
       if reverse_fun_tol is None:
          reverse_fun_tol = 1/n_mesh_points
