@@ -68,8 +68,9 @@ def create_checkpoint_wavefunc(rng, save_dir, psi, sample, params, epoch, loss, 
     sorted_coordinates = np.sort(x, axis=-1)
     z = psi(params, sorted_coordinates)
     z = z * ((-1) ** (inversion_count))
-    res = np.array([x, z])
-    np.save(f"{one_elec_density_dir}/random_epoch{epoch}.npy", res)
+    # res = np.array([x, z])
+    np.save(f"{one_elec_density_dir}/random_values_epoch{epoch}.npy", z)
+    np.save(f"{one_elec_density_dir}/random_coord_epoch{epoch}.npy", x)
     # on proton
     x = np.ones((1, n_particle*n_space_dimension)) * protons[0]
     x = np.repeat(x, ngrid, axis=0)
@@ -78,8 +79,9 @@ def create_checkpoint_wavefunc(rng, save_dir, psi, sample, params, epoch, loss, 
     sorted_coordinates = np.sort(x, axis=-1)
     z = psi(params, sorted_coordinates)
     z = z * ((-1) ** (inversion_count))
-    res = np.array([x, z])
-    np.save(f"{one_elec_density_dir}/onproton_epoch{epoch}.npy", res)
+    # res = np.array([x, z])
+    np.save(f"{one_elec_density_dir}/onproton_values_epoch{epoch}.npy", z)
+    np.save(f"{one_elec_density_dir}/onproton_coord_epoch{epoch}.npy", x)
 
     # save sample points
     sample_dir = f"{save_dir}/outputs/sample_points/"
