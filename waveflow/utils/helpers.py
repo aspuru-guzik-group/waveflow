@@ -49,7 +49,6 @@ def create_checkpoint_wavefunc(rng, save_dir, psi, sample, params, epoch, loss, 
     protons, _ = physics.system_catalogue[n_space_dimension][system_name] 
 
     # save wavefunction
-    # 1. plot output
     wavefunc_2d_dir = f"{save_dir}/outputs/wavefunctions_2d/"
     y, x = np.meshgrid(np.linspace(-box_length, box_length, ngrid), np.linspace(-box_length, box_length, ngrid))
     coordinates = np.stack([x, y], axis=-1).reshape(-1, 2)
@@ -69,7 +68,8 @@ def create_checkpoint_wavefunc(rng, save_dir, psi, sample, params, epoch, loss, 
     sorted_coordinates = np.sort(x, axis=-1)
     z = psi(params, sorted_coordinates)
     z = z * ((-1) ** (inversion_count))
-    np.save(f"{one_elec_density_dir}/random_epoch{epoch}.npy", z)
+    res = np.array([x, z])
+    np.save(f"{one_elec_density_dir}/random_epoch{epoch}.npy", res)
     # on proton
     x = np.ones((1, n_particle*n_space_dimension)) * protons[0]
     x = np.repeat(x, ngrid, axis=0)
@@ -78,7 +78,8 @@ def create_checkpoint_wavefunc(rng, save_dir, psi, sample, params, epoch, loss, 
     sorted_coordinates = np.sort(x, axis=-1)
     z = psi(params, sorted_coordinates)
     z = z * ((-1) ** (inversion_count))
-    np.save(f"{one_elec_density_dir}/onproton_epoch{epoch}.npy", z)
+    res = np.array([x, z])
+    np.save(f"{one_elec_density_dir}/onproton_epoch{epoch}.npy", res)
 
     # save sample points
     sample_dir = f"{save_dir}/outputs/sample_points/"

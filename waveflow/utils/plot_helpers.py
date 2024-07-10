@@ -174,57 +174,41 @@ def plot_wavefunctin_2d_multi(save_dir, epochs, show_fig=False):
     else:
         fig.savefig(f"{save_fig_dir}/wavefunc2d_{system_name}_L{box_length}_all.pdf", bbox_inches='tight')
 
-def plot_one_electron_density(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, system, ngrid=100, type='random'):
-    ax.cla()
-    if type == 'random':
-        x = sample(rng, weight_dict, 1)
-        x = np.repeat(x, ngrid, axis=0)
-        x = x.at[:, 0].set(np.linspace(-box_length, box_length, ngrid))
 
-        inversion_count = get_num_inversion_count(x)
-        sorted_coordinates = np.sort(x, axis=-1)
-        z = psi(weight_dict, sorted_coordinates)
-        z = z * ((-1) ** (inversion_count))
+def plot_one_electron_density(epoch, save_dir, plot_type='random', show_fig=False):
+ 
 
-        zmax = np.abs(z.max())
+    with open(f"{save_dir}/system_info.json", "r") as system_file:
+        system_dict = json.load(system_file)
+    box_length = system_dict["box_length"]
+    n_particle = system_dict["n_particle"]
+    system_name = system_dict["system_name"]
+    n_space_dimension = system_dict["n_space_dimension"]
+    protons, _ = physics.system_catalogue[n_space_dimension][system_name] 
+    save_fig_dir = f'{save_dir}/figures/electron_density/'
+
+    fig, ax = plt.subplots()
+    if plot_type == 'random':
+        data = np.load(f"{save_dir}/outputs/density_1e/random_epoch{epoch}.npy")
+        x = data[0]
+        z = data[1]
         ax.vlines(x[0, 1], -0.1 * zmax, 0.1 * zmax, colors='r')
         ax.grid(True)
         ax.plot(x, z, label='Wavefuntion')
 
-    if type == 'on_proton':
-        x = np.ones((1, n_particle*n_space_dimension)) * protons[0]
-        x = np.repeat(x, ngrid, axis=0)
-        x = x.at[:, 0].set(np.linspace(-box_length, box_length, ngrid))
-
-        inversion_count = get_num_inversion_count(x)
-        sorted_coordinates = np.sort(x, axis=-1)
-        z = psi(weight_dict, sorted_coordinates)
-        z = z * ((-1) ** (inversion_count))
-
+    if plot_type == 'on_proton':
+        data = np.load(f"{save_dir}/outputs/density_1e/onproton_epoch{epoch}.npy")
+        x = data[0]
+        z = data[1]
         zmax = np.abs(z.max())
         ax.vlines(protons[0], -0.1*zmax, 0.1*zmax, colors='r')
         ax.grid(True)
         ax.plot(x, z, label='Wavefuntion')
 
-
-# def plot_electron_density(rng, psi, sample, weight_dict, protons, box_length, fig, ax, n_particle, n_space_dimension, system, ngrid=100, type='estimate'):
-#     ax.cla()
-#     num_points = 100
-#     x = np.linspace(-box_length, box_length, ngrid)
-#     sample_points = sample(rng, weight_dict, num_points, partial_values_idx=0, partial_values=x)
-
-#     inversion_count = get_num_inversion_count(sample_points)
-#     sorted_coordinates = np.sort(sample_points, axis=-1)
-#     z = psi(weight_dict, sorted_coordinates)
-#     z = z * ((-1) ** (inversion_count))
-#     z = z**2
-#     z = z.reshape(num_points, x.shape[0])
-#     z = z.mean(0)
-
-#     zmax = z.max()
-#     ax.grid(True)
-#     ax.vlines(protons[0], 0, 0.1 * zmax, colors='r')
-#     ax.plot(x, z)
+    if show_fig:
+        plt.show() 
+    else:
+        fig.savefig(f"{save_fig_dir}/{plot_type}_epoch{epoch}.pdf", bbox_inches='tight')
 
 
 def plot_pdf_grid(save_dir, epoch, show_fig=False):
@@ -240,7 +224,7 @@ def plot_pdf_grid(save_dir, epoch, show_fig=False):
     if show_fig:
         plt.show()
     else:
-        plt.savefig(f'{figure_dir}/pdf_grid_epoch{epoch}.pdf')
+        plt.savefig(f'{figure_dir}/pdf_grid_epoch{epoch}.pdf', bbox_inches='tight')
    
 def plot_benchmark_samples(save_dir, epoch, n_grid_points=300,
                            show_fig=False, sample_file=None):
