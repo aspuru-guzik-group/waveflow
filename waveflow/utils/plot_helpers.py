@@ -53,6 +53,39 @@ def two_pinb_analytical():
     plt.savefig('./figures/two_particles_in_box_analytically.png')
 
 
+def two_elec_inbox_center(length=1, show_plot=False, save_dir="./figures/"):
+
+    n_grid_points = 200
+    x = np.linspace(-length, length, n_grid_points)
+    y = np.linspace(-length, length, n_grid_points)
+
+    xv, yv = np.meshgrid(x, y)
+    xv, yv = xv.reshape(-1), yv.reshape(-1)
+    xv = np.expand_dims(xv, axis=-1)
+    yv = np.expand_dims(yv, axis=-1)
+
+    grid = np.concatenate([xv, yv], axis=-1)
+
+    # psi, pdf, dpdf, cdf = get_particle_in_the_box_fns(length, 3)
+    # psi2, pdf2, dpdf2, cdf2 = get_particle_in_the_box_fns(length, 4)
+    n = 1
+    psi = lambda x: np.cos(x * np.pi * n / (2*length))
+    psi2 = lambda x: np.sin(x * np.pi * (n+1) / (2*length))
+
+    two_particle_in_box = lambda grid: psi(grid[:,0])*psi2(grid[:,1]) - psi(grid[:,1])*psi2(grid[:,0])
+    psi_grid = two_particle_in_box(grid).reshape(n_grid_points,n_grid_points)
+
+    fig, ax = plt.subplots()
+    ax.pcolormesh(x, y, psi_grid, cmap='RdBu', vmin=psi_grid.min(), vmax=psi_grid.max())
+    # plt.tight_layout()
+    ax.set_yticklabels([])
+    ax.set_xticklabels([])
+
+    if show_plot:
+        plt.show()
+    else:
+        plt.savefig(f'{save_dir}/two_electrons_in_box.pdf')
+
 
 def plot_wavefunctin_2d(save_dir, epoch, show_fig=False):
     fname = f"{save_dir}/outputs/wavefunctions_2d/values_epoch{epoch}.npy"
