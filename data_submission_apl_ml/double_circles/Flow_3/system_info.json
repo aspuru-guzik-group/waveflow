@@ -1,0 +1,1 @@
+{"model_type": "Flow", "dataset_name": "circles", "splines_regulation": 0.05, "flow_spline_degree": 5, "flow_spline_num_knots": 15, "prior_spline_degree": 5}
