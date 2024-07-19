@@ -1,7 +1,7 @@
 # waveflow
 A boundary-conditioned normalizing flows for electronic structures, and more!
 
-Authors: Luca Thiede and Chong Sun [Email](sunchong137@gmail.com)
+Authors: Luca Thiede and Chong Sun (Email: [sunchong137@gmail.com](mailto:sunchong137@gmail.com))
 
 ## Getting started
 Create a new conda environment (default name `waveflow`) by
